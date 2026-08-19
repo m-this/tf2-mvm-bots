@@ -1513,6 +1513,55 @@ float[] GetAbsAngles(int entity)
 	return vec;
 }
 
+/* The whole bomb path: the travel distance to the hatch from the far end of it
+
+Spawn areas are left out because they carry no distance to the hatch, so the far end this finds is
+the first area the robots walk into rather than the room they walk out of */
+float BombPathLength()
+{
+	int iAreaCount = TheNavAreas.Count;
+	float longest = 0.0;
+
+	for (int i = 0; i < iAreaCount; i++)
+	{
+		CTFNavArea area = view_as<CTFNavArea>(TheNavAreas.Get(i));
+
+		if (area == NULL_AREA)
+			continue;
+
+		if (area.HasAttributeTF(BLUE_SPAWN_ROOM) || area.HasAttributeTF(RED_SPAWN_ROOM))
+			continue;
+
+		longest = MaxFloat(longest, GetTravelDistanceToBombTarget(area));
+	}
+
+	return longest;
+}
+
+/* How far from the hatch an engineer may nest, in travel distance
+
+A fraction of the bomb path rather than a number of units. The path is a few thousand units on
+Decoy and several times that on Rottenburg, and the same number of units is a defensible choke on
+one map and the robots' spawn door on the other.
+
+An engineer is worth more than the ground it holds: a nest at the front collapses to the first
+giant that walks into it, and the wave then runs at a team with no sentry for the rest of it.
+Nesting back means the sentry is still alive when the bomb reaches the ground that matters.
+
+Zero when the map has no bomb path to measure, and the caller then takes what it can get */
+float NestDistanceLimit()
+{
+	float length = BombPathLength();
+
+	if (length <= 0.0)
+		return 0.0;
+
+	return length * redbots_manager_engineer_nest_depth.FloatValue;
+}
+
+//A nest on top of the hatch has nothing in front of it to shoot at
+#define NEST_HATCH_CLEARANCE 180.0
+
 CNavArea PickBuildArea(int client, float SentryRange = 1300.0)
 {
 	int iAreaCount = TheNavAreas.Count;
@@ -1551,6 +1600,10 @@ CNavArea PickBuildArea(int client, float SentryRange = 1300.0)
 	ArrayList ForwardAreas        = new ArrayList();
 	//Areas visible to the bomb but not nescessarily forward of it.
 	ArrayList VisibleAreasAround  = new ArrayList();
+	//Any of the above, but further up the path than an engineer should nest.
+	ArrayList AreasTooFarUp       = new ArrayList();
+
+	float limit = NestDistanceLimit();
 	
 	//Loop all nav areas
 	for (int i = 0; i < iAreaCount; i++)
@@ -1573,8 +1626,17 @@ CNavArea PickBuildArea(int client, float SentryRange = 1300.0)
 		float m_flBombTargetDistanceAtArea = GetTravelDistanceToBombTarget(area);
 		float m_flBombTargetDistanceAtBomb = GetTravelDistanceToBombTarget(bombArea);
 		
-		if (m_flBombTargetDistanceAtArea < 180.0)
+		if (m_flBombTargetDistanceAtArea < NEST_HATCH_CLEARANCE)
 			continue;
+
+		/* Further up the path than an engineer nests. Kept, because the bomb spends the start of
+		every wave up there and this is where the forward lists would otherwise be empty: better a
+		nest too far forward than an engineer that never builds one */
+		if (limit > 0.0 && m_flBombTargetDistanceAtArea > limit)
+		{
+			AreasTooFarUp.Push(area);
+			continue;
+		}
 		
 		float areaCenter[3]; area.GetCenter(areaCenter);
 		areaCenter[2] += 50.0;
@@ -1602,21 +1664,35 @@ CNavArea PickBuildArea(int client, float SentryRange = 1300.0)
 		}
 	}
 	
-	PrintToServer("PickBuildArea %i ForwardVisibleAreas | %i ForwardAreas | %i VisibleAreasAroundBomb", ForwardVisibleAreas.Length, ForwardAreas.Length, VisibleAreasAround.Length);
-	
 	CNavArea randomArea = NULL_AREA;
 	
 	if (ForwardVisibleAreas.Length     > 0) randomArea = ForwardVisibleAreas.Get(GetRandomInt(0, ForwardVisibleAreas.Length - 1));
 	else if (ForwardAreas.Length       > 0) randomArea =        ForwardAreas.Get(GetRandomInt(0, ForwardAreas.Length        - 1));
 	else if (VisibleAreasAround.Length > 0) randomArea =  VisibleAreasAround.Get(GetRandomInt(0, VisibleAreasAround.Length  - 1));
+	else if (AreasTooFarUp.Length      > 0) randomArea =       AreasTooFarUp.Get(GetRandomInt(0, AreasTooFarUp.Length       - 1));
+	
+	if (redbots_manager_debug.BoolValue)
+		PrintToServer("PickBuildArea %i ForwardVisibleAreas | %i ForwardAreas | %i VisibleAreasAroundBomb | %i AreasTooFarUp", ForwardVisibleAreas.Length, ForwardAreas.Length, VisibleAreasAround.Length, AreasTooFarUp.Length);
 	
 	ForwardVisibleAreas.Close();
 	ForwardAreas.Close();
 	VisibleAreasAround.Close();
+	AreasTooFarUp.Close();
 	
 	return randomArea;
 }
 
+/* Where an engineer nests before a wave begins
+
+There is no bomb yet, so the hatch is what there is to measure from: the areas on the bomb path
+within nesting distance of it, preferring the ones close enough to see it, which is the ground the
+robots have to cross last and the ground worth holding.
+
+It used to anchor on the robots' spawn door and put the sentry in front of that. That reads well
+and plays badly. The nest meets the whole wave at full strength with no team around it yet, the
+first giant walks through it, and the engineer spends the rest of the wave rebuilding somewhere
+behind while the team fights without a sentry. On a short map like Decoy the door is also most of
+the map away from anything that needs defending */
 CNavArea PickBuildAreaPreRound(int client, float SentryRange = 1300.0)
 {
 	int iAreaCount = TheNavAreas.Count;
@@ -1624,150 +1700,69 @@ CNavArea PickBuildAreaPreRound(int client, float SentryRange = 1300.0)
 	//Check that this map has any nav areas
 	if (iAreaCount <= 0)
 		return NULL_AREA;
-	
-	ArrayList EnemySpawnExits = new ArrayList();	
 
-	//Collect enemy exit areas after spawn door.
+	float limit = NestDistanceLimit();
+	float hatch[3]; hatch = GetBombHatchPosition();
+	hatch[2] += 40.0;
+
+	//Near enough to the hatch to nest, and with a line to it
+	ArrayList CoveringAreas = new ArrayList();
+	//Near enough to nest, seeing the hatch or not
+	ArrayList NestingAreas  = new ArrayList();
+	//On the path, but further up it than an engineer should nest
+	ArrayList AreasTooFarUp = new ArrayList();
+
 	for (int i = 0; i < iAreaCount; i++)
 	{
 		CTFNavArea area = view_as<CTFNavArea>(TheNavAreas.Get(i));
-		
+
 		if (area == NULL_AREA)
 			continue;
-		
-		//BLOCKED
+
+		if (area.HasAttributeTF(BLUE_SPAWN_ROOM) || area.HasAttributeTF(RED_SPAWN_ROOM))
+			continue;
+
 		if (area.HasAttributeTF(BLOCKED))
 			continue;
-		
-		//BLOCKED
-		if (area.HasAttributeTF(BLOCKED_AFTER_POINT_CAPTURE))
-			continue;
-		
-		//BLOCKED
-		if (area.HasAttributeTF(BLOCKED_UNTIL_POINT_CAPTURE))
-			continue;
-		
-		//Area in spawn but not an exit
-		if (GetTravelDistanceToBombTarget(area) <= 0.0 && !area.HasAttributeTF(SPAWN_ROOM_EXIT))
-			continue;
-		
-		//Area not an enemy spawn room exit
-		if (GetPlayerEnemyTeam(client) == TFTeam_Blue && !area.HasAttributeTF(BLUE_SPAWN_ROOM))
-			continue;
-		
-		//Area not an enemy spawn room exit
-		if (GetPlayerEnemyTeam(client) == TFTeam_Red && !area.HasAttributeTF(RED_SPAWN_ROOM))
-			continue;
-		
-		float flLowestBombTargetDistance = 999999.0;
-		CNavArea bestConnection = NULL_AREA;
-		
-		//Check spawn exit connections 
-		for (NavDirType dir = NORTH; dir < NUM_DIRECTIONS; dir++)
-		{			
-			//Only connections with BOMB_DROP attribute are considered good.
-			for (int iConnection = 0; iConnection < area.GetAdjacentCount(dir); iConnection++)
-			{			
-				CTFNavArea adjArea = area.GetAdjacentArea(dir, iConnection);
-				
-				//Area still in spawn... BAD
-				if (adjArea.HasAttributeTF(BLUE_SPAWN_ROOM) || adjArea.HasAttributeTF(RED_SPAWN_ROOM))
-					continue;
-				
-				float flBombTargetDistance = GetTravelDistanceToBombTarget(adjArea);
-				
-				//Area most likely in spawn
-				if (flBombTargetDistance <= 0.0)
-					continue;
-				
-				if (flBombTargetDistance <= flLowestBombTargetDistance)
-				{
-					bestConnection = adjArea;
-					flLowestBombTargetDistance = flBombTargetDistance;
-				}
-			}
-		}
-		
-		if (bestConnection != NULL_AREA)
-		{
-			EnemySpawnExits.Push(bestConnection);
-			//g_hAreasToDraw.Push(bestConnection);
-		}
-	}
-	
-	//We've failed men.
-	if (EnemySpawnExits.Length <= 0)
-	{
-		EnemySpawnExits.Close();
-		return NULL_AREA;
-	}
-	
-	//Random valid exit point.
-	CNavArea RandomEnemySpawnExit = EnemySpawnExits.Get(GetRandomInt(0, EnemySpawnExits.Length - 1));
-	
-	EnemySpawnExits.Close();
-	
-	//Search outward of the random exit untill we are some distance away.
-	float vecExitCenter[3];
-	RandomEnemySpawnExit.GetCenter(vecExitCenter);
-	vecExitCenter[2] += 45.0;
-	
-	//PrintToServer("%f %f %f", vecExitCenter[0], vecExitCenter[1], vecExitCenter[2]);
 
-	ArrayList AreasCloser                  = new ArrayList();	//Not necessarily visible but still <= 3000.0
-	ArrayList VisibleAreas                 = new ArrayList();
-	ArrayList VisibleAreasAfterSentryRange = new ArrayList();	//>= SentryRange
-	
-	for (int i = 0; i < iAreaCount; i++)
-	{
-		CTFNavArea area = view_as<CTFNavArea>(TheNavAreas.Get(i));
-		
-		if (area == NULL_AREA)
-			continue;
-		
-		if (area.HasAttributeTF((BLUE_SPAWN_ROOM | RED_SPAWN_ROOM)))
-			continue;
-		
 		//TODO
 		//Better solution because this will break on all non mvm maps.
 		if (!area.HasAttributeTF(BOMB_DROP))
 			continue;
-			
-		float center[3]; area.GetCenter(center);
-		
-		float flDistance = GetVectorDistance(center, vecExitCenter);
-		
-		if (flDistance <= SentryRange)
-			AreasCloser.Push(area);
-		
-		if (!area.IsEntirelyVisible(vecExitCenter))
+
+		float distance = GetTravelDistanceToBombTarget(area);
+
+		if (distance < NEST_HATCH_CLEARANCE)
 			continue;
-		
-		if (flDistance > (SentryRange * 0.75) && flDistance <= SentryRange * 1.25)
+
+		if (limit > 0.0 && distance > limit)
 		{
-			VisibleAreasAfterSentryRange.Push(area);
-			//g_hAreasToDraw.Push(area);
+			AreasTooFarUp.Push(area);
+			continue;
 		}
-		
-		if (flDistance <= SentryRange)
-			VisibleAreasAfterSentryRange.Push(area);
-		
-		VisibleAreas.Push(area);
+
+		NestingAreas.Push(area);
+
+		float center[3]; area.GetCenter(center);
+		center[2] += 50.0;
+
+		if (GetVectorDistance(center, hatch) <= SentryRange && area.IsEntirelyVisible(hatch))
+			CoveringAreas.Push(area);
 	}
-	
-	//PrintToServer("PickBuildAreaPreRound %i VisibleAreas | %i VisibleAreasAfterSentryRange | %i AreasCloser", VisibleAreas.Length, VisibleAreasAfterSentryRange.Length, AreasCloser.Length);
-	
+
 	CNavArea bestArea = NULL_AREA;
-	
-	if (VisibleAreasAfterSentryRange.Length > 0) bestArea = VisibleAreasAfterSentryRange.Get(GetRandomInt(0, VisibleAreasAfterSentryRange.Length - 1));
-	else if (VisibleAreas.Length > 0)            bestArea =                 VisibleAreas.Get(GetRandomInt(0, VisibleAreas.Length                 - 1));
-	else if (AreasCloser.Length > 0)             bestArea =                  AreasCloser.Get(GetRandomInt(0, AreasCloser.Length                  - 1));
-	
-	AreasCloser.Close();
-	VisibleAreas.Close();
-	VisibleAreasAfterSentryRange.Close();
-	
-	//DrawArea(bestArea, false, 6.0);
+
+	if (CoveringAreas.Length > 0)       bestArea = CoveringAreas.Get(GetRandomInt(0, CoveringAreas.Length - 1));
+	else if (NestingAreas.Length > 0)   bestArea =  NestingAreas.Get(GetRandomInt(0, NestingAreas.Length  - 1));
+	else if (AreasTooFarUp.Length > 0)  bestArea = AreasTooFarUp.Get(GetRandomInt(0, AreasTooFarUp.Length - 1));
+
+	if (redbots_manager_debug.BoolValue)
+		PrintToServer("PickBuildAreaPreRound %i CoveringAreas | %i NestingAreas | %i AreasTooFarUp", CoveringAreas.Length, NestingAreas.Length, AreasTooFarUp.Length);
+
+	CoveringAreas.Close();
+	NestingAreas.Close();
+	AreasTooFarUp.Close();
+
 	return bestArea;
 }
 

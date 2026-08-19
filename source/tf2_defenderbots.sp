@@ -161,6 +161,7 @@ ConVar redbots_manager_defender_team_size;
 ConVar redbots_manager_ready_cooldown;
 ConVar redbots_manager_keep_bot_upgrades;
 ConVar redbots_manager_bot_upgrade_interval;
+ConVar redbots_manager_engineer_nest_depth;
 ConVar redbots_manager_bot_use_upgrades;
 ConVar redbots_manager_bot_buyback_chance;
 ConVar redbots_manager_bot_buy_upgrades_chance;
@@ -238,6 +239,7 @@ public void OnPluginStart()
 	redbots_manager_ready_cooldown = CreateConVar("sm_redbots_manager_ready_cooldown", "30.0", _, FCVAR_NOTIFY, true, 0.0);
 	redbots_manager_keep_bot_upgrades = CreateConVar("sm_redbots_manager_keep_bot_upgrades", "0", _, FCVAR_NOTIFY);
 	redbots_manager_bot_upgrade_interval = CreateConVar("sm_redbots_manager_bot_upgrade_interval", "0.1", _, FCVAR_NOTIFY);
+	redbots_manager_engineer_nest_depth = CreateConVar("sm_redbots_manager_engineer_nest_depth", "0.4", "How far up the bomb path an engineer will build, as a fraction of the whole path measured from the hatch. 1.0 is the robots' spawn door.", FCVAR_NOTIFY, true, 0.05, true, 1.0);
 	redbots_manager_bot_use_upgrades = CreateConVar("sm_redbots_manager_bot_use_upgrades", "1", "Enable bots to buy upgrades.", FCVAR_NOTIFY);
 	redbots_manager_bot_buyback_chance = CreateConVar("sm_redbots_manager_bot_buyback_chance", "5", "Chance for bots to buyback into the game.", FCVAR_NOTIFY);
 	redbots_manager_bot_buy_upgrades_chance = CreateConVar("sm_redbots_manager_bot_buy_upgrades_chance", "50", "Chance for bots to buy upgrades in the middle of a game.", FCVAR_NOTIFY);
