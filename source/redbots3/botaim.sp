@@ -301,7 +301,7 @@ methodmap BotAim
 				else if (myWeaponID == TF_WEAPON_ROCKETLAUNCHER || myWeaponID == TF_WEAPON_DIRECTHIT || myWeaponID == TF_WEAPON_PARTICLE_CANNON)
 				{
 					float vecTarget[3], vecActor[3];
-					vecTarget = GetAbsOrigin(target_ent);
+					vecTarget = ShouldAimRocketsAtFeet(this.index, target_ent, myWeaponID) ? GetAbsOrigin(target_ent) : WorldSpaceCenter(target_ent);
 					vecActor = GetAbsOrigin(this.index);
 					
 					float flDistance = GetVectorDistance(vecTarget, vecActor);
@@ -316,7 +316,7 @@ methodmap BotAim
 						target_point[1] = vecTarget[1] + AbsVelocity[1] * flDistance;
 						target_point[2] = vecTarget[2] + AbsVelocity[2] * flDistance;
 						
-						//If we can't shoot at the feet shoot at the center.
+						//If we can't shoot at what we picked, shoot at the center.
 						if (!TF2_IsLineOfFireClear2(this.index, target_point))
 						{
 							vecTarget = WorldSpaceCenter(target_ent);
@@ -858,3 +858,25 @@ bool IsExplosiveProjectileWeapon(int weapon)
 	return false;
 }
 #endif
+
+
+/* Whether a rocket is worth putting on the ground under a robot rather than into it
+
+The ground is where splash comes from, and splash is worth having when there is a crowd standing
+in it: three commons walking a choke all take the hit, and none of them had to be hit.
+
+It is worth nothing against one target. A rocket into the body does its full damage where the same
+rocket at the feet does the falloff, and a giant is a wide slow target the bot hits without any
+help from the ground. The Direct Hit never wants the ground at all: its splash is a third the size
+and its reward for connecting is triple damage */
+bool ShouldAimRocketsAtFeet(int client, int target, int weaponID)
+{
+	if (weaponID == TF_WEAPON_DIRECTHIT)
+		return false;
+	
+	if (TF2_IsMiniBoss(target))
+		return false;
+	
+	//The rocket splash radius, which is the ground this shot would cover
+	return CountEnemiesNearPosition(client, GetAbsOrigin(target), 146.0) > 1;
+}

@@ -731,6 +731,30 @@ bool CanWeaponAirblast(int weapon)
 	return TF2Attrib_HookValueInt(0, "airblast_disabled", weapon) == 0;
 }
 
+/* How many live enemies stand within radius of a point
+
+Counts the robot at the point too, so one alone answers one. Used to decide whether a rocket is
+worth aiming at the ground: splash pays when it catches a crowd and costs damage when it does not */
+int CountEnemiesNearPosition(int client, const float origin[3], float radius)
+{
+	int count = 0;
+	TFTeam enemyTeam = GetPlayerEnemyTeam(client);
+	
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || !IsPlayerAlive(i))
+			continue;
+		
+		if (TF2_GetClientTeam(i) != enemyTeam)
+			continue;
+		
+		if (GetVectorDistance(WorldSpaceCenter(i), origin) <= radius)
+			count++;
+	}
+	
+	return count;
+}
+
 int FindEnemyNearestToMe(int client, const float max_distance, bool bGiantsOnly = false, bool bIgnoreUber = false, bool bStunnedOnly = false, TFClassType class = TFClass_Unknown)
 {
 	float origin[3]; origin = WorldSpaceCenter(client);
