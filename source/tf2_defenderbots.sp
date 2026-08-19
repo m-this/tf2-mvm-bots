@@ -368,6 +368,7 @@ public void OnMapStart()
 	
 	Config_LoadMap();
 	Config_LoadBotNames();
+	Config_LoadServerLoadout();
 	CreateBotPreferenceMenu();
 }
 

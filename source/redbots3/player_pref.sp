@@ -22,6 +22,42 @@ int g_iPlayerForcedPref = -1;
 char g_sPlayerPrefPath[PLATFORM_MAX_PATH];
 static KeyValues m_kvPlayerPrefData;
 
+/* A loadout the server sets for every bot, from configs/defenderbots/loadout.cfg
+When the file exists it decides every slot: a slot it leaves out keeps the stock weapon,
+and the players' own preferences are not consulted */
+static KeyValues m_kvServerLoadout;
+
+void Config_LoadServerLoadout()
+{
+	delete m_kvServerLoadout;
+
+	char filePath[PLATFORM_MAX_PATH]; BuildPath(Path_SM, filePath, sizeof(filePath), "configs/defenderbots/loadout.cfg");
+
+	if (!FileExists(filePath))
+		return;
+
+	m_kvServerLoadout = new KeyValues("loadout");
+
+	if (!m_kvServerLoadout.ImportFromFile(filePath))
+	{
+		LogError("Config_LoadServerLoadout: Could not read %s!", filePath);
+		delete m_kvServerLoadout;
+	}
+}
+
+static int GetServerLoadoutWeapon(const char[] class, const char[] slot)
+{
+	m_kvServerLoadout.Rewind();
+
+	if (!m_kvServerLoadout.JumpToKey(class))
+		return TF_ITEMDEF_DEFAULT;
+
+	int weaponIndex = m_kvServerLoadout.GetNum(slot, TF_ITEMDEF_DEFAULT);
+	m_kvServerLoadout.Rewind();
+
+	return weaponIndex;
+}
+
 static Action Timer_SavePrefData(Handle timer)
 {
 	if (!m_kvPlayerPrefData.ExportToFile(g_sPlayerPrefPath))
@@ -133,6 +169,9 @@ int GetWeaponPreference(int client, const char[] class, const char[] slot)
 //Return weapon def index
 int GetPreferredWeaponForClass(const char[] class, const char[] slot)
 {
+	if (m_kvServerLoadout != null)
+		return GetServerLoadoutWeapon(class, slot);
+
 	if (g_iPlayerForcedPref != -1)
 	{
 		//Preference forced by admin, probably wants to use his or someone else's
