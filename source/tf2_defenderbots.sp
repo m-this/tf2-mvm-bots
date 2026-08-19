@@ -1875,19 +1875,19 @@ void ExtendUpgradeTimeForNewBots()
 	}
 }
 
-/* Fill the empty seats from sm_redbots_manager_team_composition, in its order
-False when the convar is empty, and the caller falls back to the lineup mode
+/* The seats sm_redbots_manager_team_composition still wants filled, in its order, at most count of
+them. Zero when the convar is empty, and the caller falls back to the lineup mode
 
 The list is what the team should look like, not what to add: every call counts the bots already on
-RED against it first and adds only what is missing. So a top-up in the middle of a wave converges on
+RED against it first and names only what is missing. So a top-up in the middle of a wave converges on
 the same team as the first fill, whatever order the seats emptied in. A list shorter than the seats
 leaves the rest to the lineup mode */
-bool AddBotsFromTeamComposition(int count)
+int CollectMissingTeamComposition(ArrayList classes, int count)
 {
 	char list[128]; redbots_manager_team_composition.GetString(list, sizeof(list));
 
 	if (list[0] == '\0')
-		return false;
+		return 0;
 
 	char wanted[MAXPLAYERS + 1][TF2_CLASS_MAX_NAME_LENGTH];
 	int total = ExplodeString(list, ",", wanted, sizeof(wanted), sizeof(wanted[]));
@@ -1899,9 +1899,9 @@ bool AddBotsFromTeamComposition(int count)
 		if (IsClientInGame(i) && IsDefenderBot(i) && TF2_GetClientTeam(i) == TFTeam_Red)
 			held[view_as<int>(TF2_GetPlayerClass(i))]++;
 
-	int added = 0;
+	int collected = 0;
 
-	for (int i = 0; i < total && added < count; i++)
+	for (int i = 0; i < total && collected < count; i++)
 	{
 		TrimString(wanted[i]);
 
@@ -1916,10 +1916,29 @@ bool AddBotsFromTeamComposition(int count)
 			continue;
 		}
 
-		//The list is more specific than the blacklist, so it wins
-		AddDefenderTFBot(1, wanted[i], "red", "expert", false, false);
-		added++;
+		classes.PushString(wanted[i]);
+		collected++;
 	}
+
+	return collected;
+}
+
+/* Fill the empty seats from the named team
+False when the convar named nothing to add, and the caller falls back to the lineup mode */
+bool AddBotsFromTeamComposition(int count)
+{
+	ArrayList classes = new ArrayList(TF2_CLASS_MAX_NAME_LENGTH);
+	int added = CollectMissingTeamComposition(classes, count);
+
+	char class[TF2_CLASS_MAX_NAME_LENGTH];
+
+	for (int i = 0; i < classes.Length; i++)
+	{
+		classes.GetString(i, class, sizeof(class));
+		AddDefenderTFBot(1, class, "red", "expert");
+	}
+
+	delete classes;
 
 	if (added > 0)
 		PrintToChatAll("%s Adding %d bot(s)...", PLUGIN_PREFIX, added);
@@ -2050,8 +2069,39 @@ void PickAllowedBotClass(const char[] wanted, char[] buffer, int maxlen)
 	strcopy(buffer, maxlen, candidates[GetRandomInt(0, total - 1)]);
 }
 
+//Does sm_redbots_manager_team_composition ask for this class anywhere in the team it names?
+bool IsClassInTeamComposition(const char[] class)
+{
+	char list[128]; redbots_manager_team_composition.GetString(list, sizeof(list));
+
+	if (list[0] == '\0')
+		return false;
+
+	TFClassType wanted = TF2_GetClassIndexFromString(class);
+
+	if (wanted == TFClass_Unknown)
+		return false;
+
+	char entries[MAXPLAYERS + 1][TF2_CLASS_MAX_NAME_LENGTH];
+	int count = ExplodeString(list, ",", entries, sizeof(entries), sizeof(entries[]));
+
+	for (int i = 0; i < count; i++)
+	{
+		TrimString(entries[i]);
+
+		if (TF2_GetClassIndexFromString(entries[i]) == wanted)
+			return true;
+	}
+
+	return false;
+}
+
 bool IsBotClassBlacklisted(const char[] class)
 {
+	//The named team is more specific than the blacklist, so what it asks for is never blacklisted
+	if (IsClassInTeamComposition(class))
+		return false;
+
 	char list[128]; redbots_manager_class_blacklist.GetString(list, sizeof(list));
 
 	if (list[0] == '\0')
@@ -2185,11 +2235,29 @@ void UpdateChosenBotTeamComposition(int caller = -1)
 	if (newBotsToAdd < 1)
 		return;
 	
+	/* The named team is decided here, where every lineup is decided, and not where the bots are added
+	The wave begins by adding this list and nothing else, so a team named in the convar that only the
+	top-up timer ever read was a team that never played */
+	newBotsToAdd -= CollectMissingTeamComposition(g_adtChosenBotClasses, newBotsToAdd);
+	
+	//Whatever seats the named team left over are the lineup mode's to fill
+	if (newBotsToAdd > 0)
+		ChooseBotClassesFromLineupMode(newBotsToAdd);
+	
+	if (caller != -1)
+		PrintToChatAll("%s %N changed the bot team lineup", PLUGIN_PREFIX, caller);
+	else
+		PrintToChatAll("%s Bot lineup changed", PLUGIN_PREFIX);
+}
+
+/* Name count more classes for the chosen lineup, the way the lineup mode says to */
+void ChooseBotClassesFromLineupMode(int count)
+{
 	switch (redbots_manager_bot_lineup_mode.IntValue)
 	{
 		case BOT_LINEUP_MODE_RANDOM:
 		{
-			for (int i = 1; i <= newBotsToAdd; i++)
+			for (int i = 1; i <= count; i++)
 				g_adtChosenBotClasses.PushString(g_sRawPlayerClassNames[GetRandomInt(TFClass_Scout, TFClass_Engineer)]);
 		}
 		case BOT_LINEUP_MODE_PREFERENCE, BOT_LINEUP_MODE_PREFERENCE_CHOOSE:
@@ -2201,7 +2269,7 @@ void UpdateChosenBotTeamComposition(int caller = -1)
 			if (adtClassPref.Length > 0)
 			{
 				//Choose the class lineup based on players' preferences
-				for (int i = 1; i <= newBotsToAdd; i++)
+				for (int i = 1; i <= count; i++)
 				{
 					char class[TF2_CLASS_MAX_NAME_LENGTH]; adtClassPref.GetString(GetRandomInt(0, adtClassPref.Length - 1), class, sizeof(class));
 					
@@ -2211,7 +2279,7 @@ void UpdateChosenBotTeamComposition(int caller = -1)
 			else
 			{
 				//No prefernces, the lineup is random
-				for (int i = 1; i <= newBotsToAdd; i++)
+				for (int i = 1; i <= count; i++)
 					g_adtChosenBotClasses.PushString(g_sRawPlayerClassNames[GetRandomInt(TFClass_Scout, TFClass_Engineer)]);
 			}
 			
@@ -2222,11 +2290,6 @@ void UpdateChosenBotTeamComposition(int caller = -1)
 			ThrowError("Unknown lineup mode %d", redbots_manager_bot_lineup_mode.IntValue);
 		}
 	}
-	
-	if (caller != -1)
-		PrintToChatAll("%s %N changed the bot team lineup", PLUGIN_PREFIX, caller);
-	else
-		PrintToChatAll("%s Bot lineup changed", PLUGIN_PREFIX);
 }
 
 void AddBotsFromChosenTeamComposition()
