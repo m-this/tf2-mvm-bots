@@ -242,7 +242,7 @@ void CollectUpgrades(int client)
 			UpgradeInfo.SetInt("slot", slot);
 			UpgradeInfo.SetInt("index", index);
 			UpgradeInfo.SetInt("random", GetRandomInt(MIN_INT, MAX_INT));
-			UpgradeInfo.SetInt("priority", GetUpgradePriority(UpgradeInfo));
+			UpgradeInfo.SetInt("priority", GetUpgradePriority(client, UpgradeInfo));
 			
 			CTFPlayerUpgrades[client].Push(UpgradeInfo);
 			
@@ -338,66 +338,226 @@ void CollectUpgrades(int client)
 	delete new_json;
 }
 
-int GetUpgradePriority(JSONObject info)
+/* What a bot buys at the upgrade station, highest number first
+
+Every upgrade it can afford is sorted by this and the top one is bought, so this function is the
+whole of a bot's shopping. It used to return GetRandomInt(50, 100) for everything except a Spy's
+knife, which is why a Heavy would buy jump height while its minigun stayed stock.
+
+The bands:
+
+  300+  the upgrade that is the reason to carry this exact weapon
+  200+  the class's own damage, which for an Engineer is the sentry and for a Medic the medigun
+  100+  keeping that damage going: clip, ammo, reload
+   50+  worth having once the damage is bought
+    0+  staying alive, which a bot that respawns every wave needs least
+  -10   canteens, which a bot never learns to use well
+
+Nothing here caps anything. CanUpgradeWithAttrib already refuses an upgrade at its ceiling, so a
+maxed damage bonus falls through to the next line on its own.
+
+The attribute strings are the ones in scripts/items/mvm_upgrades.txt. One this table has not met
+lands at 50, below the damage and above the resistances */
+int GetUpgradePriority(int client, JSONObject info)
 {
-	CMannVsMachineUpgrades upgrade = CMannVsMachineUpgradeManager().GetUpgradeByIndex(info.GetInt("index"));
+	int slot = info.GetInt("slot");
 	
-/*	if (info.GetInt("pclass") == view_as<int>(TFClass_Sniper)) {
-		if (info.GetInt("slot") == TF_LOADOUT_SLOT_PRIMARY && StrEqual(upgrade.m_szAttribute(), "explosive sniper shot")) {
-			return 100;
-		}
-	}
-	
-	if (info.GetInt("pclass") == view_as<int>(TFClass_Medic)) {
-		if (info.GetInt("slot") == TF_LOADOUT_SLOT_SECONDARY && StrEqual(upgrade.m_szAttribute(), "generate rage on heal")) {
-			return 100;
-		}
-	}
-	
-	if (info.GetInt("pclass") == view_as<int>(TFClass_Soldier)) {
-		if (info.GetInt("slot") == TF_LOADOUT_SLOT_PRIMARY)
-		{
-			if(StrEqual(upgrade.m_szAttribute(), "heal on kill")) 
-				return 90;
-			
-			if(StrEqual(upgrade.m_szAttribute(), "rocket specialist")) 
-				return 80;
-		}
-	}
-	*/
-	if (info.GetInt("pclass") == view_as<int>(TFClass_Spy)) 
-	{
-		if (info.GetInt("slot") == TF_LOADOUT_SLOT_MELEE) 
-		{
-			if (StrEqual(upgrade.m_szAttribute(), "armor piercing"))
-				return 100;
-				
-			if (StrEqual(upgrade.m_szAttribute(), "melee attack rate bonus"))
-				return 90;
-				
-			if (StrEqual(upgrade.m_szAttribute(), "robo sapper"))
-				return 80;
-		}
-	}
-	/*
-	if (info.GetInt("pclass") == view_as<int>(TFClass_Heavy)) {
-		if (info.GetInt("slot") == TF_LOADOUT_SLOT_PRIMARY && StrEqual(upgrade.m_szAttribute(), "attack projectiles")) {
-			return 100;
-		}
-	}
-	
-	if (info.GetInt("pclass") == view_as<int>(TFClass_Scout)) {
-		if (info.GetInt("slot") == TF_LOADOUT_SLOT_SECONDARY && StrEqual(upgrade.m_szAttribute(), "applies snare effect")) {
-			return 100;
-		}
-	}*/
-	
-	// low priority for canteen upgrades
-	if (info.GetInt("slot") == TF_LOADOUT_SLOT_ACTION) 
+	//A canteen is worth less to a bot than anything it can shoot with
+	if (slot == TF_LOADOUT_SLOT_ACTION)
 		return -10;
 	
-	// default priority
-	return GetRandomInt(50, 100);
+	CMannVsMachineUpgrades upgrade = CMannVsMachineUpgradeManager().GetUpgradeByIndex(info.GetInt("index"));
+	
+	if (upgrade.Address == Address_Null)
+		return 50;
+	
+	char attribute[MAX_ATTRIBUTE_DESCRIPTION_LENGTH]; attribute = upgrade.m_szAttribute();
+	
+	int priority = LoadoutUpgradePriority(client, slot, attribute);
+	
+	if (priority > 0)
+		return priority;
+	
+	priority = ClassUpgradePriority(view_as<TFClassType>(info.GetInt("pclass")), slot, attribute);
+	
+	if (priority > 0)
+		return priority;
+	
+	return GeneralUpgradePriority(attribute);
+}
+
+/* The upgrade that is the reason to carry this weapon at all, by item definition index
+
+Zero when the weapon in that slot has no opinion, which is most of them: this only names the few
+where the loadout, not the class, decides what to buy first */
+static int LoadoutUpgradePriority(int client, int slot, const char[] attribute)
+{
+	if (slot < TF_LOADOUT_SLOT_PRIMARY || slot > TF_LOADOUT_SLOT_MELEE)
+		return 0;
+	
+	int weapon = GetPlayerWeaponSlot(client, slot);
+	
+	if (weapon < 1 || !HasEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex"))
+		return 0;
+	
+	switch (GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex"))
+	{
+		case 594: //Phlogistinator: its taunt fills from damage dealt, and all of its damage burns
+		{
+			if (StrEqual(attribute, "weapon burn dmg increased")) return 320;
+			if (StrEqual(attribute, "weapon burn time increased")) return 300;
+		}
+		case 35: //Kritzkrieg: the crits are the weapon, so the meter is what matters
+		{
+			if (StrEqual(attribute, "ubercharge rate bonus")) return 330;
+		}
+		case 411: //Quick-Fix: it heals rather than saves, so it should heal faster
+		{
+			if (StrEqual(attribute, "healing mastery")) return 330;
+			if (StrEqual(attribute, "ubercharge rate bonus")) return 300;
+		}
+		case 312: //Brass Beast: the damage minigun, and it cannot reposition to make up for less
+		{
+			if (StrEqual(attribute, "damage bonus")) return 320;
+		}
+		case 424: //Tomislav: it already fires fast, so damage per bullet beats more bullets
+		{
+			if (StrEqual(attribute, "damage bonus")) return 300;
+		}
+		case 752: //Hitman's Heatmaker: reach the shot sooner
+		{
+			if (StrEqual(attribute, "SRifle Charge rate increased")) return 300;
+		}
+		case 526: //Machina: every shot is a charged one, so damage rides on all of them
+		{
+			if (StrEqual(attribute, "damage bonus")) return 300;
+		}
+		case 996: //Loose Cannon: a faster cannonball is one a bot can actually land
+		{
+			if (StrEqual(attribute, "Projectile speed increased")) return 300;
+		}
+		case 997: //Rescue Ranger: every shot and every repair at range costs metal
+		{
+			if (StrEqual(attribute, "metal regen")) return 300;
+			if (StrEqual(attribute, "maxammo metal increased")) return 290;
+		}
+	}
+	
+	return 0;
+}
+
+/* What this class contributes with, which is not always the weapon in its hands */
+static int ClassUpgradePriority(TFClassType pclass, int slot, const char[] attribute)
+{
+	switch (pclass)
+	{
+		case TFClass_Engineer:
+		{
+			//The sentry is the damage. The shotgun only defends it
+			if (StrEqual(attribute, "engy sentry fire rate increased")) return 320;
+			if (StrEqual(attribute, "engy building health bonus")) return 260;
+			if (StrEqual(attribute, "engy disposable sentries")) return 230;
+			if (StrEqual(attribute, "metal regen")) return 220;
+			if (StrEqual(attribute, "maxammo metal increased")) return 210;
+			if (StrEqual(attribute, "engy dispenser radius increased")) return 90;
+		}
+		case TFClass_Medic:
+		{
+			//A Medic that shoots is a Medic not healing, so its own damage comes last
+			if (StrEqual(attribute, "generate rage on heal")) return 320;
+			if (StrEqual(attribute, "ubercharge rate bonus")) return 300;
+			if (StrEqual(attribute, "healing mastery")) return 280;
+			if (StrEqual(attribute, "uber duration bonus")) return 230;
+			if (StrEqual(attribute, "overheal expert")) return 210;
+			if (StrEqual(attribute, "damage bonus")) return 40;
+			if (StrEqual(attribute, "fire rate bonus")) return 40;
+		}
+		case TFClass_Sniper:
+		{
+			//One shot through a line of robots, which is what a Sniper is for here
+			if (StrEqual(attribute, "explosive sniper shot")) return 330;
+			if (StrEqual(attribute, "SRifle Charge rate increased")) return 240;
+		}
+		case TFClass_Spy:
+		{
+			if (slot == TF_LOADOUT_SLOT_MELEE)
+			{
+				//A backstab through a giant's armour is the whole class in this mode
+				if (StrEqual(attribute, "armor piercing")) return 330;
+				if (StrEqual(attribute, "melee attack rate bonus")) return 280;
+				if (StrEqual(attribute, "robo sapper")) return 240;
+			}
+		}
+		case TFClass_Pyro:
+		{
+			//Reflecting what is aimed at the team beats burning a little harder
+			if (StrEqual(attribute, "attack projectiles")) return 250;
+			if (StrEqual(attribute, "weapon burn dmg increased")) return 240;
+			if (StrEqual(attribute, "weapon burn time increased")) return 220;
+		}
+		case TFClass_Soldier:
+		{
+			if (StrEqual(attribute, "rocket specialist")) return 240;
+		}
+		case TFClass_Heavy:
+		{
+			//Shooting down the rockets aimed at the team
+			if (StrEqual(attribute, "attack projectiles")) return 230;
+		}
+		case TFClass_Scout:
+		{
+			//Milk marks a wave for the whole team, which is worth more than what one Scout shoots
+			if (StrEqual(attribute, "applies snare effect")) return 250;
+			if (StrEqual(attribute, "mad milk syringes")) return 200;
+			//Money is the Scout's job here and it needs the legs to do it
+			if (StrEqual(attribute, "move speed bonus")) return 190;
+		}
+	}
+	
+	return 0;
+}
+
+/* Damage first, then what keeps it firing. What a bot buys when nothing above had an opinion */
+static int GeneralUpgradePriority(const char[] attribute)
+{
+	//--- The damage itself
+	if (StrEqual(attribute, "damage bonus")) return 260;
+	if (StrEqual(attribute, "fire rate bonus")) return 250;
+	if (StrEqual(attribute, "melee attack rate bonus")) return 200;
+	if (StrEqual(attribute, "projectile penetration")) return 190;
+	if (StrEqual(attribute, "projectile penetration heavy")) return 190;
+	if (StrEqual(attribute, "critboost on kill")) return 180;
+	
+	//--- Keeping it firing
+	if (StrEqual(attribute, "clip size upgrade atomic")) return 170;
+	if (StrEqual(attribute, "clip size bonus upgrade")) return 170;
+	if (StrEqual(attribute, "faster reload rate")) return 160;
+	if (StrEqual(attribute, "maxammo primary increased")) return 150;
+	if (StrEqual(attribute, "Projectile speed increased")) return 130;
+	if (StrEqual(attribute, "maxammo secondary increased")) return 120;
+	
+	//--- Worth having once the damage is bought
+	if (StrEqual(attribute, "heal on kill")) return 110;
+	if (StrEqual(attribute, "mark for death")) return 90;
+	if (StrEqual(attribute, "armor piercing")) return 85;
+	if (StrEqual(attribute, "attack projectiles")) return 80;
+	if (StrEqual(attribute, "increase buff duration")) return 75;
+	if (StrEqual(attribute, "effect bar recharge rate increased")) return 70;
+	if (StrEqual(attribute, "charge recharge rate increased")) return 70;
+	if (StrEqual(attribute, "generate rage on damage")) return 60;
+	if (StrEqual(attribute, "bleeding duration")) return 55;
+	
+	//--- A bot respawns every wave, so staying alive is what it needs least
+	if (StrEqual(attribute, "move speed bonus")) return 45;
+	if (StrEqual(attribute, "health regen")) return 40;
+	if (StrEqual(attribute, "dmg taken from bullets reduced")) return 35;
+	if (StrEqual(attribute, "dmg taken from blast reduced")) return 35;
+	if (StrEqual(attribute, "dmg taken from fire reduced")) return 30;
+	if (StrEqual(attribute, "dmg taken from crit reduced")) return 30;
+	if (StrEqual(attribute, "damage force reduction")) return 25;
+	if (StrEqual(attribute, "increased jump height")) return 10;
+	
+	return 50;
 }
 
 int FindPriorityIndex(JSONArray array, const char[] key, int value)
