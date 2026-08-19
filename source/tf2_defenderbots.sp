@@ -239,11 +239,11 @@ public void OnPluginStart()
 	redbots_manager_use_custom_loadouts = CreateConVar("sm_redbots_manager_use_custom_loadouts", "0", "Let's bots use different weapons.", FCVAR_NOTIFY);
 	redbots_manager_class_blacklist = CreateConVar("sm_redbots_manager_class_blacklist", "", "Classes the bots never play, comma-separated. Example: sniper,spy", FCVAR_NOTIFY);
 	redbots_manager_team_composition = CreateConVar("sm_redbots_manager_team_composition", "", "The classes the bots fill RED with, in order, comma-separated. Overrides the lineup mode and the blacklist. Example: engineer,medic,heavyweapons,soldier,demoman", FCVAR_NOTIFY);
-	redbots_manager_kick_bots = CreateConVar("sm_redbots_manager_kick_bots", "1", "Kick bots on wave failure/completion.", FCVAR_NOTIFY);
+	redbots_manager_kick_bots = CreateConVar("sm_redbots_manager_kick_bots", "0", "Kick bots on wave failure/completion. A kicked bot is replaced by a new one that owns nothing, so this throws away every upgrade the team bought.", FCVAR_NOTIFY);
 	redbots_manager_min_players = CreateConVar("sm_redbots_manager_min_players", "3", "Minimum players for normal missions. Other difficulties are adjusted based on this value. Set to -1 to disable entirely.", FCVAR_NOTIFY, true, -1.0, true, float(MAXPLAYERS));
 	redbots_manager_defender_team_size = CreateConVar("sm_redbots_manager_defender_team_size", "6", _, FCVAR_NOTIFY);
 	redbots_manager_ready_cooldown = CreateConVar("sm_redbots_manager_ready_cooldown", "30.0", _, FCVAR_NOTIFY, true, 0.0);
-	redbots_manager_keep_bot_upgrades = CreateConVar("sm_redbots_manager_keep_bot_upgrades", "0", _, FCVAR_NOTIFY);
+	redbots_manager_keep_bot_upgrades = CreateConVar("sm_redbots_manager_keep_bot_upgrades", "1", "Let bots that survive a failed wave keep what they bought, instead of refunding it and making them shop again from nothing.", FCVAR_NOTIFY);
 	redbots_manager_bot_upgrade_interval = CreateConVar("sm_redbots_manager_bot_upgrade_interval", "0.1", _, FCVAR_NOTIFY);
 	redbots_manager_engineer_nest_depth = CreateConVar("sm_redbots_manager_engineer_nest_depth", "0.4", "How far up the bomb path an engineer will build, as a fraction of the whole path measured from the hatch. 1.0 is the robots' spawn door.", FCVAR_NOTIFY, true, 0.05, true, 1.0);
 	redbots_manager_bot_use_upgrades = CreateConVar("sm_redbots_manager_bot_use_upgrades", "1", "Enable bots to buy upgrades.", FCVAR_NOTIFY);
@@ -405,6 +405,9 @@ public void OnClientDisconnect(int client)
 
 public void OnClientPutInServer(int client)
 {
+	if (!IsFakeClient(client))
+		MakeRoomForHumanPlayer(client);
+	
 	g_bHasUpgraded[client] = false;
 	g_arrExtraButtons[client].Reset();
 	m_flDeadRethinkTime[client] = 0.0;
@@ -1798,6 +1801,45 @@ bool ShouldProcessCommand(int client)
 	
 	m_flLastCommandTime[client] = GetGameTime() + COMMAND_MAX_RATE;
 	return true;
+}
+
+/* Free a defender slot for somebody who just connected
+
+The bots are not kicked between waves any more, because a kicked bot is a bot that paid for its
+upgrades and left them behind. That leaves nothing to open a slot: the game caps the defending
+team, the bots fill it, and a player who joins the server after the mission started is told the
+team is full for the rest of it.
+
+A dead bot goes first, since kicking one costs the team nothing it still had */
+void MakeRoomForHumanPlayer(int client)
+{
+	if (GetHumanAndDefenderBotCount(TFTeam_Red) < redbots_manager_defender_team_size.IntValue)
+		return;
+	
+	int victim = -1;
+	
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (i == client || !IsClientInGame(i) || !g_bIsDefenderBot[i])
+			continue;
+		
+		if (TF2_GetClientTeam(i) != TFTeam_Red)
+			continue;
+		
+		if (!IsPlayerAlive(i))
+		{
+			victim = i;
+			break;
+		}
+		
+		if (victim == -1)
+			victim = i;
+	}
+	
+	if (victim == -1)
+		return;
+	
+	KickClient(victim, "BotManager3: Making room for a player");
 }
 
 void RemoveAllDefenderBots(char[] reason = "", bool bDanceInstead = false)
