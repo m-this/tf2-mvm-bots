@@ -79,10 +79,25 @@ public Action CTFBotUpgrade_Update(BehaviorAction action, int actor, float inter
 		
 		if (info != null) 
 		{
-			CTFBotPurchaseUpgrades_PurchaseUpgrade(actor, info);
+			bool purchased = CTFBotPurchaseUpgrades_PurchaseUpgrade(actor, info);
 			
 			if (redbots_manager_debug_actions.BoolValue)
 				PrintToChatAll("Currenct left for %N: %d", actor, TF2_GetCurrency(actor));
+			
+			/* The game refused what we asked for
+			Nothing about the next interval would differ, so the same upgrade would be picked and
+			refused until the window runs out, with the wave waiting on a bot that cannot spend */
+			if (!purchased)
+			{
+				SetPlayerReady(actor, true);
+				
+				if (redbots_manager_debug_actions.BoolValue)
+					PrintToChatAll("%N was refused upgrade %d in slot %d", actor, info.GetInt("index"), info.GetInt("slot"));
+				
+				delete info;
+				
+				return GetUpgradePostAction(actor, action);
+			}
 		}
 		else 
 		{
@@ -232,6 +247,14 @@ void CollectUpgrades(int client)
 			CMannVsMachineUpgrades upgrades = CMannVsMachineUpgradeManager().GetUpgradeByIndex(index);
 			
 			if (upgrades.m_iUIGroup() == UIGROUP_UPGRADE_ATTACHED_TO_PLAYER && slot != -1) 
+				continue;
+			
+			/* Canteens are not bought here
+			The player slot takes every upgrade the game does not attach to a weapon, which sweeps
+			up the powerup bottle charges too. The game refuses those on slot -1, the bot pays
+			nothing, and the next interval picks the same charge again for as long as the upgrade
+			window lasts. PurchaseAffordableCanteens buys them, on TF_LOADOUT_SLOT_ACTION */
+			if (upgrades.m_iUIGroup() == UIGROUP_POWERUPBOTTLE)
 				continue;
 			
 			CEconItemAttributeDefinition attr = CEIAD_GetAttributeDefinitionByName(upgrades.m_szAttribute());
@@ -691,10 +714,24 @@ JSONObject CTFBotPurchaseUpgrades_ChooseUpgrade(int actor)
 	return null;
 }
 
-void CTFBotPurchaseUpgrades_PurchaseUpgrade(int actor, JSONObject info)
+/* False when the credits never moved, which is the game turning the purchase down
+
+An upgrade that costs nothing cannot be told apart this way, so it counts as bought */
+bool CTFBotPurchaseUpgrades_PurchaseUpgrade(int actor, JSONObject info)
 {
-	KV_MVM_Upgrade(actor, 1, info.GetInt("slot"), info.GetInt("index"));
+	int slot = info.GetInt("slot");
+	int index = info.GetInt("index");
+	int cost = GetCostForUpgrade(CMannVsMachineUpgradeManager().GetUpgradeByIndex(index).Address, slot, info.GetInt("pclass"), actor);
+	int currencyBefore = TF2_GetCurrency(actor);
+	
+	KV_MVM_Upgrade(actor, 1, slot, index);
+	
+	if (cost > 0 && TF2_GetCurrency(actor) == currencyBefore)
+		return false;
+	
 	++m_nPurchasedUpgrades[actor];
+	
+	return true;
 }
 
 void KV_MVM_Upgrade(int client, int count, int slot, int index)
