@@ -396,6 +396,9 @@ public void OnClientDisconnect(int client)
 	if (client == g_iPlayerForcedPref)
 		g_iPlayerForcedPref = -1;
 	
+	if (!IsFakeClient(client))
+		CreateTimer(0.1, Timer_RefillDefenderTeam, _, TIMER_FLAG_NO_MAPCHANGE);
+	
 	g_bIsDefenderBot[client] = false;
 	
 	g_bChoosingBotClasses[client] = false;
@@ -1801,6 +1804,40 @@ bool ShouldProcessCommand(int client)
 	
 	m_flLastCommandTime[client] = GetGameTime() + COMMAND_MAX_RATE;
 	return true;
+}
+
+//Players, on any team: the bots are here to play with somebody, and a spectator still counts
+int GetRealPlayerCount()
+{
+	int count = 0;
+	
+	for (int i = 1; i <= MaxClients; i++)
+		if (IsClientInGame(i) && !IsFakeClient(i))
+			count++;
+	
+	return count;
+}
+
+/* Put a bot back in the slot a player just left
+
+Runs a tick after the disconnect, because the leaving player is still in the game at the point the
+forward fires and would otherwise still be counted. Nobody is left to play with if the last player
+leaves, so an empty defending team is left empty rather than filled with six bots holding a hatch
+for no one */
+static Action Timer_RefillDefenderTeam(Handle timer)
+{
+	if (!g_bBotsEnabled)
+		return Plugin_Stop;
+	
+	if (GetRealPlayerCount() < 1)
+		return Plugin_Stop;
+	
+	int missing = redbots_manager_defender_team_size.IntValue - GetHumanAndDefenderBotCount(TFTeam_Red);
+	
+	if (missing > 0)
+		AddBotsBasedOnLineupMode(missing);
+	
+	return Plugin_Stop;
 }
 
 /* Free a defender slot for somebody who just connected
