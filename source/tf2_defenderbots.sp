@@ -195,6 +195,7 @@ Address g_pMannVsMachineUpgrades;
 #endif
 
 #include "redbots3/util.sp"
+#include "redbots3/weapon_tuning.sp"
 #include "redbots3/offsets.sp"
 #include "redbots3/sdkcalls.sp"
 #include "redbots3/loadouts.sp"
