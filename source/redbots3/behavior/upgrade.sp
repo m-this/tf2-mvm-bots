@@ -417,11 +417,6 @@ static int LoadoutUpgradePriority(int client, int slot, const char[] attribute)
 	
 	switch (GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex"))
 	{
-		case 594: //Phlogistinator: its taunt fills from damage dealt, and all of its damage burns
-		{
-			if (StrEqual(attribute, "weapon burn dmg increased")) return 320;
-			if (StrEqual(attribute, "weapon burn time increased")) return 300;
-		}
 		case 35: //Kritzkrieg: the crits are the weapon, so the meter is what matters
 		{
 			if (StrEqual(attribute, "ubercharge rate bonus")) return 330;
@@ -505,10 +500,14 @@ static int ClassUpgradePriority(TFClassType pclass, int slot, const char[] attri
 		}
 		case TFClass_Pyro:
 		{
-			//Reflecting what is aimed at the team beats burning a little harder
+			//Reflecting what is aimed at the team is the job. The flames themselves come first
 			if (StrEqual(attribute, "attack projectiles")) return 250;
-			if (StrEqual(attribute, "weapon burn dmg increased")) return 240;
-			if (StrEqual(attribute, "weapon burn time increased")) return 220;
+			/* Afterburn is the last thing to spend a credit on, whatever the flamethrower
+			It does not scale with the upgrade the way direct damage does, a robot dies before it
+			finishes ticking, and a giant outlives it. That holds for the Phlogistinator too: its
+			taunt fills from damage dealt, and direct flame damage is most of what it deals */
+			if (StrEqual(attribute, "weapon burn dmg increased")) return 20;
+			if (StrEqual(attribute, "weapon burn time increased")) return 15;
 		}
 		case TFClass_Soldier:
 		{
