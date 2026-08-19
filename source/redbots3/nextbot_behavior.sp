@@ -1310,7 +1310,10 @@ void EquipBestWeaponForThreat(int client, const CKnownEntity threat)
 	if (BaseCombatCharacter_GetAmmoCount(client, TF_AMMO_PRIMARY) <= 0)
 		primary = -1;
 	
-	if (BaseCombatCharacter_GetAmmoCount(client, TFWeaponSlot_Secondary) <= 0)
+	/* TFWeaponSlot_Secondary is 1 and TF_AMMO_SECONDARY is 2, so this read primary ammo and
+	retired the secondary along with the primary. A Heavy whose minigun ran dry was left with
+	no shotgun, an Engineer with no pistol, a Sniper with no SMG */
+	if (BaseCombatCharacter_GetAmmoCount(client, TF_AMMO_SECONDARY) <= 0)
 		secondary = -1;
 	
 	INextBot myBot = CBaseNPC_GetNextBotOfEntity(client);
@@ -1403,6 +1406,19 @@ void EquipBestWeaponForThreat(int client, const CKnownEntity threat)
 				}
 			}
 		}
+	}
+	
+	/* Whatever the rules above picked, never walk at a robot holding something that cannot
+	fire. The per class cases only ever choose between weapons; this is the one place that
+	asks whether the choice can still shoot. Melee always can */
+	if (gun != -1 && !IsMeleeWeapon(gun) && !HasAmmo(gun))
+	{
+		if (primary != -1 && HasAmmo(primary))
+			gun = primary;
+		else if (secondary != -1 && HasAmmo(secondary))
+			gun = secondary;
+		else if (melee != -1)
+			gun = melee;
 	}
 	
 	if (gun != -1)
