@@ -1702,10 +1702,27 @@ int GetHumanAndDefenderBotCount(TFTeam team)
 	int count = 0;
 	
 	for (int i = 1; i <= MaxClients; i++)
-		if (IsClientInGame(i) && (g_bIsDefenderBot[i] || !IsFakeClient(i)) && TF2_GetClientTeam(i) == team)
+		if (IsClientInGame(i) && (IsDefenderBot(i) || !IsFakeClient(i)) && TF2_GetClientTeam(i) == team)
 			count++;
 	
 	return count;
+}
+
+/* One of ours, including one that has not spawned yet
+g_bIsDefenderBot is set on the first spawn, and between tf_bot_add and that spawn the bot is on the
+team and counts for nothing. The top-up timer runs every second in that window and adds one more,
+which is how a six man team ends up with seven or eight members. The name is set at tf_bot_add */
+bool IsDefenderBot(int client)
+{
+	if (g_bIsDefenderBot[client])
+		return true;
+	
+	if (!IsFakeClient(client))
+		return false;
+	
+	char clientName[MAX_NAME_LENGTH]; GetClientName(client, clientName, sizeof(clientName));
+	
+	return StrContains(clientName, TFBOT_IDENTITY_NAME) != -1;
 }
 
 int GetDefenderBotCount(TFTeam team)
