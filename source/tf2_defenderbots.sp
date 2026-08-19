@@ -66,10 +66,16 @@ enum struct esMapConfiguration
 	void Initialize()
 	{
 		this.adtSniperSpot = new ArrayList(3);
+		this.adtEngineerNestLocation = new ArrayList(3);
+		this.adtTeleporterEntranceLocation = new ArrayList(3);
+		this.adtTeleporterExitLocation = new ArrayList(3);
 	}
 	void Reset()
 	{
 		this.adtSniperSpot.Clear();
+		this.adtEngineerNestLocation.Clear();
+		this.adtTeleporterEntranceLocation.Clear();
+		this.adtTeleporterExitLocation.Clear();
 	}
 }
 
@@ -2380,25 +2386,43 @@ void Config_LoadMap()
 		return;
 	}
 	
-	if (kv.JumpToKey("SniperSpot"))
-	{
-		if (kv.GotoFirstSubKey(false))
-		{
-			do
-			{
-				float vec[3]; kv.GetVector("origin", vec);
-				g_arrMapConfig.adtSniperSpot.PushArray(vec);
-			} while (kv.GotoNextKey(false));
-		}
-		
-		kv.GoBack();
-	}
+	Config_LoadLocations(kv, "SniperSpot", g_arrMapConfig.adtSniperSpot);
+	Config_LoadLocations(kv, "EngineerNest", g_arrMapConfig.adtEngineerNestLocation);
+	Config_LoadLocations(kv, "TeleporterEntrance", g_arrMapConfig.adtTeleporterEntranceLocation);
+	Config_LoadLocations(kv, "TeleporterExit", g_arrMapConfig.adtTeleporterExitLocation);
 	
 	CloseHandle(kv);
 	
 #if defined TESTING_ONLY
 	LogMessage("Config_LoadMap: Found %d locations for SniperSpot", g_arrMapConfig.adtSniperSpot.Length);
+	LogMessage("Config_LoadMap: Found %d locations for EngineerNest", g_arrMapConfig.adtEngineerNestLocation.Length);
+	LogMessage("Config_LoadMap: Found %d locations for TeleporterEntrance", g_arrMapConfig.adtTeleporterEntranceLocation.Length);
+	LogMessage("Config_LoadMap: Found %d locations for TeleporterExit", g_arrMapConfig.adtTeleporterExitLocation.Length);
 #endif
+}
+
+/* Every "origin" under a named block, in map order
+
+A block this map does not have leaves the list empty, which is what every caller falls back on:
+the map configurations are hand written one map at a time, so most of them define some blocks and
+not others */
+void Config_LoadLocations(KeyValues kv, const char[] key, ArrayList locations)
+{
+	if (!kv.JumpToKey(key))
+		return;
+	
+	if (kv.GotoFirstSubKey(false))
+	{
+		do
+		{
+			float vec[3]; kv.GetVector("origin", vec);
+			locations.PushArray(vec);
+		} while (kv.GotoNextKey(false));
+		
+		kv.GoBack();
+	}
+	
+	kv.GoBack();
 }
 
 void Config_LoadBotNames()

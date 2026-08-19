@@ -1559,8 +1559,159 @@ float NestDistanceLimit()
 	return length * redbots_manager_engineer_nest_depth.FloatValue;
 }
 
+//Where each engineer holds, read by the nest scoring below and written by the engineer behaviours
+CNavArea m_aNestArea[MAXPLAYERS + 1] = {NULL_AREA, ...};
+
+/* The engineer items a bot has to play differently to play at all
+
+An item definition index rather than a weapon id: the game gives the Gunslinger and the stock
+wrench the same TF_WEAPON_WRENCH, and it is the item that decides whether this engineer holds a
+level three or spends mini sentries */
+#define TF_ITEMDEF_GUNSLINGER		142
+#define TF_ITEMDEF_EUREKA_EFFECT	589
+#define TF_ITEMDEF_RESCUE_RANGER	997
+#define TF_ITEMDEF_WRANGLER		140
+
+int GetLoadoutSlotItemDefinitionIndex(int client, int slot)
+{
+	int weapon = GetPlayerWeaponSlot(client, slot);
+	
+	if (weapon < 1 || !HasEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex"))
+		return -1;
+	
+	return GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
+}
+
+bool TF2_IsGunslingerEquipped(int client)
+{
+	return GetLoadoutSlotItemDefinitionIndex(client, TFWeaponSlot_Melee) == TF_ITEMDEF_GUNSLINGER;
+}
+
+bool TF2_IsEurekaEffectEquipped(int client)
+{
+	return GetLoadoutSlotItemDefinitionIndex(client, TFWeaponSlot_Melee) == TF_ITEMDEF_EUREKA_EFFECT;
+}
+
+bool TF2_IsRescueRangerEquipped(int client)
+{
+	return GetLoadoutSlotItemDefinitionIndex(client, TFWeaponSlot_Primary) == TF_ITEMDEF_RESCUE_RANGER;
+}
+
 //A nest on top of the hatch has nothing in front of it to shoot at
 #define NEST_HATCH_CLEARANCE 180.0
+
+//Two nests closer together than this cover the same ground twice and die to the same blast
+#define NEST_SPACING 500.0
+
+/* How good a nest this area is, higher being better
+
+Every candidate handed to this has already passed the tests that make it a nest at all: on the
+bomb path, out of the spawn rooms, not on top of the hatch, within nesting depth. What is left is
+a matter of degree, and picking the best of them beats the random pick this replaces, which was
+free to put the sentry in a corridor behind the fight while a ledge over the choke went unused.
+
+  range     a sentry wants the robots inside its range and not on top of it, so the ideal is most
+            of the way out: close in, it is meleed by the first giant to arrive
+  height    ground above the path is worth holding: the sentry shoots down onto the robots and the
+            splash that answers it mostly does not reach back up
+  room      a wide area fits the sentry, the dispenser and the engineer between them
+  spacing   two engineers nesting on the same ledge is one blast killing both nests
+
+An engineer carrying a Gunslinger scores the opposite way on range and height. The mini sentry is
+built in two seconds and dies in one, so it is spent rather than held: it wants to be near the
+robots where it is worth the metal, not on a ledge where it plinks */
+float ScoreNestArea(int client, CTFNavArea area, const float target[3], float SentryRange)
+{
+	bool disposable = TF2_IsGunslingerEquipped(client);
+	
+	float center[3]; area.GetCenter(center);
+	center[2] += 50.0;
+	
+	float range = GetVectorDistance(center, target);
+	float ideal = SentryRange * (disposable ? 0.35 : 0.75);
+	float score = 100.0 - (FloatAbs(range - ideal) / SentryRange) * 100.0;
+	
+	if (!disposable)
+	{
+		float height = center[2] - target[2];
+		
+		if (height > 0.0)
+			score += MinFloat(height, 300.0) * 0.1;
+	}
+	
+	score += MinFloat(area.GetSizeX(), area.GetSizeY()) * 0.05;
+	
+	//Somebody is already holding this ground
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (i == client || !IsClientInGame(i) || m_aNestArea[i] == NULL_AREA || m_aNestArea[i] == view_as<CNavArea>(area))
+			continue;
+		
+		float other[3]; m_aNestArea[i].GetCenter(other);
+		
+		if (GetVectorDistance(center, other) < NEST_SPACING)
+			score -= 50.0;
+	}
+	
+	return score;
+}
+
+/* The best scoring area in the list, or NULL_AREA for an empty one
+
+The lists are tiers: a caller asks for the best of the areas that see the bomb before it asks for
+the best of the areas that merely face it, so the score only ever orders areas that are already
+equally good on the thing that matters most */
+CNavArea BestNestArea(int client, ArrayList areas, const float target[3], float SentryRange)
+{
+	CNavArea best = NULL_AREA;
+	float bestScore = 0.0;
+	
+	for (int i = 0; i < areas.Length; i++)
+	{
+		CTFNavArea area = view_as<CTFNavArea>(areas.Get(i));
+		float score = ScoreNestArea(client, area, target, SentryRange);
+		
+		if (best == NULL_AREA || score > bestScore)
+		{
+			best = view_as<CNavArea>(area);
+			bestScore = score;
+		}
+	}
+	
+	return best;
+}
+
+/* The nest the map configuration asks for, or NULL_AREA when it asks for nothing
+
+A hand placed nest is there because somebody stood on that ground and decided it was the spot, so
+it outranks anything the nav mesh reasoning below arrives at. The spots still go through the
+score, which is what spreads several engineers across several of them and what keeps a spot from
+being used when another engineer already holds it */
+CNavArea PickConfiguredNestArea(int client, const float target[3], float SentryRange)
+{
+	ArrayList spots = g_arrMapConfig.adtEngineerNestLocation;
+	
+	if (spots.Length == 0)
+		return NULL_AREA;
+	
+	ArrayList areas = new ArrayList();
+	
+	for (int i = 0; i < spots.Length; i++)
+	{
+		float spot[3]; spots.GetArray(i, spot);
+		
+		CNavArea area = TheNavMesh.GetNearestNavArea(spot, false, 500.0, false, true, TEAM_ANY);
+		
+		if (area != NULL_AREA)
+			areas.Push(area);
+	}
+	
+	CNavArea best = BestNestArea(client, areas, target, SentryRange);
+	
+	delete areas;
+	
+	return best;
+}
 
 CNavArea PickBuildArea(int client, float SentryRange = 1300.0)
 {
@@ -1581,6 +1732,11 @@ CNavArea PickBuildArea(int client, float SentryRange = 1300.0)
 	vecTargetPos[0] = bombinfo.vPosition[0];
 	vecTargetPos[1] = bombinfo.vPosition[1];
 	vecTargetPos[2] = bombinfo.vPosition[2] + 40.0;
+	
+	CNavArea configured = PickConfiguredNestArea(client, vecTargetPos, SentryRange);
+	
+	if (configured != NULL_AREA)
+		return configured;
 	
 	CTFNavArea bombArea = TheNavMesh.GetNearestNavArea(vecTargetPos, false, 90000.0, false, true, TEAM_ANY);
 	
@@ -1666,10 +1822,10 @@ CNavArea PickBuildArea(int client, float SentryRange = 1300.0)
 	
 	CNavArea randomArea = NULL_AREA;
 	
-	if (ForwardVisibleAreas.Length     > 0) randomArea = ForwardVisibleAreas.Get(GetRandomInt(0, ForwardVisibleAreas.Length - 1));
-	else if (ForwardAreas.Length       > 0) randomArea =        ForwardAreas.Get(GetRandomInt(0, ForwardAreas.Length        - 1));
-	else if (VisibleAreasAround.Length > 0) randomArea =  VisibleAreasAround.Get(GetRandomInt(0, VisibleAreasAround.Length  - 1));
-	else if (AreasTooFarUp.Length      > 0) randomArea =       AreasTooFarUp.Get(GetRandomInt(0, AreasTooFarUp.Length       - 1));
+	if (ForwardVisibleAreas.Length     > 0) randomArea = BestNestArea(client, ForwardVisibleAreas, vecTargetPos, SentryRange);
+	else if (ForwardAreas.Length       > 0) randomArea = BestNestArea(client, ForwardAreas,        vecTargetPos, SentryRange);
+	else if (VisibleAreasAround.Length > 0) randomArea = BestNestArea(client, VisibleAreasAround,  vecTargetPos, SentryRange);
+	else if (AreasTooFarUp.Length      > 0) randomArea = BestNestArea(client, AreasTooFarUp,       vecTargetPos, SentryRange);
 	
 	if (redbots_manager_debug.BoolValue)
 		PrintToServer("PickBuildArea %i ForwardVisibleAreas | %i ForwardAreas | %i VisibleAreasAroundBomb | %i AreasTooFarUp", ForwardVisibleAreas.Length, ForwardAreas.Length, VisibleAreasAround.Length, AreasTooFarUp.Length);
@@ -1704,6 +1860,11 @@ CNavArea PickBuildAreaPreRound(int client, float SentryRange = 1300.0)
 	float limit = NestDistanceLimit();
 	float hatch[3]; hatch = GetBombHatchPosition();
 	hatch[2] += 40.0;
+	
+	CNavArea configured = PickConfiguredNestArea(client, hatch, SentryRange);
+	
+	if (configured != NULL_AREA)
+		return configured;
 
 	//Near enough to the hatch to nest, and with a line to it
 	ArrayList CoveringAreas = new ArrayList();
@@ -1752,9 +1913,9 @@ CNavArea PickBuildAreaPreRound(int client, float SentryRange = 1300.0)
 
 	CNavArea bestArea = NULL_AREA;
 
-	if (CoveringAreas.Length > 0)       bestArea = CoveringAreas.Get(GetRandomInt(0, CoveringAreas.Length - 1));
-	else if (NestingAreas.Length > 0)   bestArea =  NestingAreas.Get(GetRandomInt(0, NestingAreas.Length  - 1));
-	else if (AreasTooFarUp.Length > 0)  bestArea = AreasTooFarUp.Get(GetRandomInt(0, AreasTooFarUp.Length - 1));
+	if (CoveringAreas.Length > 0)       bestArea = BestNestArea(client, CoveringAreas, hatch, SentryRange);
+	else if (NestingAreas.Length > 0)   bestArea = BestNestArea(client, NestingAreas,  hatch, SentryRange);
+	else if (AreasTooFarUp.Length > 0)  bestArea = BestNestArea(client, AreasTooFarUp, hatch, SentryRange);
 
 	if (redbots_manager_debug.BoolValue)
 		PrintToServer("PickBuildAreaPreRound %i CoveringAreas | %i NestingAreas | %i AreasTooFarUp", CoveringAreas.Length, NestingAreas.Length, AreasTooFarUp.Length);
