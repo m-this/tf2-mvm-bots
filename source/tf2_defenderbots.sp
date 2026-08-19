@@ -294,6 +294,7 @@ public void OnPluginStart()
 	RegAdminCmd("sm_purgebots", Command_RemoveAllBots, ADMFLAG_GENERIC);
 	RegAdminCmd("sm_botmanager_stop", Command_StopManagingBots, ADMFLAG_GENERIC);
 	RegAdminCmd("sm_view_bot_upgrades", Command_ViewBotUpgrades, ADMFLAG_GENERIC);
+	RegAdminCmd("sm_dump_spot", Command_DumpSpot, ADMFLAG_GENERIC);
 	
 	AddCommandListener(Listener_TournamentPlayerReadystate, "tournament_player_readystate");
 	
@@ -1177,6 +1178,36 @@ public Action Command_StopManagingBots(int client, int args)
 {
 	ManageDefenderBots(false);
 	ReplyToCommand(client, "Stopped manaing bots.");
+	
+	return Plugin_Handled;
+}
+
+/* Where you are standing, as a map configuration block
+
+The nest, teleporter and sniper locations in configs/defenderbots/map are all somebody standing on
+the ground they meant and writing down where that was. This prints the line to write down, so the
+map data can be authored in the map instead of guessed from a compiled brush */
+public Action Command_DumpSpot(int client, int args)
+{
+	if (client < 1 || !IsClientInGame(client))
+	{
+		ReplyToCommand(client, "[SM] This command requires standing somewhere in the map.");
+		return Plugin_Handled;
+	}
+	
+	char block[64] = "EngineerNest";
+	
+	if (args >= 1)
+		GetCmdArg(1, block, sizeof(block));
+	
+	float origin[3]; GetClientAbsOrigin(client, origin);
+	
+	char mapName[PLATFORM_MAX_PATH]; GetCurrentMap(mapName, sizeof(mapName));
+	
+	ReplyToCommand(client, "[SM] %s on %s:", block, mapName);
+	ReplyToCommand(client, "\t\t\t\"origin\" \"%.0f %.0f %.0f\"", origin[0], origin[1], origin[2]);
+	
+	LogMessage("%s %s: \"origin\" \"%.0f %.0f %.0f\"", mapName, block, origin[0], origin[1], origin[2]);
 	
 	return Plugin_Handled;
 }

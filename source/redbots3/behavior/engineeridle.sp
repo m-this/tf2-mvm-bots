@@ -261,6 +261,12 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 		}
 	}
 	
+	/* The nest is standing and the wave has not started, so there is time for a teleporter
+	Nothing below this point is skipped by it: the action gives up the moment the wave starts or
+	the sentry stops standing, and the engineer goes straight back to the nest */
+	if (m_ctSentrySafe[actor] > GetGameTime() && !g_bGoingToGrabBuilding[actor] && ShouldBuildTeleporter(actor))
+		return action.SuspendFor(CTFBotMvMEngineerBuildTeleporter(), "Nest is up, building a teleporter");
+	
 	if (dispenser != INVALID_ENT_REFERENCE && m_ctSentrySafe[actor] > GetGameTime())
 	{
 		if (TF2_GetUpgradeLevel(dispenser) < 3 || BaseEntity_GetHealth(dispenser) < TF2Util_GetEntityMaxHealth(dispenser))
