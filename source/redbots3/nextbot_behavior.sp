@@ -1629,6 +1629,12 @@ void PurchaseAffordableCanteens(int client, int count = 3)
 			PrintToChatAll("[PurchaseAffordableCanteens] %N desires %d more charges of canteen type %d", client, count, desiredType);
 	}
 	
+	/* The bottle is already full
+	Asking the game for nothing buys nothing, but the command still goes out, and anything reading
+	what the bots buy sees a purchase that never happened */
+	if (count < 1)
+		return;
+	
 	int currency = TF2_GetCurrency(client);
 	const int slot = TF_LOADOUT_SLOT_ACTION;
 	int iClass = view_as<int>(TF2_GetPlayerClass(client));
@@ -1718,6 +1724,10 @@ void PurchaseAffordableCanteens(int client, int count = 3)
 		currency -= selectedCost;
 		purchaseAmount++;
 	}
+	
+	//The price moved under us between choosing and paying
+	if (purchaseAmount < 1)
+		return;
 	
 	KV_MVM_Upgrade(client, purchaseAmount, slot, selectedUpgradeIndex);
 	

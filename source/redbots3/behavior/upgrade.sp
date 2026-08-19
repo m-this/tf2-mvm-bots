@@ -121,8 +121,12 @@ public Action CTFBotUpgrade_Update(BehaviorAction action, int actor, float inter
 
 public void CTFBotUpgrade_OnEnd(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
 {
-	//Lastly, try to purchase any canteens we can afford
-	PurchaseAffordableCanteens(actor);
+	/* Lastly, try to purchase any canteens we can afford
+	Only at a station: this action also ends when the bot is nowhere near one, where the game refuses
+	the purchase and the bot walks back to try again, once per bounce, for as long as it takes it to
+	reach the station */
+	if (TF2_IsInUpgradeZone(actor))
+		PurchaseAffordableCanteens(actor);
 	
 	KV_MvM_UpgradesDone(actor);
 	
