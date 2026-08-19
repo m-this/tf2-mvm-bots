@@ -794,6 +794,12 @@ float GetMaxAttackRange(int client)
 	if (IsMeleeWeapon(myWeapon))
 		return 100.0;
 	
+	//Only where firing further is genuinely wasted; most loadouts say nothing here
+	float tunedDesired, tunedMax;
+	
+	if (GetTunedWeaponRanges(myWeapon, tunedDesired, tunedMax) && tunedMax > RANGE_TUNING_NONE)
+		return tunedMax;
+	
 	int myWeaponID = TF2Util_GetWeaponID(myWeapon);
 	
 	if (myWeaponID == TF_WEAPON_FLAMETHROWER)
@@ -839,7 +845,10 @@ bool IsExplosiveProjectileWeapon(int weapon)
 	{
 		switch (TF2Util_GetWeaponID(weapon))
 		{
-			case TF_WEAPON_ROCKETLAUNCHER, TF_WEAPON_DIRECTHIT, TF_WEAPON_GRENADELAUNCHER, TF_WEAPON_PIPEBOMBLAUNCHER, TF_WEAPON_JAR:
+			//The cannon belongs here as much as any of them: without it the bot skips the
+			//proximity check below and fires a grenade into the robot it is standing against
+			case TF_WEAPON_ROCKETLAUNCHER, TF_WEAPON_DIRECTHIT, TF_WEAPON_GRENADELAUNCHER, TF_WEAPON_PIPEBOMBLAUNCHER, TF_WEAPON_JAR,
+			TF_WEAPON_CANNON:
 			{
 				return true;
 			}

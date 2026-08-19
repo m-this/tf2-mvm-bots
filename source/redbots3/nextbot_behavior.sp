@@ -1010,6 +1010,12 @@ float GetDesiredAttackRange(int client)
 	if (weapon < 1)
 		return 0.0;
 	
+	//The loadout the server handed out is more specific than the weapon's ID
+	float tunedDesired, tunedMax;
+	
+	if (GetTunedWeaponRanges(weapon, tunedDesired, tunedMax))
+		return tunedDesired;
+	
 	int weaponID = TF2Util_GetWeaponID(weapon);
 	
 	if (weaponID == TF_WEAPON_KNIFE)
