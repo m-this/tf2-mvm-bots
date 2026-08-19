@@ -321,6 +321,30 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 	{
 		float dist = GetVectorDistance(GetAbsOrigin(actor), GetAbsOrigin(sentry));
 		
+		/* A finished sentry is not a job
+		The wrench does nothing to a level three at full health and full shells, and the engineer
+		swinging it is an engineer not shooting at the robots walking into his nest */
+		if (!SentryNeedsMetal(sentry))
+		{
+			EquipWeaponSlot(actor, TFWeaponSlot_Primary);
+			
+			UpdateLookAroundForEnemies(actor, true);
+		}
+		else if (CanRepairFromRange(actor, sentry, dist))
+		{
+			//The Rescue Ranger repairs from behind cover, which is the whole reason to carry it
+			EquipWeaponSlot(actor, TFWeaponSlot_Primary);
+			
+			AimHeadTowards(myBody, WorldSpaceCenter(sentry), CRITICAL, 1.0, _, "Repair my Sentry from here");
+			
+			if (myBody.IsHeadAimingOnTarget())
+				VS_PressFireButton(actor);
+			
+			g_arrPluginBot[actor].bPathing = false;
+			
+			return action.Continue();
+		}
+		
 		if (m_ctRecomputePathMvMEngiIdle[actor] < GetGameTime()) 
 		{
 			m_ctRecomputePathMvMEngiIdle[actor] = GetGameTime() + GetRandomFloat(1.0, 2.0);
@@ -346,7 +370,7 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 			g_arrPluginBot[actor].bPathing = true;
 		}
 		
-		if (dist < 90.0) 
+		if (dist < 90.0 && SentryNeedsMetal(sentry)) 
 		{
 			if (!myLoco.IsStuck())
 			{
@@ -363,6 +387,44 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 	}
 	
 	return action.Continue();
+}
+
+/* Whether there is anything the wrench can still do for this sentry
+
+A mini sentry cannot be upgraded and is rebuilt rather than nursed, so for a Gunslinger this is
+only ever about damage taken. Shells are counted because a sentry out of ammo is a sentry that
+does nothing while it looks perfectly healthy */
+bool SentryNeedsMetal(int sentry)
+{
+	if (TF2_IsBuilding(sentry))
+		return true;
+	
+	if (BaseEntity_GetHealth(sentry) < TF2Util_GetEntityMaxHealth(sentry))
+		return true;
+	
+	if (!TF2_IsMiniBuilding(sentry) && TF2_GetUpgradeLevel(sentry) < 3)
+		return true;
+	
+	return GetEntProp(sentry, Prop_Send, "m_iAmmoShells") < 100;
+}
+
+//A Rescue Ranger bolt repairs at range, so its engineer does not walk into the open to hold a nest
+bool CanRepairFromRange(int actor, int sentry, float dist)
+{
+	if (!TF2_IsRescueRangerEquipped(actor))
+		return false;
+	
+	//Close enough to swing at, and the wrench repairs faster
+	if (dist < 200.0)
+		return false;
+	
+	if (dist > SENTRY_MAX_RANGE)
+		return false;
+	
+	if (GetEntProp(actor, Prop_Data, "m_iAmmo", _, 3) < 30)
+		return false;
+	
+	return IsLineOfFireClearEntity(actor, GetEyePosition(actor), sentry);
 }
 
 static void CTFBotMvMEngineerIdle_OnEnd(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
