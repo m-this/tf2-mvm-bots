@@ -356,8 +356,15 @@ The bands:
 Nothing here caps anything. CanUpgradeWithAttrib already refuses an upgrade at its ceiling, so a
 maxed damage bonus falls through to the next line on its own.
 
-The attribute strings are the ones in scripts/items/mvm_upgrades.txt. One this table has not met
-lands at 50, below the damage and above the resistances */
+The attribute strings are the ones in scripts/items/mvm_upgrades.txt. An upgrade this table has
+not met is ranked at random between 50 and 100, which is what the mod did with every upgrade
+before this existed.
+
+That fallback is the point. A Team Fortress 2 update that renames an attribute, or a mission that
+adds one, would otherwise give every upgrade the same number: the sort would then be stable rather
+than sensible, and every bot would buy the same wrong thing in the same order forever. Ranking the
+unknown at random degrades to the old behaviour one upgrade at a time instead, and leaves the ones
+this table does know still ahead of the resistances */
 int GetUpgradePriority(int client, JSONObject info)
 {
 	int slot = info.GetInt("slot");
@@ -368,10 +375,14 @@ int GetUpgradePriority(int client, JSONObject info)
 	
 	CMannVsMachineUpgrades upgrade = CMannVsMachineUpgradeManager().GetUpgradeByIndex(info.GetInt("index"));
 	
+	//Nothing to rank it on, so rank it the way the mod used to rank everything
 	if (upgrade.Address == Address_Null)
-		return 50;
+		return UnrankedUpgradePriority();
 	
 	char attribute[MAX_ATTRIBUTE_DESCRIPTION_LENGTH]; attribute = upgrade.m_szAttribute();
+	
+	if (attribute[0] == '\0')
+		return UnrankedUpgradePriority();
 	
 	int priority = LoadoutUpgradePriority(client, slot, attribute);
 	
@@ -557,7 +568,17 @@ static int GeneralUpgradePriority(const char[] attribute)
 	if (StrEqual(attribute, "damage force reduction")) return 25;
 	if (StrEqual(attribute, "increased jump height")) return 10;
 	
-	return 50;
+	return UnrankedUpgradePriority();
+}
+
+/* An upgrade no table above recognised
+
+The mod's own answer for every upgrade, kept for the ones this file does not name. It has to
+stay random: a constant would tie every unknown upgrade, and a tie is broken by whichever the
+game listed first, so a bot would buy the same wrong thing every wave of every mission */
+static int UnrankedUpgradePriority()
+{
+	return GetRandomInt(50, 100);
 }
 
 int FindPriorityIndex(JSONArray array, const char[] key, int value)
