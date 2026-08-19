@@ -11,8 +11,6 @@ float m_ctAdvanceNestSpot[MAXPLAYERS + 1];
 
 float m_ctRecomputePathMvMEngiIdle[MAXPLAYERS + 1];
 
-CNavArea m_aNestArea[MAXPLAYERS + 1] = {NULL_AREA, ...};
-
 bool g_bGoingToGrabBuilding[MAXPLAYERS + 1];
 int m_hBuildingToGrab[MAXPLAYERS + 1];
 
