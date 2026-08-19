@@ -154,6 +154,7 @@ ConVar redbots_manager_mode;
 ConVar redbots_manager_bot_lineup_mode;
 ConVar redbots_manager_use_custom_loadouts;
 ConVar redbots_manager_class_blacklist;
+ConVar redbots_manager_team_composition;
 ConVar redbots_manager_kick_bots;
 ConVar redbots_manager_min_players;
 ConVar redbots_manager_defender_team_size;
@@ -229,6 +230,7 @@ public void OnPluginStart()
 	redbots_manager_bot_lineup_mode = CreateConVar("sm_redbots_manager_bot_lineup_mode", "0", "How bot team composition is decided.", FCVAR_NOTIFY);
 	redbots_manager_use_custom_loadouts = CreateConVar("sm_redbots_manager_use_custom_loadouts", "0", "Let's bots use different weapons.", FCVAR_NOTIFY);
 	redbots_manager_class_blacklist = CreateConVar("sm_redbots_manager_class_blacklist", "", "Classes the bots never play, comma-separated. Example: sniper,spy", FCVAR_NOTIFY);
+	redbots_manager_team_composition = CreateConVar("sm_redbots_manager_team_composition", "", "The classes the bots fill RED with, in order, comma-separated. Overrides the lineup mode and the blacklist. Example: engineer,medic,heavyweapons,soldier,demoman", FCVAR_NOTIFY);
 	redbots_manager_kick_bots = CreateConVar("sm_redbots_manager_kick_bots", "1", "Kick bots on wave failure/completion.", FCVAR_NOTIFY);
 	redbots_manager_min_players = CreateConVar("sm_redbots_manager_min_players", "3", "Minimum players for normal missions. Other difficulties are adjusted based on this value. Set to -1 to disable entirely.", FCVAR_NOTIFY, true, -1.0, true, float(MAXPLAYERS));
 	redbots_manager_defender_team_size = CreateConVar("sm_redbots_manager_defender_team_size", "6", _, FCVAR_NOTIFY);
@@ -1831,6 +1833,13 @@ void ManageDefenderBots(bool bManage, bool bAddBots = true)
 
 void AddBotsBasedOnLineupMode(int count, bool bAdjustTime = true)
 {
+	if (AddBotsFromTeamComposition(count))
+	{
+		if (bAdjustTime)
+			ExtendUpgradeTimeForNewBots();
+
+		return;
+	}
 	switch (redbots_manager_bot_lineup_mode.IntValue)
 	{
 		case BOT_LINEUP_MODE_RANDOM:
@@ -1848,18 +1857,73 @@ void AddBotsBasedOnLineupMode(int count, bool bAdjustTime = true)
 	}
 	
 	if (bAdjustTime)
+		ExtendUpgradeTimeForNewBots();
+}
+
+void ExtendUpgradeTimeForNewBots()
+{
+	float restartRoundTime = GameRules_GetPropFloat("m_flRestartRoundTime");
+
+	if (restartRoundTime <= 0)
+		return;
+
+	if (restartRoundTime - GetGameTime() <= BUY_UPGRADES_MAX_TIME)
 	{
-		float restartRoundTime = GameRules_GetPropFloat("m_flRestartRoundTime");
-		
-		if (restartRoundTime > 0)
-		{
-			if (restartRoundTime - GetGameTime() <= BUY_UPGRADES_MAX_TIME)
-			{
-				//Add a little more time for the new bot to ready
-				GameRules_SetPropFloat("m_flRestartRoundTime", restartRoundTime + BUY_UPGRADES_MAX_TIME);
-			}
-		}
+		//Add a little more time for the new bot to ready
+		GameRules_SetPropFloat("m_flRestartRoundTime", restartRoundTime + BUY_UPGRADES_MAX_TIME);
 	}
+}
+
+/* Fill the empty seats from sm_redbots_manager_team_composition, in its order
+False when the convar is empty, and the caller falls back to the lineup mode
+
+The list is what the team should look like, not what to add: every call counts the bots already on
+RED against it first and adds only what is missing. So a top-up in the middle of a wave converges on
+the same team as the first fill, whatever order the seats emptied in. A list shorter than the seats
+leaves the rest to the lineup mode */
+bool AddBotsFromTeamComposition(int count)
+{
+	char list[128]; redbots_manager_team_composition.GetString(list, sizeof(list));
+
+	if (list[0] == '\0')
+		return false;
+
+	char wanted[MAXPLAYERS + 1][TF2_CLASS_MAX_NAME_LENGTH];
+	int total = ExplodeString(list, ",", wanted, sizeof(wanted), sizeof(wanted[]));
+
+	//How many bots of each class already hold a seat
+	int held[view_as<int>(TFClass_Engineer) + 1];
+
+	for (int i = 1; i <= MaxClients; i++)
+		if (IsClientInGame(i) && IsDefenderBot(i) && TF2_GetClientTeam(i) == TFTeam_Red)
+			held[view_as<int>(TF2_GetPlayerClass(i))]++;
+
+	int added = 0;
+
+	for (int i = 0; i < total && added < count; i++)
+	{
+		TrimString(wanted[i]);
+
+		TFClassType class = TF2_GetClassIndexFromString(wanted[i]);
+
+		if (class == TFClass_Unknown)
+			continue;
+
+		if (held[view_as<int>(class)] > 0)
+		{
+			held[view_as<int>(class)]--;
+			continue;
+		}
+
+		//The list is more specific than the blacklist, so it wins
+		AddDefenderTFBot(1, wanted[i], "red", "expert", false, false);
+		added++;
+	}
+
+	if (added > 0)
+		PrintToChatAll("%s Adding %d bot(s)...", PLUGIN_PREFIX, added);
+
+	return added >= count;
 }
 
 /* Decide what to do when a player decides to change their team
@@ -1949,9 +2013,12 @@ void HandleTeamPlayerCountChanged(TFTeam team, int iWhoChanging = -1)
 	}
 }
 
-void AddDefenderTFBot(int count, char[] class, char[] team = "red", char[] difficulty = "expert", bool quotaManaged = false)
+void AddDefenderTFBot(int count, char[] class, char[] team = "red", char[] difficulty = "expert", bool quotaManaged = false, bool honorBlacklist = true)
 {
-	char allowed[TF2_CLASS_MAX_NAME_LENGTH]; PickAllowedBotClass(class, allowed, sizeof(allowed));
+	char allowed[TF2_CLASS_MAX_NAME_LENGTH]; strcopy(allowed, sizeof(allowed), class);
+
+	if (honorBlacklist)
+		PickAllowedBotClass(class, allowed, sizeof(allowed));
 
 	//Send command as many times as needed because custom names aren't supported when adding multiple
 	for (int i = 0; i < count; i++)
