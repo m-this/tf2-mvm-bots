@@ -153,6 +153,7 @@ ConVar redbots_manager_debug_actions;
 ConVar redbots_manager_mode;
 ConVar redbots_manager_bot_lineup_mode;
 ConVar redbots_manager_use_custom_loadouts;
+ConVar redbots_manager_class_blacklist;
 ConVar redbots_manager_kick_bots;
 ConVar redbots_manager_min_players;
 ConVar redbots_manager_defender_team_size;
@@ -227,6 +228,7 @@ public void OnPluginStart()
 	redbots_manager_mode = CreateConVar("sm_redbots_manager_mode", "0", "What mode of the mod the use.", FCVAR_NOTIFY);
 	redbots_manager_bot_lineup_mode = CreateConVar("sm_redbots_manager_bot_lineup_mode", "0", "How bot team composition is decided.", FCVAR_NOTIFY);
 	redbots_manager_use_custom_loadouts = CreateConVar("sm_redbots_manager_use_custom_loadouts", "0", "Let's bots use different weapons.", FCVAR_NOTIFY);
+	redbots_manager_class_blacklist = CreateConVar("sm_redbots_manager_class_blacklist", "", "Classes the bots never play, comma-separated. Example: sniper,spy", FCVAR_NOTIFY);
 	redbots_manager_kick_bots = CreateConVar("sm_redbots_manager_kick_bots", "1", "Kick bots on wave failure/completion.", FCVAR_NOTIFY);
 	redbots_manager_min_players = CreateConVar("sm_redbots_manager_min_players", "3", "Minimum players for normal missions. Other difficulties are adjusted based on this value. Set to -1 to disable entirely.", FCVAR_NOTIFY, true, -1.0, true, float(MAXPLAYERS));
 	redbots_manager_defender_team_size = CreateConVar("sm_redbots_manager_defender_team_size", "6", _, FCVAR_NOTIFY);
@@ -1932,9 +1934,61 @@ void HandleTeamPlayerCountChanged(TFTeam team, int iWhoChanging = -1)
 
 void AddDefenderTFBot(int count, char[] class, char[] team = "red", char[] difficulty = "expert", bool quotaManaged = false)
 {
+	char allowed[TF2_CLASS_MAX_NAME_LENGTH]; PickAllowedBotClass(class, allowed, sizeof(allowed));
+
 	//Send command as many times as needed because custom names aren't supported when adding multiple
 	for (int i = 0; i < count; i++)
-		ServerCommand("tf_bot_add %d %s %s %s %s %s", 1, class, team, difficulty, quotaManaged ? "" : "noquota", TFBOT_IDENTITY_NAME);
+		ServerCommand("tf_bot_add %d %s %s %s %s %s", 1, allowed, team, difficulty, quotaManaged ? "" : "noquota", TFBOT_IDENTITY_NAME);
+}
+
+//A blacklisted class becomes a random class that is not, so every path that adds a bot obeys the list
+void PickAllowedBotClass(const char[] wanted, char[] buffer, int maxlen)
+{
+	strcopy(buffer, maxlen, wanted);
+
+	if (!IsBotClassBlacklisted(wanted))
+		return;
+
+	char candidates[9][TF2_CLASS_MAX_NAME_LENGTH];
+	int total = 0;
+
+	for (int i = view_as<int>(TFClass_Scout); i <= view_as<int>(TFClass_Engineer); i++)
+	{
+		if (!IsBotClassBlacklisted(g_sRawPlayerClassNames[i]))
+			strcopy(candidates[total++], TF2_CLASS_MAX_NAME_LENGTH, g_sRawPlayerClassNames[i]);
+	}
+
+	//Everything is blacklisted, which cannot be meant: the list is ignored
+	if (total == 0)
+		return;
+
+	strcopy(buffer, maxlen, candidates[GetRandomInt(0, total - 1)]);
+}
+
+bool IsBotClassBlacklisted(const char[] class)
+{
+	char list[128]; redbots_manager_class_blacklist.GetString(list, sizeof(list));
+
+	if (list[0] == '\0')
+		return false;
+
+	TFClassType wanted = TF2_GetClassIndexFromString(class);
+
+	if (wanted == TFClass_Unknown)
+		return false;
+
+	char entries[9][TF2_CLASS_MAX_NAME_LENGTH];
+	int count = ExplodeString(list, ",", entries, sizeof(entries), sizeof(entries[]));
+
+	for (int i = 0; i < count; i++)
+	{
+		TrimString(entries[i]);
+
+		if (TF2_GetClassIndexFromString(entries[i]) == wanted)
+			return true;
+	}
+
+	return false;
 }
 
 void AddRandomDefenderBots(int amount)
