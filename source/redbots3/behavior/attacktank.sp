@@ -314,11 +314,19 @@ int EvalTankWeapon_Demo(int slot, int weapon)
 		{
 			return 100;
 		}
+		/* A tank is the one target a bot cannot miss, so the clip is worth more than the aim
+		Eight stickies on the hull and one press is the most damage a Demoman does to anything in
+		this mode. This scored zero, below the melee, which is how a bot with a stickybomb
+		launcher ended up hitting a tank with a bottle */
+		case TF_WEAPON_PIPEBOMBLAUNCHER:
+		{
+			return 110;
+		}
 		case TF_WEAPON_BOTTLE, TF_WEAPON_SHOVEL, TF_WEAPON_SWORD, TF_WEAPON_STICKBOMB:
 		{
 			return 80;
 		}
-		case TF_WEAPON_BUFF_ITEM, TF_WEAPON_PARACHUTE, TF_WEAPON_PIPEBOMBLAUNCHER, TF_WEAPON_STICKY_BALL_LAUNCHER:
+		case TF_WEAPON_BUFF_ITEM, TF_WEAPON_PARACHUTE, TF_WEAPON_STICKY_BALL_LAUNCHER:
 		{
 			return 0;
 		}

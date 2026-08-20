@@ -7,6 +7,7 @@
 PathFollower m_pPath[MAXPLAYERS + 1];
 ChasePath m_pChasePath[MAXPLAYERS + 1];
 float m_flRepathTime[MAXPLAYERS + 1];
+static float m_flNextJumpTime[MAXPLAYERS + 1];
 
 static int m_nCurrentPowerupBottle[MAXPLAYERS + 1];
 static float m_flNextBottleUseTime[MAXPLAYERS + 1];
@@ -65,6 +66,8 @@ esPluginBot g_arrPluginBot[MAXPLAYERS + 1];
 #include "behavior/engineerbuildsentrygun.sp"
 #include "behavior/engineerbuilddispenser.sp"
 #include "behavior/engineerbuildteleporter.sp"
+#include "behavior/spycheck.sp"
+#include "behavior/stickytrap.sp"
 #include "behavior/spylurk.sp"
 #include "behavior/spysap.sp"
 #include "behavior/spysapplayer.sp"
@@ -89,6 +92,9 @@ void InitNextBotPathing()
 void ResetNextBot(int client)
 {
 	m_flRepathTime[client] = 0.0;
+	m_flNextJumpTime[client] = 0.0;
+	ResetSpyCheck(client);
+	ResetStickyTrap(client);
 	
 	m_nCurrentPowerupBottle[client] = POWERUP_BOTTLE_NONE;
 	m_flNextBottleUseTime[client] = 0.0;
@@ -397,6 +403,21 @@ public Action CTFBotMainAction_SelectTargetPoint(BehaviorAction action, INextBot
 				
 				return Plugin_Changed;
 			}
+			case TF_WEAPON_ROCKETLAUNCHER:
+			{
+				/* Splash, when there is a crowd standing in it
+
+				ShouldAimRocketsAtFeet was written for the aiming code behind IDLEBOT_AIMING, which
+				is not compiled, so nothing ever asked it anything. The live aiming is Valve's, and
+				Valve's aims at the middle of the robot, which is the right answer for one robot and
+				the wrong one for the line of them walking a choke */
+				if (BaseEntity_IsPlayer(entity) && ShouldAimRocketsAtFeet(me, entity, TF_WEAPON_ROCKETLAUNCHER))
+				{
+					vec = GetAbsOrigin(entity);
+
+					return Plugin_Changed;
+				}
+			}
 			case TF_WEAPON_SNIPERRIFLE, TF_WEAPON_SNIPERRIFLE_DECAP, TF_WEAPON_SNIPERRIFLE_CLASSIC:
 			{
 				//For sniper rifles, try to lookup their head bone to aim at
@@ -500,9 +521,30 @@ public Action CTFBotTacticalMonitor_Update(BehaviorAction action, int actor, flo
 	
 	if (GameRules_GetRoundState() == RoundState_RoundRunning)
 	{
+		/* Nothing else matters while a buster is on top of the bot
+		Above health and ammo on purpose: a bot walking to a health pack through the blast is a
+		bot that arrives dead */
+		if (CTFBotEvadeBuster_IsPossible(actor))
+			return action.SuspendFor(CTFBotEvadeBuster(), "Sentry buster");
+
+		UpdateScoutCombatJump(actor);
+
+		/* The bombs already on the ground, blown when the blast pays
+		Pressed here rather than anywhere in the attack behaviour, because it holds whatever the
+		bot is doing: a Demoman walking to the next fight is still standing over his last one */
+		if (ShouldDetonateStickies(actor))
+			VS_PressAltFireButton(actor);
+
+		/* Spies, in two pieces: what the bot can honestly say it has seen of one, and whether
+		that is enough for it to go and frisk the teammate who was not there a moment ago */
+		UpdateSpyIntel(actor);
+
+		if (CTFBotSpyCheck_IsPossible(actor))
+			return action.SuspendFor(CTFBotSpyCheck(), "Spy check");
+
 		bool low_health = false;
-		
-		float health_ratio = float(GetClientHealth(actor)) / float(TEMP_GetPlayerMaxHealth(actor));
+
+		float health_ratio = HealthRatio(actor);
 		
 		if ((GetTimeSinceWeaponFired(actor) > 2.0 || TF2_GetPlayerClass(actor) == TFClass_Sniper) && health_ratio < tf_bot_health_critical_ratio.FloatValue)
 			low_health = true;
@@ -530,6 +572,62 @@ public Action CTFBotTacticalMonitor_Update(BehaviorAction action, int actor, flo
 	}
 	
 	return Plugin_Continue;
+}
+
+/* A Scout that keeps both feet on the ground
+
+Nothing in this mod ever pressed IN_JUMP. Not in a fight, not to cross a gap, nowhere: a
+play-test called the Scouts too easy to kill and that is the whole of the reason. A robot leads
+a target moving in two dimensions perfectly well. The third one is most of what keeps a Scout
+alive, and it costs him nothing: a scattergun is as accurate in the air as on the ground.
+
+Only a Scout. Every other class is slower in the air than on it, and a Heavy who leaves the
+ground has traded his aim for a hop */
+
+//Close enough that the robot shooting back cannot miss unless it is made to
+#define SCOUT_JUMP_THREAT_RANGE	900.0
+
+//Slow enough to be standing still, whatever the bot thinks it is doing
+#define SCOUT_JUMP_MIN_SPEED	100.0
+
+static void UpdateScoutCombatJump(int client)
+{
+	if (TF2_GetPlayerClass(client) != TFClass_Scout)
+		return;
+
+	if (m_flNextJumpTime[client] > GetGameTime())
+		return;
+
+	//Already in the air, or held down by something that a jump will not get it out of
+	if (!(GetEntityFlags(client) & FL_ONGROUND))
+		return;
+
+	if (TF2_IsPlayerInCondition(client, TFCond_Dazed) || TF2_IsPlayerInCondition(client, TFCond_Slowed))
+		return;
+
+	/* Standing still. A jump in place lands where it started and is a worse target for the second
+	it is in the air, so the dodge is only a dodge while the bot is going somewhere */
+	float velocity[3]; GetEntPropVector(client, Prop_Data, "m_vecVelocity", velocity);
+
+	if (velocity[0] * velocity[0] + velocity[1] * velocity[1] < SCOUT_JUMP_MIN_SPEED * SCOUT_JUMP_MIN_SPEED)
+		return;
+
+	INextBot myBot = CBaseNPC_GetNextBotOfEntity(client);
+	CKnownEntity threat = myBot.GetVisionInterface().GetPrimaryKnownThreat(false);
+
+	if (threat == NULL_KNOWN_ENTITY || !threat.IsVisibleRecently())
+		return;
+
+	float threatOrigin[3]; threat.GetLastKnownPosition(threatOrigin);
+
+	if (myBot.IsRangeGreaterThanEx(threatOrigin, SCOUT_JUMP_THREAT_RANGE))
+		return;
+
+	//Irregular on purpose: a jump on a fixed beat is as easy to lead as no jump at all
+	m_flNextJumpTime[client] = GetGameTime() + GetRandomFloat(0.5, 1.2);
+
+	//No duration: one command's worth of the button, which is one jump
+	g_arrExtraButtons[client].PressButtons(IN_JUMP);
 }
 
 public Action CTFBotScenarioMonitor_Update(BehaviorAction action, int actor, float interval, ActionResult result)
@@ -571,11 +669,22 @@ public Action CTFBotMedicHeal_UpdatePost(BehaviorAction action, int actor, float
 		return action.SuspendFor(CTFBotMedicRevive(), "Revive teammate");
 	
 	int myWeapon = BaseCombatCharacter_GetActiveWeapon(actor);
-	
+
+	if (myWeapon != -1 && TF2Util_GetWeaponID(myWeapon) == TF_WEAPON_MEDIGUN)
+	{
+		int patient = action.GetHandleEntity(ACTION_HEAL_PATIENT_OFFSET);
+
+		/* The charge, which nothing here used to decide
+		Pressed rather than set: the deploy belongs to the game, and this only ever asks for it
+		sooner than the game's own dying-patient rule would have */
+		if (ShouldDeployUber(actor, myWeapon, patient))
+			VS_PressAltFireButton(actor);
+	}
+
 	if (myWeapon != -1 && TF2Util_GetWeaponID(myWeapon) == TF_WEAPON_MEDIGUN && GetMedigunType(myWeapon) == MEDIGUN_RESIST)
 	{
 		int myPatient = action.GetHandleEntity(ACTION_HEAL_PATIENT_OFFSET);
-		
+
 		if (myPatient > 0)
 		{
 			int iResistType = GetResistType(myWeapon);
@@ -781,7 +890,18 @@ Action GetDesiredBotAction(int client, BehaviorAction action)
 				else if (CTFBotCollectNearMoney_SelectTarget(client))
 					return action.SuspendFor(CTFBotCollectNearMoney(), "Nearby money");
 			}
-			case TFClass_Soldier, TFClass_Pyro, TFClass_DemoMan:
+			case TFClass_DemoMan:
+			{
+				if (CTFBotAttackTank_SelectTarget(client))
+					return action.SuspendFor(CTFBotAttackTank(), "Attacking tank");
+				else if (CTFBotDefenderAttack_SelectTarget(client))
+					return action.SuspendFor(CTFBotDefenderAttack(), "CTFBotAttack_IsPossible");
+				else if (CTFBotStickyTrap_IsPossible(client))
+					return action.SuspendFor(CTFBotStickyTrap(), "Nothing to fight, so lay a trap");
+				else if (CTFBotCollectNearMoney_SelectTarget(client))
+					return action.SuspendFor(CTFBotCollectNearMoney(), "Nearby money");
+			}
+			case TFClass_Soldier, TFClass_Pyro:
 			{
 				if (CTFBotAttackTank_SelectTarget(client))
 					return action.SuspendFor(CTFBotAttackTank(), "Attacking tank");
@@ -1328,7 +1448,21 @@ void EquipBestWeaponForThreat(int client, const CKnownEntity threat)
 	
 	switch (TF2_GetPlayerClass(client))
 	{
-		case TFClass_DemoMan, TFClass_Heavy, TFClass_Spy, TFClass_Medic, TFClass_Engineer:
+		case TFClass_DemoMan:
+		{
+			/* The stickybomb launcher, which this switch used to pass over in silence
+			A Demoman was listed with the classes that only ever want their primary, so the
+			launcher came out when the pipes ran dry and at no other time */
+			float threatOrigin[3]; threat.GetLastKnownPosition(threatOrigin);
+			float myOrigin[3]; GetClientAbsOrigin(client, myOrigin);
+			float threatRange = GetVectorDistance(myOrigin, threatOrigin);
+
+			if (secondary != -1 && ShouldUseStickyLauncher(client, secondary, threatEnt, threatRange))
+				gun = secondary;
+			else if (gun != -1 && !Clip1(gun) && secondary != -1 && Clip1(secondary))
+				gun = secondary;
+		}
+		case TFClass_Heavy, TFClass_Spy, TFClass_Medic, TFClass_Engineer:
 		{
 			//Uses primary
 		}
@@ -1829,16 +1963,42 @@ void GetFlameThrowerAimForTank(int tank, float aimPos[3])
 	aimPos[2] += 90.0;
 }
 
+/* Whether a teleporter is worth walking to
+
+It used to answer yes to everything, in both branches, so the caller that exists to stop a bot
+looking for one never stopped anything. A play-test watched the result and drew the obvious
+conclusion, that engineers are better off not building teleporters at all: a defender who wants
+to ride one has to walk back to the entrance first, and the entrance is at the spawn the fight is
+being pushed towards. So the bots walked away from the hatch, into the teleporter, and out of it
+roughly where they had started, having given the wave the seconds it takes to do all that.
+
+A ride is worth it when it saves a walk the bot would otherwise make: the fight has to be far
+enough up the path that going back to spawn and coming out forward is still ahead. When the bomb
+is on the hatch, nothing is forward of anything, and the answer is no.
+
+This says nothing about which teleporter, because there is nothing here to say it with. It is the
+gate on looking at all, which is where the cost is */
+
+//Far enough up the path that the walk back to the entrance is bought back by the ride
+#define TELEPORTER_WORTH_RIDING	1500.0
+
 static bool ShouldUseTeleporter(int client)
 {
-	switch (TF2_GetPlayerClass(client))
-	{
-		case TFClass_Medic, TFClass_Engineer:
-		{
-			//These classes have their own logic
-			return true;
-		}
-	}
-	
-	return true;
+	BombInfo_t bombinfo;
+
+	//No bomb in play, so there is no fight to be late for and no reason to leave the ground
+	if (!GetBombInfo(bombinfo))
+		return false;
+
+	CTFNavArea myArea = view_as<CTFNavArea>(CBaseCombatCharacter(client).GetLastKnownArea());
+
+	if (myArea == NULL_AREA)
+		return false;
+
+	CTFNavArea bombArea = view_as<CTFNavArea>(TheNavMesh.GetNearestNavArea(bombinfo.vPosition));
+
+	if (bombArea == NULL_AREA)
+		return false;
+
+	return GetTravelDistanceToBombTarget(myArea) + TELEPORTER_WORTH_RIDING < GetTravelDistanceToBombTarget(bombArea);
 }

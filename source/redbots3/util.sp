@@ -39,11 +39,12 @@ enum //medigun_resist_types_t
 	MEDIGUN_NUM_RESISTS
 }
 
+//The game's own medigun_weapontypes_t, and its own names: 1 is the Kritzkrieg, not an uber
 enum //medigun_weapontypes_t
 {
 	MEDIGUN_STANDARD = 0,
-	MEDIGUN_UBER,
-	MEDIGUN_QUICKFIX,
+	MEDIGUN_CRITBOOST,
+	MEDIGUN_MEGAHEAL,
 	MEDIGUN_RESIST
 }
 
@@ -434,6 +435,56 @@ bool IsSentryBusterRobot(int client)
 	char model[PLATFORM_MAX_PATH]; GetClientModel(client, model, PLATFORM_MAX_PATH);
 	
 	return StrEqual(model, "models/bots/demo/bot_sentry_buster.mdl");
+}
+
+//What the explosion reaches. Valve's own is smaller, and a bot that stops running early is dead
+#define BUSTER_BLAST_RANGE	400.0
+
+//How close a live buster has to be before a bot drops what it is doing and runs
+#define BUSTER_FLEE_RANGE	700.0
+
+/* How far away a buster has to be for the engineer to still have time to move the sentry
+
+A buster walks faster than an engineer carries. Further out than this and the engineer would put
+the sentry down and pick it up again for every robot that walks past the nest */
+#define BUSTER_HAUL_RANGE	1800.0
+
+/* The nearest live sentry buster to a point, or -1 for none
+
+A buster is a mission robot, so there is at most one of them worth caring about at a time, but
+nothing in the game promises that: the loop reads them all and keeps the closest.
+
+Busters still in the spawn room are skipped. One walks the whole length of the map to reach a
+sentry, and a team that starts running when it leaves the door spends the wave running */
+int FindSentryBusterNear(const float origin[3], TFTeam enemyTeam, float maxRange)
+{
+	float bestDistance = maxRange;
+	int best = -1;
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || !IsPlayerAlive(i))
+			continue;
+
+		if (TF2_GetClientTeam(i) != enemyTeam)
+			continue;
+
+		if (!IsSentryBusterRobot(i))
+			continue;
+
+		if (TF2Util_IsPointInRespawnRoom(WorldSpaceCenter(i)))
+			continue;
+
+		float distance = GetVectorDistance(WorldSpaceCenter(i), origin);
+
+		if (distance < bestDistance)
+		{
+			bestDistance = distance;
+			best = i;
+		}
+	}
+
+	return best;
 }
 
 int FindBotNearestToBombNearestToHatch(int client)
@@ -1595,6 +1646,8 @@ level three or spends mini sentries */
 #define TF_ITEMDEF_EUREKA_EFFECT	589
 #define TF_ITEMDEF_RESCUE_RANGER	997
 #define TF_ITEMDEF_WRANGLER		140
+#define TF_ITEMDEF_WIDOWMAKER		527
+#define TF_ITEMDEF_SHORT_CIRCUIT	528
 
 int GetLoadoutSlotItemDefinitionIndex(int client, int slot)
 {
@@ -1621,11 +1674,103 @@ bool TF2_IsRescueRangerEquipped(int client)
 	return GetLoadoutSlotItemDefinitionIndex(client, TFWeaponSlot_Primary) == TF_ITEMDEF_RESCUE_RANGER;
 }
 
+/* Whether this engineer's gun is paid for out of the metal supply
+
+Every shot from one of these is a sentry repair that does not happen, which is what makes the
+metal upgrades the first thing such an engineer should buy rather than a convenience */
+bool EngineerGunSpendsMetal(int client)
+{
+	if (TF2_GetPlayerClass(client) != TFClass_Engineer)
+		return false;
+
+	switch (GetLoadoutSlotItemDefinitionIndex(client, TFWeaponSlot_Primary))
+	{
+		case TF_ITEMDEF_WIDOWMAKER, TF_ITEMDEF_RESCUE_RANGER: return true;
+	}
+
+	return GetLoadoutSlotItemDefinitionIndex(client, TFWeaponSlot_Secondary) == TF_ITEMDEF_SHORT_CIRCUIT;
+}
+
 //A nest on top of the hatch has nothing in front of it to shoot at
 #define NEST_HATCH_CLEARANCE 180.0
 
 //Two nests closer together than this cover the same ground twice and die to the same blast
 #define NEST_SPACING 500.0
+
+//How far from the sentry to look for ground to move it to, away from a buster
+#define SENTRY_HAUL_SEARCH_RANGE 1200.0
+
+/* How close to the bomb a nest is allowed to be, as a fraction of the sentry's range
+
+A third of it. Closer than that and the sentry spends none of its range: the robots are already
+on top of it when it opens fire, the giant that walks in melees it, and the engineer holding it
+is standing in the fight rather than behind it */
+#define NEST_MIN_BOMB_RANGE_FRACTION 0.34
+
+/* How many pieces of the approach to sample, and what seeing all of them is worth
+
+Bounded because the term is computed for every candidate area: a map hands out as many areas
+within a sentry's range of the bomb as its mesh happens to have, and a score is not worth an
+unbounded loop. Two dozen spread across the ground is enough to tell a ledge over the choke from
+a corner behind a wall */
+#define MAX_APPROACH_SAMPLES	24
+#define NEST_SIGHT_SCORE	80.0
+
+/* The ground the robots have to cross to reach the target
+
+Areas on the bomb path within a sentry's range of it, taken with a stride so that a mesh with
+hundreds of them still describes the whole approach rather than one corner of it */
+static void CollectBombApproachAreas(const float target[3], float SentryRange, ArrayList out)
+{
+	AreasCollector hAreas = TheNavMesh.CollectAreasInRadius(target, SentryRange);
+
+	int count = hAreas.Count();
+	int stride = count > MAX_APPROACH_SAMPLES ? count / MAX_APPROACH_SAMPLES : 1;
+
+	for (int i = 0; i < count && out.Length < MAX_APPROACH_SAMPLES; i += stride)
+	{
+		CTFNavArea area = view_as<CTFNavArea>(hAreas.Get(i));
+
+		if (!area.HasAttributeTF(BOMB_DROP))
+			continue;
+
+		if (area.HasAttributeTF(BLUE_SPAWN_ROOM) || area.HasAttributeTF(RED_SPAWN_ROOM))
+			continue;
+
+		out.Push(area);
+	}
+
+	delete hAreas;
+}
+
+/* What this area can actually shoot at, which is the thing a play-test said was missing
+
+"Their sentries are blocked by the walls." A nest was tested against one point, the bomb, and a
+line to one point says nothing about a lane. A spot with the bomb visible through a doorway and
+a wall across everything either side of it passed, and the sentry built there fires at whatever
+crosses the doorway and nothing else.
+
+The nav mesh already knows this. Visibility between areas is computed when the mesh is built, so
+asking it is a lookup rather than a trace, and the whole approach can be asked about for the cost
+of the one trace this replaces.
+
+A mesh built without visibility data answers no to everything. Then every candidate scores zero
+here and the other terms decide, which is what happened before this existed */
+static float NestSightScore(CTFNavArea area, ArrayList approach)
+{
+	if (approach == null || approach.Length == 0)
+		return 0.0;
+
+	int seen = 0;
+
+	for (int i = 0; i < approach.Length; i++)
+	{
+		if (area.IsCompletelyVisible(view_as<CNavArea>(approach.Get(i))))
+			seen++;
+	}
+
+	return (float(seen) / float(approach.Length)) * NEST_SIGHT_SCORE;
+}
 
 /* How good a nest this area is, higher being better
 
@@ -1644,7 +1789,7 @@ free to put the sentry in a corridor behind the fight while a ledge over the cho
 An engineer carrying a Gunslinger scores the opposite way on range and height. The mini sentry is
 built in two seconds and dies in one, so it is spent rather than held: it wants to be near the
 robots where it is worth the metal, not on a ledge where it plinks */
-float ScoreNestArea(int client, CTFNavArea area, const float target[3], float SentryRange)
+float ScoreNestArea(int client, CTFNavArea area, const float target[3], float SentryRange, ArrayList approach = null)
 {
 	bool disposable = TF2_IsGunslingerEquipped(client);
 	
@@ -1664,6 +1809,8 @@ float ScoreNestArea(int client, CTFNavArea area, const float target[3], float Se
 	}
 	
 	score += MinFloat(area.GetSizeX(), area.GetSizeY()) * 0.05;
+	
+	score += NestSightScore(area, approach);
 	
 	//Somebody is already holding this ground
 	for (int i = 1; i <= MaxClients; i++)
@@ -1690,10 +1837,14 @@ CNavArea BestNestArea(int client, ArrayList areas, const float target[3], float 
 	CNavArea best = NULL_AREA;
 	float bestScore = 0.0;
 	
+	//The ground the robots cross to reach the target, sampled once for the whole list
+	ArrayList approach = new ArrayList();
+	CollectBombApproachAreas(target, SentryRange, approach);
+	
 	for (int i = 0; i < areas.Length; i++)
 	{
 		CTFNavArea area = view_as<CTFNavArea>(areas.Get(i));
-		float score = ScoreNestArea(client, area, target, SentryRange);
+		float score = ScoreNestArea(client, area, target, SentryRange, approach);
 		
 		if (best == NULL_AREA || score > bestScore)
 		{
@@ -1701,6 +1852,8 @@ CNavArea BestNestArea(int client, ArrayList areas, const float target[3], float 
 			bestScore = score;
 		}
 	}
+	
+	delete approach;
 	
 	return best;
 }
@@ -1737,6 +1890,128 @@ CNavArea PickConfiguredNestArea(int client, const float target[3], float SentryR
 	return best;
 }
 
+/* The nest spots the map itself carries, and where they come from
+
+The TODO in this repository said the compiled map does not hold this data and that somebody has
+to stand on the ground and decide. That is true of three of the seven official maps. It is not
+true of the other four, and it is not true of most community maps built after them.
+
+Decoy, Bigrock, Rottenburg and Mannhattan ship thirteen to twenty-seven bot_hint_sentrygun and
+bot_hint_engineer_nest entities each. They are there for the engineer robots, so they are BLU's
+and they face the wrong way, and neither of those things matters. A sentry shoots in a circle,
+and the ground under a spot Valve chose for one team to hold a corridor from is the same ground
+the other team holds the same corridor from. What the entity is really saying is that a level
+three fits here, that it has a line down the lane, and that a mapper put it there on purpose.
+
+They are read at runtime rather than copied into the configuration files, so a community map that
+built on the same prefabs is covered without anybody authoring anything.
+
+None of it is trusted blindly. Every spot goes through the same nest score as everything else, so
+one deep in the robots' half loses to the nav mesh reasoning below on distance to the bomb. A
+hand written EngineerNest block still outranks all of it: somebody stood there. */
+
+//Put a limit on everything. Mannhattan carries twenty-seven; a map with a thousand is broken
+#define MAX_MAP_HINT_NESTS	64
+
+static ArrayList g_adtMapHintNests;
+static bool g_bMapHintNestsLoaded;
+
+//The map changed, so what the last map's entities said about it is worth nothing
+void ResetMapHintNests()
+{
+	g_bMapHintNestsLoaded = false;
+
+	if (g_adtMapHintNests != null)
+		g_adtMapHintNests.Clear();
+}
+
+static void CollectMapHintNests(const char[] classname)
+{
+	int entity = -1;
+
+	while ((entity = FindEntityByClassname(entity, classname)) != -1)
+	{
+		if (g_adtMapHintNests.Length >= MAX_MAP_HINT_NESTS)
+			return;
+
+		float origin[3]; origin = GetAbsOrigin(entity);
+
+		if (IsZeroVector(origin))
+			continue;
+
+		g_adtMapHintNests.PushArray(origin);
+	}
+}
+
+/* Read the first time an engineer asks, rather than at map start
+
+The entities are the map's own and they are spawned long before this, but reading them late costs
+nothing and does not depend on when a forward happens to fire relative to the level's entities */
+static ArrayList MapHintNests()
+{
+	if (g_adtMapHintNests == null)
+		g_adtMapHintNests = new ArrayList(3);
+
+	if (g_bMapHintNestsLoaded)
+		return g_adtMapHintNests;
+
+	g_bMapHintNestsLoaded = true;
+
+	CollectMapHintNests("bot_hint_sentrygun");
+	CollectMapHintNests("bot_hint_engineer_nest");
+
+	if (redbots_manager_debug.BoolValue)
+		PrintToServer("MapHintNests: %d nest spots from the map's own entities", g_adtMapHintNests.Length);
+
+	return g_adtMapHintNests;
+}
+
+//The best of the map's own nest spots, or NULL_AREA when the map carries none
+CNavArea PickMapHintNestArea(int client, const float target[3], float SentryRange)
+{
+	ArrayList spots = MapHintNests();
+
+	if (spots.Length == 0)
+		return NULL_AREA;
+
+	ArrayList areas = new ArrayList();
+
+	for (int i = 0; i < spots.Length; i++)
+	{
+		float spot[3]; spots.GetArray(i, spot);
+
+		CNavArea area = TheNavMesh.GetNearestNavArea(spot, false, 500.0, false, true, TEAM_ANY);
+
+		if (area == NULL_AREA)
+			continue;
+
+		CTFNavArea tfArea = view_as<CTFNavArea>(area);
+
+		//A spot inside either spawn room is one the engineer cannot hold, whoever it was put there for
+		if (tfArea.HasAttributeTF(BLUE_SPAWN_ROOM) || tfArea.HasAttributeTF(RED_SPAWN_ROOM))
+			continue;
+
+		areas.Push(area);
+	}
+
+	CNavArea best = BestNestArea(client, areas, target, SentryRange);
+
+	delete areas;
+
+	return best;
+}
+
+/* Whether a spot is close enough to the bomb to be worth holding, and far enough to survive it
+
+Both bounds matter and only one of them existed. A nest further up the path than the depth limit
+is a nest the wave walks past; a nest on top of the bomb is a sentry the first giant meleed, with
+a dispenser nobody but the engineer stands at, which is what a play-test found sitting on Decoy's
+hatch. Valve keeps its own engineer robots 1300 units off the bomb for the same reason */
+static bool IsNestRangeSane(float rangeToBomb, float SentryRange)
+{
+	return rangeToBomb >= SentryRange * NEST_MIN_BOMB_RANGE_FRACTION && rangeToBomb < SentryRange;
+}
+
 CNavArea PickBuildArea(int client, float SentryRange = 1300.0)
 {
 	int iAreaCount = TheNavAreas.Count;
@@ -1762,6 +2037,11 @@ CNavArea PickBuildArea(int client, float SentryRange = 1300.0)
 	if (configured != NULL_AREA)
 		return configured;
 	
+	CNavArea hinted = PickMapHintNestArea(client, vecTargetPos, SentryRange);
+	
+	if (hinted != NULL_AREA)
+		return hinted;
+	
 	CTFNavArea bombArea = TheNavMesh.GetNearestNavArea(vecTargetPos, false, 90000.0, false, true, TEAM_ANY);
 	
 	if (bombArea == NULL_AREA)
@@ -1782,6 +2062,8 @@ CNavArea PickBuildArea(int client, float SentryRange = 1300.0)
 	ArrayList VisibleAreasAround  = new ArrayList();
 	//Any of the above, but further up the path than an engineer should nest.
 	ArrayList AreasTooFarUp       = new ArrayList();
+	//On top of the bomb, which is a nest only when the map offers nothing else.
+	ArrayList AreasTooClose       = new ArrayList();
 
 	float limit = NestDistanceLimit();
 	
@@ -1826,6 +2108,16 @@ CNavArea PickBuildArea(int client, float SentryRange = 1300.0)
 		if (flAreaDistanceToBomb >= SentryRange)
 			continue;
 		
+		/* Close enough to the bomb that the sentry never uses its range
+		Kept rather than dropped, and kept last: a nest on top of the bomb is bad and no nest at
+		all is worse, and a map whose every area near the bomb is this close is a map where the
+		engineer would otherwise stand around with 300 metal */
+		if (!IsNestRangeSane(flAreaDistanceToBomb, SentryRange))
+		{
+			AreasTooClose.Push(area);
+			continue;
+		}
+		
 		bool bAreaVisibleToBomb = area.IsEntirelyVisible(vecTargetPos);
 		
 		if (bAreaVisibleToBomb)
@@ -1850,16 +2142,68 @@ CNavArea PickBuildArea(int client, float SentryRange = 1300.0)
 	else if (ForwardAreas.Length       > 0) randomArea = BestNestArea(client, ForwardAreas,        vecTargetPos, SentryRange);
 	else if (VisibleAreasAround.Length > 0) randomArea = BestNestArea(client, VisibleAreasAround,  vecTargetPos, SentryRange);
 	else if (AreasTooFarUp.Length      > 0) randomArea = BestNestArea(client, AreasTooFarUp,       vecTargetPos, SentryRange);
+	else if (AreasTooClose.Length      > 0) randomArea = BestNestArea(client, AreasTooClose,       vecTargetPos, SentryRange);
 	
 	if (redbots_manager_debug.BoolValue)
-		PrintToServer("PickBuildArea %i ForwardVisibleAreas | %i ForwardAreas | %i VisibleAreasAroundBomb | %i AreasTooFarUp", ForwardVisibleAreas.Length, ForwardAreas.Length, VisibleAreasAround.Length, AreasTooFarUp.Length);
+		PrintToServer("PickBuildArea %i ForwardVisibleAreas | %i ForwardAreas | %i VisibleAreasAroundBomb | %i AreasTooFarUp | %i AreasTooClose", ForwardVisibleAreas.Length, ForwardAreas.Length, VisibleAreasAround.Length, AreasTooFarUp.Length, AreasTooClose.Length);
 	
 	ForwardVisibleAreas.Close();
 	ForwardAreas.Close();
 	VisibleAreasAround.Close();
 	AreasTooFarUp.Close();
+	AreasTooClose.Close();
 	
 	return randomArea;
+}
+
+/* Ground to move a sentry to when a buster is walking towards it, or NULL_AREA for none
+
+Not a nest. The sentry is going back where it was as soon as the buster is dead, so this asks for
+one thing only: that the blast happens somewhere else. Far enough that the sentry survives it,
+near enough that the engineer is not carrying a building across the map while the wave arrives.
+
+Nothing here is clever about where the buster will walk. A buster chases the sentry that hurt it
+most, so it follows, and what the engineer buys is the time it takes to walk the difference. That
+time is what the team kills it in, and the blast that does land lands away from the dispenser and
+away from whoever was standing at the nest */
+CNavArea PickBusterRetreatArea(int sentry, int buster)
+{
+	float sentryOrigin[3]; sentryOrigin = GetAbsOrigin(sentry);
+	float busterOrigin[3]; busterOrigin = WorldSpaceCenter(buster);
+
+	//Anywhere the sentry ends up has to beat where it stands now by a blast, or it was not worth moving
+	float bestDistance = GetVectorDistance(sentryOrigin, busterOrigin) + BUSTER_BLAST_RANGE;
+	CNavArea best = NULL_AREA;
+
+	AreasCollector hAreas = TheNavMesh.CollectAreasInRadius(sentryOrigin, SENTRY_HAUL_SEARCH_RANGE);
+
+	int count = hAreas.Count();
+
+	//One engineer, once per buster, but the count belongs to the map rather than to this
+	if (count > 256)
+		count = 256;
+
+	for (int i = 0; i < count; i++)
+	{
+		CTFNavArea area = view_as<CTFNavArea>(hAreas.Get(i));
+
+		if (area.HasAttributeTF(BLUE_SPAWN_ROOM) || area.HasAttributeTF(RED_SPAWN_ROOM))
+			continue;
+
+		float center[3]; area.GetCenter(center);
+
+		float distance = GetVectorDistance(center, busterOrigin);
+
+		if (distance <= bestDistance)
+			continue;
+
+		bestDistance = distance;
+		best = view_as<CNavArea>(area);
+	}
+
+	delete hAreas;
+
+	return best;
 }
 
 /* Where an engineer nests before a wave begins
@@ -1890,12 +2234,19 @@ CNavArea PickBuildAreaPreRound(int client, float SentryRange = 1300.0)
 	if (configured != NULL_AREA)
 		return configured;
 
+	CNavArea hinted = PickMapHintNestArea(client, hatch, SentryRange);
+
+	if (hinted != NULL_AREA)
+		return hinted;
+
 	//Near enough to the hatch to nest, and with a line to it
 	ArrayList CoveringAreas = new ArrayList();
 	//Near enough to nest, seeing the hatch or not
 	ArrayList NestingAreas  = new ArrayList();
 	//On the path, but further up it than an engineer should nest
 	ArrayList AreasTooFarUp = new ArrayList();
+	//On top of the hatch, which is a nest only when the map offers nothing else
+	ArrayList AreasTooClose = new ArrayList();
 
 	for (int i = 0; i < iAreaCount; i++)
 	{
@@ -1926,12 +2277,21 @@ CNavArea PickBuildAreaPreRound(int client, float SentryRange = 1300.0)
 			continue;
 		}
 
-		NestingAreas.Push(area);
-
 		float center[3]; area.GetCenter(center);
 		center[2] += 50.0;
 
-		if (GetVectorDistance(center, hatch) <= SentryRange && area.IsEntirelyVisible(hatch))
+		/* Sitting on the hatch is not nesting, whichever tier the area would have landed in
+		The clearance above is a travel distance along the bomb path and says nothing about a
+		ledge directly over the hatch, which is a short walk and no distance at all */
+		if (!IsNestRangeSane(GetVectorDistance(center, hatch), SentryRange))
+		{
+			AreasTooClose.Push(area);
+			continue;
+		}
+
+		NestingAreas.Push(area);
+
+		if (area.IsEntirelyVisible(hatch))
 			CoveringAreas.Push(area);
 	}
 
@@ -1940,13 +2300,15 @@ CNavArea PickBuildAreaPreRound(int client, float SentryRange = 1300.0)
 	if (CoveringAreas.Length > 0)       bestArea = BestNestArea(client, CoveringAreas, hatch, SentryRange);
 	else if (NestingAreas.Length > 0)   bestArea = BestNestArea(client, NestingAreas,  hatch, SentryRange);
 	else if (AreasTooFarUp.Length > 0)  bestArea = BestNestArea(client, AreasTooFarUp, hatch, SentryRange);
+	else if (AreasTooClose.Length > 0)  bestArea = BestNestArea(client, AreasTooClose, hatch, SentryRange);
 
 	if (redbots_manager_debug.BoolValue)
-		PrintToServer("PickBuildAreaPreRound %i CoveringAreas | %i NestingAreas | %i AreasTooFarUp", CoveringAreas.Length, NestingAreas.Length, AreasTooFarUp.Length);
+		PrintToServer("PickBuildAreaPreRound %i CoveringAreas | %i NestingAreas | %i AreasTooFarUp | %i AreasTooClose", CoveringAreas.Length, NestingAreas.Length, AreasTooFarUp.Length, AreasTooClose.Length);
 
 	CoveringAreas.Close();
 	NestingAreas.Close();
 	AreasTooFarUp.Close();
+	AreasTooClose.Close();
 
 	return bestArea;
 }

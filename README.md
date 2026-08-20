@@ -14,9 +14,17 @@ TFBots that can play Mann vs Machine.
 - [REST in Pawn](https://github.com/ErikMinekus/sm-ripext)
 ## Compilation Only
 - [stocklib_officerspy](https://github.com/OfficerSpy/SM_Stock_OfficerSpy)
+# Testing
+`testbed/` runs a server with nobody on it and writes down what the bots did
+with every wave: cleared or lost, how long, how many robots and defenders died,
+how many backstabs, what the engineers lost. `testbed/run.sh` plays a mission,
+`testbed/report.py` compares two runs. See `testbed/README.md`.
+
 # Notes
 - Initial AI code is a port over from [[TF2] MvM AFK Bot](https://github.com/Pelipoika/TF2_Idlebot) AI code.
 - Internal PluginBot based on C++ code from [PathFollower](https://github.com/Pelipoika/PathFollower).
 - Certain functions have functionality based on Valve's own code from the game.
 - Tank Weapon Score System based on C++ code from mvm defender bots behavior from [sigsegv MvM](https://github.com/sigsegv-mvm/sigsegv-mvm).
 - Custom Sniper spots for various maps by Us_le.
+- Spy checking and the stickybomb trap follow the approach in [RCBot2](https://github.com/chrizonix/RCBot2) by Cheeseh: paranoia that grows from where a Spy was last seen, a suspect picked out as the teammate who was not there a moment ago, and a bomb-by-bomb trap laid across a spread rather than onto one point. The code is ours; the ideas are worth the credit.
+- Engineer nest spots are read from the map's own `bot_hint_sentrygun` and `bot_hint_engineer_nest` entities where a map carries them.
