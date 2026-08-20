@@ -30,14 +30,19 @@ services:
       BOT_USE_UPGRADES: ${TESTBED_BOT_USE_UPGRADES:-1}
       STATS_FILE: ${TESTBED_STATS_FILE:-mvmbots_stats.jsonl}
       TESTBED_HOST: ${TESTBED_HOST:-1}
+      # Comma-separated SteamIDs that get root, for walking a map by hand
+      TESTBED_ADMIN_STEAMIDS: ${TESTBED_ADMIN_STEAMIDS:-}
     ports:
       # 27025, not 27015: a machine that already runs a game server is a machine
       # whose game port is taken, and the whole reason the game is already
       # downloaded here is that a server is using it.
       #
-      # Loopback only. This server has no password, no Steam session and a
-      # known rcon password, and it exists to be shouted at by a script.
-      - "127.0.0.1:${TESTBED_PORT:-27025}:${TESTBED_PORT:-27025}/udp"
+      # The game port answers wherever TESTBED_BIND says, so somebody on the LAN
+      # can join and walk the map. It defaults to loopback: this server has no
+      # password and no Steam session, so opening it is a decision, not a default.
+      - "${TESTBED_BIND:-127.0.0.1}:${TESTBED_PORT:-27025}:${TESTBED_PORT:-27025}/udp"
+      # rcon is the TCP half of the same port, and it never leaves this machine.
+      # The password is in a file in the repository.
       - "127.0.0.1:${TESTBED_PORT:-27025}:${TESTBED_PORT:-27025}/tcp"
     volumes:
       - tf2game:/home/steam/tf-dedicated

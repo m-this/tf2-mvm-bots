@@ -34,6 +34,9 @@ static void Event_MvmWaveFailed(Event event, const char[] name, bool dontBroadca
 {
 	m_iWaveFailCounterTick++;
 	
+	//The same wave comes back down the same route, so there is nothing new to say about the nests
+	EngineerNestRelocation_ResetAll();
+	
 	if (redbots_manager_kick_bots.BoolValue)
 	{
 		RemoveAllDefenderBots("BotManager3: Wave failed!");
@@ -65,6 +68,11 @@ static void Event_MvmWaveFailed(Event event, const char[] name, bool dontBroadca
 
 static void Event_MvmWaveComplete(Event event, const char[] name, bool dontBroadcast)
 {
+	/* Before anything below sends the engineers off to shop
+	The upgrade session is what tears their buildings down, and it needs this answer to know whether
+	it should */
+	EngineerNestRelocation_OnWaveComplete();
+	
 	if (redbots_manager_kick_bots.BoolValue)
 	{
 		RemoveAllDefenderBots("BotManager3: Wave complete!", IsFinalWave());
@@ -175,6 +183,7 @@ static void Event_TeamplayRoundStart(Event event, const char[] name, bool dontBr
 	if (event.GetBool("full_reset"))
 	{
 		SetupSniperSpotHints();
+		EngineerNestRelocation_ResetAll();
 	}
 }
 

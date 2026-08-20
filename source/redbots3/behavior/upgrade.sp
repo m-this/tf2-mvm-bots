@@ -145,8 +145,18 @@ public void CTFBotUpgrade_OnEnd(BehaviorAction action, int actor, BehaviorAction
 	
 	KV_MvM_UpgradesDone(actor);
 	
-	if (TF2_GetPlayerClass(actor) == TFClass_Engineer && GameRules_GetRoundState() == RoundState_BetweenRounds)
+	/* Buildings come down only when the nest is moving
+
+	This used to tear them down after every between-waves shopping trip, which is a level three
+	rebuilt from nothing at the start of every wave. The between-waves re-evaluation now says
+	whether the ground stopped being good: when it did, the buildings are standing in the wrong
+	place and rebuilding at the new nest is cheaper than walking one back across the map; when it
+	did not, the engineer walks back to a sentry that is already up */
+	if (TF2_GetPlayerClass(actor) == TFClass_Engineer && GameRules_GetRoundState() == RoundState_BetweenRounds && m_aNestAreaRelocate[actor] != NULL_AREA)
 	{
+		m_aNestArea[actor] = m_aNestAreaRelocate[actor];
+		m_aNestAreaRelocate[actor] = NULL_AREA;
+		
 		DetonateObjectOfType(actor, TFObject_Sentry);
 		DetonateObjectOfType(actor, TFObject_Dispenser);
 	}
