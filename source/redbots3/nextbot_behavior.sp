@@ -524,16 +524,20 @@ public Action CTFBotMainAction_SelectTargetPoint(BehaviorAction action, INextBot
 					return Plugin_Changed;
 				}
 			}
-			/* case TF_WEAPON_FLAMETHROWER:
+			case TF_WEAPON_FLAMETHROWER:
 			{
+				/* Aim above a tank rather than at it
+
+				Flames rise, so a Pyro standing at the treads and pointing straight ahead puts
+				half of every puff into the ground. The wiki's advice is to aim at the top of it,
+				which is what this offset is, and a Pyro is the tank damage in most lineups */
 				if (IsBaseBoss(entity))
 				{
 					GetFlameThrowerAimForTank(entity, vec);
-					PrintToChatAll("AIM AT: %f %f %f", vec[0], vec[1], vec[2]);
 					
 					return Plugin_Changed;
 				}
-			} */
+			}
 		}
 	}
 	

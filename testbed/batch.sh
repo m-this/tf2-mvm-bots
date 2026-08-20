@@ -17,7 +17,7 @@ mkdir -p "$out"
 
 # Two engineers to have something to measure, and the classes that live off
 # what they build.
-comp="engineer,engineer,soldier,pyro,heavyweapons,medic"
+comp="scout,soldier,demoman,heavyweapons,engineer,medic"
 
 play() {
 	tree=$1 name=$2 i=$3

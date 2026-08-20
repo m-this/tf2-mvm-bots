@@ -874,6 +874,15 @@ bool ShouldAimRocketsAtFeet(int client, int target, int weaponID)
 	if (weaponID == TF_WEAPON_DIRECTHIT)
 		return false;
 	
+	/* A rocket fired into a Pyro's face comes back
+
+	Robot Pyros airblast, and a reflected rocket is the Soldier's own damage aimed at his team.
+	The wiki says to shoot the ground instead of the robot, which is a shot an airblast cannot
+	catch. Worth doing even for one of them, and even for a giant, which is why this sits above
+	both tests below */
+	if (BaseEntity_IsPlayer(target) && IsClientInGame(target) && TF2_GetPlayerClass(target) == TFClass_Pyro)
+		return true;
+	
 	if (TF2_IsMiniBoss(target))
 		return false;
 	
