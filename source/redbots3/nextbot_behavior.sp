@@ -8,6 +8,8 @@ PathFollower m_pPath[MAXPLAYERS + 1];
 ChasePath m_pChasePath[MAXPLAYERS + 1];
 float m_flRepathTime[MAXPLAYERS + 1];
 static float m_flNextJumpTime[MAXPLAYERS + 1];
+static float m_flScoutDoubleJumpTime[MAXPLAYERS + 1];
+static int m_iScoutDoubleJumpSide[MAXPLAYERS + 1];
 
 static int m_nCurrentPowerupBottle[MAXPLAYERS + 1];
 static float m_flNextBottleUseTime[MAXPLAYERS + 1];
@@ -590,10 +592,41 @@ ground has traded his aim for a hop */
 //Slow enough to be standing still, whatever the bot thinks it is doing
 #define SCOUT_JUMP_MIN_SPEED	100.0
 
+/* The second jump, and why it is not every time
+
+A Scout that always double jumps is as easy to lead as one that never does: the second jump lands
+on the same beat every time. Seven times in ten is often enough to be the thing an aim expects and
+irregular enough that expecting it is wrong.
+
+The second jump goes the other way. Jumping twice in one direction is one long arc and a shooter
+tracks it; jumping left and then right is two arcs with a corner in the middle, and the corner is
+what a robot's aim cannot follow. Reported after the 1.3 play-test: he only ever single jumps */
+#define SCOUT_DOUBLE_JUMP_CHANCE	70
+#define SCOUT_DOUBLE_JUMP_DELAY		0.22
+#define SCOUT_JUMP_STRAFE_TIME		0.35
+
 static void UpdateScoutCombatJump(int client)
 {
 	if (TF2_GetPlayerClass(client) != TFClass_Scout)
 		return;
+
+	/* The second half of a double jump, which by definition happens off the ground, so this is
+	before every check that wants the bot standing on something */
+	if (m_flScoutDoubleJumpTime[client] > 0.0)
+	{
+		if (GetGameTime() < m_flScoutDoubleJumpTime[client])
+			return;
+
+		m_flScoutDoubleJumpTime[client] = 0.0;
+
+		//Landed early. The air jump is gone and pressing it again only queues the next ground one
+		if (GetEntityFlags(client) & FL_ONGROUND)
+			return;
+
+		g_arrExtraButtons[client].PressButtons(IN_JUMP | m_iScoutDoubleJumpSide[client], SCOUT_JUMP_STRAFE_TIME);
+
+		return;
+	}
 
 	if (m_flNextJumpTime[client] > GetGameTime())
 		return;
@@ -626,8 +659,15 @@ static void UpdateScoutCombatJump(int client)
 	//Irregular on purpose: a jump on a fixed beat is as easy to lead as no jump at all
 	m_flNextJumpTime[client] = GetGameTime() + GetRandomFloat(0.5, 1.2);
 
-	//No duration: one command's worth of the button, which is one jump
-	g_arrExtraButtons[client].PressButtons(IN_JUMP);
+	int side = GetRandomInt(0, 1) ? IN_MOVELEFT : IN_MOVERIGHT;
+
+	g_arrExtraButtons[client].PressButtons(IN_JUMP | side, SCOUT_JUMP_STRAFE_TIME);
+
+	if (GetRandomInt(1, 100) > SCOUT_DOUBLE_JUMP_CHANCE)
+		return;
+
+	m_flScoutDoubleJumpTime[client] = GetGameTime() + SCOUT_DOUBLE_JUMP_DELAY;
+	m_iScoutDoubleJumpSide[client] = (side == IN_MOVELEFT) ? IN_MOVERIGHT : IN_MOVELEFT;
 }
 
 public Action CTFBotScenarioMonitor_Update(BehaviorAction action, int actor, float interval, ActionResult result)
@@ -1462,9 +1502,21 @@ void EquipBestWeaponForThreat(int client, const CKnownEntity threat)
 			else if (gun != -1 && !Clip1(gun) && secondary != -1 && Clip1(secondary))
 				gun = secondary;
 		}
-		case TFClass_Heavy, TFClass_Spy, TFClass_Medic, TFClass_Engineer:
+		case TFClass_Heavy, TFClass_Spy, TFClass_Engineer:
 		{
 			//Uses primary
+		}
+		case TFClass_Medic:
+		{
+			/* The medigun is the weapon, and the syringe gun is what he holds when there is
+			nobody to point it at
+
+			A medic is a class whose damage is somebody else's. Every visible robot used to pull
+			him onto his primary, which drops the beam, stops the heal and stops the charge
+			building, in exchange for a syringe gun nobody is frightened of. Reported after the
+			1.3 play-test: "the Medics always keep using their Syringe Guns" */
+			if (secondary != -1 && MedicHasPatient(client, secondary))
+				gun = secondary;
 		}
 		case TFClass_Scout:
 		{

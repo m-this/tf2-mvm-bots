@@ -568,9 +568,16 @@ static int ClassUpgradePriority(TFClassType pclass, int slot, const char[] attri
 			if (StrEqual(attribute, "engy sentry fire rate increased")) return 320;
 			if (StrEqual(attribute, "engy building health bonus")) return 260;
 			if (StrEqual(attribute, "engy disposable sentries")) return 230;
+			/* Dispenser radius is bought early, not last
+
+			It used to rank below everything because it heals one engineer standing next to his own
+			dispenser. It does not any more: a bot that is hurt or low on ammo now holds the bomb
+			from a friendly dispenser instead of walking off to a health pack, so the radius is how
+			much of the team that covers. Reported after the 1.3 play-test as "incredibly useful,
+			a very good upgrade to max out early" */
+			if (StrEqual(attribute, "engy dispenser radius increased")) return 240;
 			if (StrEqual(attribute, "metal regen")) return 220;
 			if (StrEqual(attribute, "maxammo metal increased")) return 210;
-			if (StrEqual(attribute, "engy dispenser radius increased")) return 90;
 		}
 		case TFClass_Medic:
 		{
