@@ -66,6 +66,8 @@ enum struct esMapConfiguration
 	//Nests that only apply to a wave with a tank in it, and nests that only apply to one without
 	ArrayList adtNestTankOnlyLocation;
 	ArrayList adtNestNoTankLocation;
+	//The lineup this map wants, comma separated, empty when it does not care
+	char strComposition[128];
 	
 	void Initialize()
 	{
@@ -86,6 +88,7 @@ enum struct esMapConfiguration
 		this.adtDispenserLocation.Clear();
 		this.adtNestTankOnlyLocation.Clear();
 		this.adtNestNoTankLocation.Clear();
+		this.strComposition[0] = '\0';
 	}
 }
 
@@ -2075,7 +2078,7 @@ the same team as the first fill, whatever order the seats emptied in. A list sho
 leaves the rest to the lineup mode */
 int CollectMissingTeamComposition(ArrayList classes, int count)
 {
-	char list[128]; redbots_manager_team_composition.GetString(list, sizeof(list));
+	char list[128]; GetWantedTeamComposition(list, sizeof(list));
 
 	if (list[0] == '\0')
 		return 0;
@@ -2260,10 +2263,28 @@ void PickAllowedBotClass(const char[] wanted, char[] buffer, int maxlen)
 	strcopy(buffer, maxlen, candidates[GetRandomInt(0, total - 1)]);
 }
 
+/* The lineup to fill RED with, or an empty string to leave it to the lineup mode
+
+The convar wins over the map. Somebody who typed a team into the console is answering a question
+the map file guessed at, and the map is a default rather than an instruction.
+
+The map's own answer exists because the right team is not the same on every map: Mannworks is
+full of deflector Heavies, which eat a Soldier's rockets and do nothing to a second Heavy, and
+Coal Town is one long bottleneck full of Spies, where a Pyro is worth more than the reach */
+void GetWantedTeamComposition(char[] out, int maxlen)
+{
+	redbots_manager_team_composition.GetString(out, maxlen);
+
+	if (out[0] != '\0')
+		return;
+
+	strcopy(out, maxlen, g_arrMapConfig.strComposition);
+}
+
 //Does sm_redbots_manager_team_composition ask for this class anywhere in the team it names?
 bool IsClassInTeamComposition(const char[] class)
 {
-	char list[128]; redbots_manager_team_composition.GetString(list, sizeof(list));
+	char list[128]; GetWantedTeamComposition(list, sizeof(list));
 
 	if (list[0] == '\0')
 		return false;
@@ -2576,6 +2597,7 @@ void Config_LoadMap()
 	Config_LoadLocations(kv, "DispenserSpot", g_arrMapConfig.adtDispenserLocation);
 	Config_LoadLocations(kv, "NestTankOnly", g_arrMapConfig.adtNestTankOnlyLocation);
 	Config_LoadLocations(kv, "NestNoTank", g_arrMapConfig.adtNestNoTankLocation);
+	kv.GetString("Composition", g_arrMapConfig.strComposition, sizeof(g_arrMapConfig.strComposition), "");
 	
 	CloseHandle(kv);
 	

@@ -216,6 +216,59 @@ public void OnActionCreated(BehaviorAction action, int actor, const char[] name)
 	}
 }
 
+/* What a robot is worth killing first
+
+The numbers are an order, not a measurement. Anything inside THREAT_URGENT_RANGE outranks the
+list: a bot that ignores the Heavy in front of it to shoot a Sniper across the map dies holding
+a good idea */
+#define THREAT_URGENT_RANGE	400.0
+
+enum
+{
+	THREAT_PRIORITY_NONE = 0,
+	THREAT_PRIORITY_BOMB,
+	THREAT_PRIORITY_GIANT,
+	THREAT_PRIORITY_GIANT_BOMB,
+	THREAT_PRIORITY_SUPPORT,
+	THREAT_PRIORITY_MEDIC,
+	THREAT_PRIORITY_URGENT
+}
+
+static int ThreatPriority(int threat, float rangeSq)
+{
+	if (rangeSq < THREAT_URGENT_RANGE * THREAT_URGENT_RANGE)
+		return THREAT_PRIORITY_URGENT;
+	
+	if (!BaseEntity_IsPlayer(threat) || !IsClientInGame(threat))
+		return THREAT_PRIORITY_NONE;
+	
+	switch (TF2_GetPlayerClass(threat))
+	{
+		//A giant with a Medic on it is not killable until the Medic is dead
+		case TFClass_Medic:
+			return THREAT_PRIORITY_MEDIC;
+		
+		//The two the rest of the team cannot get to: one sits out of reach, the other builds
+		case TFClass_Sniper, TFClass_Engineer:
+			return THREAT_PRIORITY_SUPPORT;
+	}
+	
+	bool giant = TF2_IsMiniBoss(threat);
+	bool carrier = TF2_HasTheFlag(threat);
+	
+	//Carrying the bomb halves a robot's speed, except a giant's, so that one is still running
+	if (giant && carrier)
+		return THREAT_PRIORITY_GIANT_BOMB;
+	
+	if (giant)
+		return THREAT_PRIORITY_GIANT;
+	
+	if (carrier)
+		return THREAT_PRIORITY_BOMB;
+	
+	return THREAT_PRIORITY_NONE;
+}
+
 public Action CTFBotMainAction_SelectMoreDangerousThreat(BehaviorAction action, INextBot nextbot, int entity, CKnownEntity threat1, CKnownEntity threat2, CKnownEntity& knownEntity)
 {
 	int me = action.Actor;
@@ -285,8 +338,22 @@ public Action CTFBotMainAction_SelectMoreDangerousThreat(BehaviorAction action, 
 	float rangeSq1 = nextbot.GetRangeSquaredTo(iThreat1);
 	float rangeSq2 = nextbot.GetRangeSquaredTo(iThreat2);
 	
+	/* Shoot the robot that is worth shooting, not the one that happens to be nearest
+
+	Every guide written about this mode says the same order, and none of it was here: the Medic
+	first because a giant being healed cannot be killed at all, then the Sniper and the Engineer
+	because they are the two the rest of the team cannot reach, then giants, then whoever is
+	holding the bomb. A robot close enough to be killing the bot outranks all of it, because a
+	priority target is worth nothing to a corpse */
+	int priority1 = ThreatPriority(iThreat1, rangeSq1);
+	int priority2 = ThreatPriority(iThreat2, rangeSq2);
+	
+	if (priority1 != priority2)
+	{
+		knownEntity = priority1 > priority2 ? threat1 : threat2;
+	}
 	//Target the closest visible
-	if (rangeSq1 < rangeSq2)
+	else if (rangeSq1 < rangeSq2)
 	{
 		knownEntity = threat1;
 	}
