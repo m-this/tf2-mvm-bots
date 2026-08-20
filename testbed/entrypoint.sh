@@ -50,6 +50,51 @@ install_addons() {
 	return 0
 }
 
+# Whoever walks the map to write down nest spots joins as a plain player, and
+# sm_dump_spot needs ADMFLAG_GENERIC. Two things grant it, because they fail in
+# different ways.
+#
+# admins_simple.ini is the real one: named SteamIDs get root, so sm_addbots and
+# the rest work too. It depends on the client's SteamID reaching the server,
+# which this server has no Steam session to verify.
+#
+# The override is the fallback, and only for sm_dump_spot: it prints a position
+# and changes nothing, so a server on a LAN losing that flag costs nothing.
+install_admin_config() {
+	dir="$GAME/addons/sourcemod/configs"
+	[ -d "$dir" ] || return 1
+
+	{
+		echo '// Managed by the mvm-bots test-bed. Edits here are replaced on restart.'
+		for id in $(echo "${TESTBED_ADMIN_STEAMIDS:-}" | tr ',' ' '); do
+			# admins_simple.ini reads STEAM_0:Y:Z and [U:1:N] and nothing else. A
+			# SteamID64 in it is not an error, it is a line that never matches
+			# anybody, so the account number comes out of it here and both forms
+			# get written. Which one the client reports is the server's business.
+			case "$id" in
+			7656119*)
+				account=$((id - 76561197960265728))
+				printf '"STEAM_0:%d:%d" "99:z"\n' "$((account % 2))" "$((account / 2))"
+				printf '"[U:1:%d]" "99:z"\n' "$account"
+				;;
+			*)
+				printf '"%s" "99:z"\n' "$id"
+				;;
+			esac
+		done
+	} >"$dir/admins_simple.ini"
+
+	cat >"$dir/admin_overrides.cfg" <<-CFG
+	// Managed by the mvm-bots test-bed. Edits here are replaced on restart.
+	Overrides
+	{
+		"sm_dump_spot"		""
+	}
+	CFG
+
+	return 0
+}
+
 # The measurements are worth nothing if the run they came from cannot be
 # described, so the configuration is generated here in one place and the run
 # script prints it back.
@@ -63,6 +108,17 @@ install_server_cfg() {
 	rcon_password "${SRCDS_RCONPW}"
 	sv_password ""
 	sv_lan 1
+
+	// Marking up a map means flying it: noclip is how the EngineerNest and
+	// TeleporterExit spots in configs/defenderbots/map get written down.
+	sv_cheats 1
+
+	// The log file, so chat from whoever is walking the map can be read from
+	// outside the game. sv_logecho 0 keeps it out of the container's stdout,
+	// which the supervisor below already writes to every thirty seconds.
+	sv_logfile 1
+	sv_logecho 0
+	log on
 
 	// Nobody is going to join, so nothing waits for anybody. One ready player
 	// starts a wave, and the bots ready themselves up.
@@ -113,7 +169,7 @@ install_server_cfg() {
 
 supervise() {
 	while true; do
-		if install_addons && install_server_cfg; then
+		if install_addons && install_server_cfg && install_admin_config; then
 			echo "[test-bed] installed the bots and the statistics plugin"
 		fi
 		sleep "$INTERVAL"

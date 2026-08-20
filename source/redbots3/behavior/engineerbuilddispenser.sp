@@ -1,3 +1,5 @@
+#define DISPENSER_SPOT_TAKEN_RANGE	150.0
+
 BehaviorAction CTFBotMvMEngineerBuildDispenser()
 {
 	BehaviorAction action = ActionsManager.Create("DefenderBuildDispenser");
@@ -46,7 +48,9 @@ public Action CTFBotMvMEngineerBuildDispenser_Update(BehaviorAction action, int 
 	}
 	
 	float areaCenter[3];
-	CNavArea_GetRandomPoint(m_aNestArea[actor], areaCenter);
+	
+	if (!ConfiguredDispenserSpot(actor, areaCenter))
+		CNavArea_GetRandomPoint(m_aNestArea[actor], areaCenter);
 	
 	float range_to_hint = GetVectorDistance(GetAbsOrigin(actor), areaCenter);
 	
@@ -103,4 +107,54 @@ public Action CTFBotMvMEngineerBuildDispenser_Update(BehaviorAction action, int 
 public void CTFBotMvMEngineerBuildDispenser_OnEnd(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
 {
 	UpdateLookAroundForEnemies(actor, true);
+}
+
+/* The dispenser spot the map configuration asks for, false when it asks for nothing
+
+Nearest to the nest rather than to the engineer, because he walks back to the nest anyway and the
+dispenser is there to feed the sentry */
+bool ConfiguredDispenserSpot(int actor, float spot[3])
+{
+	ArrayList spots = g_arrMapConfig.adtDispenserLocation;
+	
+	if (spots.Length == 0)
+		return false;
+	
+	ArrayList free = new ArrayList(3);
+	
+	for (int i = 0; i < spots.Length; i++)
+	{
+		float candidate[3]; spots.GetArray(i, candidate);
+		
+		if (!IsDispenserSpotTaken(actor, candidate))
+			free.PushArray(candidate);
+	}
+	
+	float nest[3]; m_aNestArea[actor].GetCenter(nest);
+	
+	bool found = NearestConfiguredSpot(free, nest, spot);
+	
+	delete free;
+	
+	return found;
+}
+
+//Spreads several engineers over the spots the map names instead of stacking them on the nearest one
+bool IsDispenserSpotTaken(int actor, const float spot[3])
+{
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (i == actor || !IsClientInGame(i))
+			continue;
+		
+		int dispenser = GetObjectOfType(i, TFObject_Dispenser);
+		
+		if (dispenser == INVALID_ENT_REFERENCE)
+			continue;
+		
+		if (GetVectorDistance(spot, GetAbsOrigin(dispenser)) < DISPENSER_SPOT_TAKEN_RANGE)
+			return true;
+	}
+	
+	return false;
 }

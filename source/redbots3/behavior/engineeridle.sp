@@ -17,6 +17,19 @@ int m_hBuildingToGrab[MAXPLAYERS + 1];
 //The nest an engineer was holding before a buster moved him off it, NULL_AREA when he is on it
 CNavArea m_aNestAreaBeforeHaul[MAXPLAYERS + 1] = {NULL_AREA, ...};
 
+//The nest an engineer is leaving for better ground, NULL_AREA when no relocation haul is running
+CNavArea m_aNestAreaBeforeRelocate[MAXPLAYERS + 1] = {NULL_AREA, ...};
+
+//When a relocation haul stops being worth finishing
+float m_ctNestRelocateDeadline[MAXPLAYERS + 1];
+
+/* How long an engineer gets to move a sentry to better ground before he puts it down where he is
+
+The move is decided between waves and the wave can start while he is still walking. A sentry in a
+toolbox when the robots arrive is worse than a badly placed level three, so the haul runs on a
+clock rather than on a promise that it finishes in time */
+#define NEST_RELOCATE_HAUL_TIME	20.0
+
 float m_ctSentryUnderFire[MAXPLAYERS + 1];
 int m_iSentryHealthLast[MAXPLAYERS + 1];
 
@@ -41,6 +54,8 @@ static Action CTFBotMvMEngineerIdle_OnStart(BehaviorAction action, int actor, Be
 	
 	//A fresh engineer holds no ground yet, so there is nowhere for a buster to have moved him off
 	m_aNestAreaBeforeHaul[actor] = NULL_AREA;
+	m_aNestAreaBeforeRelocate[actor] = NULL_AREA;
+	m_ctNestRelocateDeadline[actor] = -1.0;
 	m_iSentryHealthLast[actor] = 0;
 	
 	CTFBotMvMEngineerIdle_ResetProperties(actor);
@@ -111,6 +126,52 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 		return action.Continue();
 	}
 
+	/* The between-waves answer says this nest moved and the buildings are still standing on the old
+	ground, which is what happens when nothing tore them down at the upgrade station. Same carry as
+	the buster haul above, with better ground as the goal rather than open ground */
+	if (m_aNestAreaRelocate[actor] != NULL_AREA
+	&& m_aNestAreaBeforeHaul[actor] == NULL_AREA
+	&& !g_bGoingToGrabBuilding[actor]
+	&& !TF2_IsCarryingObject(actor)
+	&& (sentry == INVALID_ENT_REFERENCE || !TF2_IsBuilding(sentry)))
+	{
+		CNavArea destination = m_aNestAreaRelocate[actor];
+		
+		//One move per between-waves period, whether or not there is anything to carry to it
+		m_aNestAreaRelocate[actor] = NULL_AREA;
+		
+		if (sentry == INVALID_ENT_REFERENCE)
+		{
+			//Nothing to carry, so the new ground is simply where the next sentry goes up
+			m_aNestArea[actor] = destination;
+		}
+		else
+		{
+			if (redbots_manager_debug_actions.BoolValue)
+				PrintToServer("CTFBotMvMEngineerIdle_Update: RELOCATE NEST");
+			
+			m_aNestAreaBeforeRelocate[actor] = m_aNestArea[actor];
+			
+			CTFBotMvMEngineerIdle_ResetProperties(actor);
+			
+			m_ctNestRelocateDeadline[actor] = GetGameTime() + NEST_RELOCATE_HAUL_TIME;
+			m_aNestArea[actor] = destination;
+			
+			g_bGoingToGrabBuilding[actor] = true;
+			m_hBuildingToGrab[actor] = EntIndexToEntRef(sentry);
+			
+			g_arrPluginBot[actor].SetPathGoalEntity(sentry);
+			
+			/* The dispenser stays behind on ground nobody holds any more
+			Only one building can be carried at a time and the sentry is the one worth the walk, so
+			the dispenser is spent rather than dragged: the idle loop below builds another one at the
+			new nest for 100 metal as soon as the sentry is safe */
+			DetonateObjectOfType(actor, TFObject_Dispenser);
+			
+			return action.Continue();
+		}
+	}
+	
 	if (bShouldAdvance && !g_bGoingToGrabBuilding[actor])
 	{
 		//DetonateObjectOfType(actor, TFObject_Sentry);
@@ -138,6 +199,33 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 	IBody myBody = myNextbot.GetBodyInterface();
 	ILocomotion myLoco = myNextbot.GetLocomotionInterface();
 	
+	/* The clock ran out on a relocation, which means the wave started while he was still walking
+
+	Down where he stands beats carried into the middle of a wave: the ground under his feet is at
+	worst ground he was already crossing, and the alternative is a nest that exists in a toolbox.
+	Before he picks the sentry up there is nothing to put down and the old nest is still a nest */
+	if (m_aNestAreaBeforeRelocate[actor] != NULL_AREA && m_ctNestRelocateDeadline[actor] > 0.0 && GetGameTime() > m_ctNestRelocateDeadline[actor])
+	{
+		m_ctNestRelocateDeadline[actor] = -1.0;
+		
+		if (TF2_IsCarryingObject(actor))
+		{
+			CNavArea here = TheNavMesh.GetNearestNavArea(GetAbsOrigin(actor), false, 500.0, false, true, TEAM_ANY);
+			
+			if (here != NULL_AREA)
+				m_aNestArea[actor] = here;
+		}
+		else
+		{
+			m_aNestArea[actor] = m_aNestAreaBeforeRelocate[actor];
+			
+			g_bGoingToGrabBuilding[actor] = false;
+			m_hBuildingToGrab[actor] = INVALID_ENT_REFERENCE;
+		}
+		
+		m_aNestAreaBeforeRelocate[actor] = NULL_AREA;
+	}
+	
 	if (g_bGoingToGrabBuilding[actor])
 	{
 		int building = EntRefToEntIndex(m_hBuildingToGrab[actor]);
@@ -146,6 +234,8 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 		{
 			g_bGoingToGrabBuilding[actor] = false;
 			m_hBuildingToGrab[actor] = INVALID_ENT_REFERENCE;
+			m_aNestAreaBeforeRelocate[actor] = NULL_AREA;
+			m_ctNestRelocateDeadline[actor] = -1.0;
 			
 			if (redbots_manager_debug_actions.BoolValue)
 				PrintToServer("CTFBotMvMEngineerIdle_Update: g_bGoingToGrabBuilding : building %i | m_aNestArea %x", building, m_aNestArea[actor]);
@@ -212,6 +302,8 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 						{
 							g_bGoingToGrabBuilding[actor] = false;
 							m_hBuildingToGrab[actor] = INVALID_ENT_REFERENCE;
+							m_aNestAreaBeforeRelocate[actor] = NULL_AREA;
+							m_ctNestRelocateDeadline[actor] = -1.0;
 							
 							g_arrPluginBot[actor].bPathing = false;
 						}
@@ -644,4 +736,56 @@ bool CTFBotMvMEngineerIdle_ShouldAdvanceNestSpot(int actor)
 	//PrintToServer("m_flBombTargetDistance %f > bombinfo.hatch_dist_back %f = %s", m_flBombTargetDistance, bombinfo.GetFloat("hatch_dist_back"), bigger ? "Yes" : "No");
 	
 	return bigger;
+}
+/* Ask every engineer whether the ground he holds is still the ground he wants, once per wave
+
+Wave complete rather than wave start, because that is the last moment the old buildings are still
+his to decide about: the upgrade session that follows tears them down, and the answer here is what
+tells it whether to. It also gives him the whole shopping period to act on the answer instead of
+carrying a sentry while the robots walk in.
+
+An engineer with no nest, a dead one, or one whose sentry is still going up is left alone. There is
+nothing to compare against in the first two cases, and in the third nobody yet knows what the
+building is worth */
+void EngineerNestRelocation_OnWaveComplete()
+{
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		m_aNestAreaRelocate[i] = NULL_AREA;
+		
+		if (!IsClientInGame(i) || !g_bIsDefenderBot[i] || !IsPlayerAlive(i))
+			continue;
+		
+		if (TF2_GetPlayerClass(i) != TFClass_Engineer)
+			continue;
+		
+		if (TF2_IsCarryingObject(i))
+			continue;
+		
+		int sentry = GetObjectOfType(i, TFObject_Sentry);
+		
+		if (sentry != INVALID_ENT_REFERENCE && TF2_IsBuilding(sentry))
+			continue;
+		
+		CNavArea destination;
+		
+		if (!ShouldRelocateNest(i, destination))
+			continue;
+		
+		m_aNestAreaRelocate[i] = destination;
+		
+		if (redbots_manager_debug.BoolValue)
+			PrintToServer("EngineerNestRelocation_OnWaveComplete: %N is moving nest", i);
+	}
+}
+
+//A wave that has to be replayed is a wave down the same route, so the pending answer is thrown away
+void EngineerNestRelocation_ResetAll()
+{
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		m_aNestAreaRelocate[i] = NULL_AREA;
+		m_aNestAreaBeforeRelocate[i] = NULL_AREA;
+		m_ctNestRelocateDeadline[i] = -1.0;
+	}
 }

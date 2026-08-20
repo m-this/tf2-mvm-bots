@@ -27,6 +27,16 @@ One line each. The spec has the detail and the reasoning.
 - Bots stop riding a teleporter backwards to reach its entrance.
 - `testbed/` measures a run: waves cleared, how long, who died to what. It
   plays a mission with nobody on the server.
+- Six maps carry hand written nest, dispenser and teleporter exit data, walked
+  in game rather than guessed. See item 3.
+- Engineers place dispensers on authored spots, and skip one another engineer
+  already occupies.
+- Engineers re-score their nest when a wave ends and haul to a better one.
+- Rottenburg's two conditional nests work: `NestTankOnly` and `NestNoTank`,
+  decided by the wave's class icons rather than by looking for a live tank.
+- `PickBuildArea` skips `BLOCKED` areas. Only `PickBuildAreaPreRound` did.
+- `GetBombInfo` tested `BLUE_SPAWN_ROOM` twice where it meant `RED_SPAWN_ROOM`,
+  in two places, so RED spawn counted toward the length of the bomb path.
 
 ## 1. The crash. Fixed, and it was the test-bed's own entrypoint
 
@@ -93,19 +103,23 @@ readies up, the mod spawns six bots, they shop, the wave begins, and every wave
 is written down. Run a mission before the changes and the same mission after,
 and read `report.py`. Do the baseline twice before believing either.
 
-## 3. Three maps carry no nest data. Open
+## 3. Map data. Six maps done, the rest open
 
-`mvm_coaltown`, `mvm_mannworks` and `mvm_ghost_town` predate engineer robots
-and ship none of the `bot_hint_sentrygun` entities the other four official maps
-carry, so on those three the nav mesh reasoning is the whole answer. They want
-hand written `EngineerNest` blocks, which outrank everything else because
-somebody stood there and decided.
+`mvm_bigrock`, `mvm_coaltown`, `mvm_decoy`, `mvm_mannworks`, `mvm_mannhattan`
+and `mvm_rottenburg` now carry `EngineerNest`, `DispenserSpot` and
+`TeleporterExit` blocks. Somebody flew each map and stood on each spot, so they
+outrank the nav mesh reasoning and the map's own hint entities.
 
-```
-sm_dump_spot EngineerNest
-```
+The raw capture is in `testbed/results/`: `spots.log` is what the command
+printed, `chat.log` is what was said while printing it, and
+`spots-annotated.tsv` joins the two and carries the corrections. Spots that
+were dumped and then rejected are marked rejected rather than deleted, so a
+coordinate that looks odd can be traced back to what was said about it.
 
-Three to five spots each is enough for a six bot team.
+What is left is the other twenty-two config files, none of which have been
+walked. `sm_dump_spot <block> [aim]` prints the line to paste. Stand on the
+spot for accuracy; `aim` traces the crosshair to the world, which is how a map
+gets marked from above without landing on every spot.
 
 ## 4. A nest is scored for the bomb and not for the team. Open
 
@@ -119,8 +133,8 @@ yet is that nothing in this mod says where the team holds.
 
 ## 5. Teleporters: whether to build one at all. Open, and it is a question first
 
-The bots do not build them. No map names `TeleporterEntrance` or
-`TeleporterExit`, and the build behaviour refuses without both.
+The bots do not build them. Six maps now name a `TeleporterExit`, but none
+names a `TeleporterEntrance`, and the build behaviour refuses without both.
 
 The play-test found the ride is worth less than it looks: the entrance is at
 spawn, so taking one means walking backwards first. `ShouldUseTeleporter` now
@@ -161,7 +175,42 @@ That last one is nearly free here, because the mod picks the RED team and knows
 exactly which classes it asked for. A RED Heavy on a team with no Heavy in it is
 a Spy, and no human on the server would have to be told.
 
-## 9. Not this repository
+## 9. Nothing senses which way the robots came. Open
+
+The nest scorer reasons about the bomb and about static mesh data. `BOMB_DROP`,
+nav visibility, the spawn room flags and `bot_hint_sentrygun` are all baked at
+map compile time and identical every wave. The only dynamic inputs are the
+bomb's position, which resets to the same place each wave, and `BLOCKED`, which
+is now read.
+
+So on a map where the mesh does not change and only the spawn door differs,
+`ShouldRelocateNest` computes a gain near zero and correctly does nothing.
+Mannworks is exactly that map, and it is where the note asking for this was
+written.
+
+The cheap way in is to watch the robots instead of the map. Sample live BLU
+players on a timer, map each to a nav area, count visits per area, and use
+"where robots actually walked" as the approach sample in place of the radius
+around the bomb, falling back to today's sample when the count is empty. It is
+one wave behind by construction: wave N is chosen from wave N-1's traffic,
+which is right whenever the spawn side repeats and wrong exactly once when it
+flips.
+
+Parsing the popfile would know the route before the wave instead of after. It
+is a text parser for a format with no schema, plus a file location problem on
+custom missions, for information that arrives one wave later for free.
+
+## 10. Engineers now keep their buildings across waves. Needs a play-test
+
+`CTFBotUpgrade_OnEnd` used to detonate the sentry and the dispenser at the end
+of every shopping trip, so no engineer ever kept a building across a wave and
+the nest was silently re-picked every time, with a level 3 rebuilt from
+nothing. That teardown is now gated on whether the nest actually changed.
+
+It is what makes item 3's relocation observable, and it is a real change to how
+every map plays. Nobody has watched a mission with it on.
+
+## 11. Not this repository
 
 A cash bundle spent on upgrades leaves the money negative when the wave is
 lost. It is `tf2-archipelago`'s to fix, item 12 in its TODO: the plugin writes

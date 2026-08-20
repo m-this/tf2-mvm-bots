@@ -62,6 +62,10 @@ enum struct esMapConfiguration
 	ArrayList adtEngineerNestLocation;
 	ArrayList adtTeleporterEntranceLocation;
 	ArrayList adtTeleporterExitLocation;
+	ArrayList adtDispenserLocation;
+	//Nests that only apply to a wave with a tank in it, and nests that only apply to one without
+	ArrayList adtNestTankOnlyLocation;
+	ArrayList adtNestNoTankLocation;
 	
 	void Initialize()
 	{
@@ -69,6 +73,9 @@ enum struct esMapConfiguration
 		this.adtEngineerNestLocation = new ArrayList(3);
 		this.adtTeleporterEntranceLocation = new ArrayList(3);
 		this.adtTeleporterExitLocation = new ArrayList(3);
+		this.adtDispenserLocation = new ArrayList(3);
+		this.adtNestTankOnlyLocation = new ArrayList(3);
+		this.adtNestNoTankLocation = new ArrayList(3);
 	}
 	void Reset()
 	{
@@ -76,6 +83,9 @@ enum struct esMapConfiguration
 		this.adtEngineerNestLocation.Clear();
 		this.adtTeleporterEntranceLocation.Clear();
 		this.adtTeleporterExitLocation.Clear();
+		this.adtDispenserLocation.Clear();
+		this.adtNestTankOnlyLocation.Clear();
+		this.adtNestNoTankLocation.Clear();
 	}
 }
 
@@ -168,6 +178,7 @@ ConVar redbots_manager_ready_cooldown;
 ConVar redbots_manager_keep_bot_upgrades;
 ConVar redbots_manager_bot_upgrade_interval;
 ConVar redbots_manager_engineer_nest_depth;
+ConVar redbots_manager_engineer_nest_relocate_score_gain_min;
 ConVar redbots_manager_bot_use_upgrades;
 ConVar redbots_manager_bot_buyback_chance;
 ConVar redbots_manager_bot_buy_upgrades_chance;
@@ -247,6 +258,7 @@ public void OnPluginStart()
 	redbots_manager_keep_bot_upgrades = CreateConVar("sm_redbots_manager_keep_bot_upgrades", "1", "Let bots that survive a failed wave keep what they bought, instead of refunding it and making them shop again from nothing.", FCVAR_NOTIFY);
 	redbots_manager_bot_upgrade_interval = CreateConVar("sm_redbots_manager_bot_upgrade_interval", "0.1", _, FCVAR_NOTIFY);
 	redbots_manager_engineer_nest_depth = CreateConVar("sm_redbots_manager_engineer_nest_depth", "0.4", "How far up the bomb path an engineer will build, as a fraction of the whole path measured from the hatch. 1.0 is the robots' spawn door.", FCVAR_NOTIFY, true, 0.05, true, 1.0);
+	redbots_manager_engineer_nest_relocate_score_gain_min = CreateConVar("sm_redbots_manager_engineer_nest_relocate_score_gain_min", "40.0", "How much better a nest spot has to score than the one an engineer holds before he moves to it between waves. 0 makes him move for any improvement at all.", FCVAR_NOTIFY, true, 0.0, true, 200.0);
 	redbots_manager_bot_use_upgrades = CreateConVar("sm_redbots_manager_bot_use_upgrades", "1", "Enable bots to buy upgrades.", FCVAR_NOTIFY);
 	redbots_manager_bot_buyback_chance = CreateConVar("sm_redbots_manager_bot_buyback_chance", "5", "Chance for bots to buyback into the game.", FCVAR_NOTIFY);
 	redbots_manager_bot_buy_upgrades_chance = CreateConVar("sm_redbots_manager_bot_buy_upgrades_chance", "50", "Chance for bots to buy upgrades in the middle of a game.", FCVAR_NOTIFY);
@@ -295,7 +307,9 @@ public void OnPluginStart()
 	RegAdminCmd("sm_purgebots", Command_RemoveAllBots, ADMFLAG_GENERIC);
 	RegAdminCmd("sm_botmanager_stop", Command_StopManagingBots, ADMFLAG_GENERIC);
 	RegAdminCmd("sm_view_bot_upgrades", Command_ViewBotUpgrades, ADMFLAG_GENERIC);
-	RegAdminCmd("sm_dump_spot", Command_DumpSpot, ADMFLAG_GENERIC);
+	//Not RegAdminCmd: it prints where the caller is standing and changes nothing, and needing
+	//an admin entry to write down a nest spot is a gate in front of the only way to author one
+	RegConsoleCmd("sm_dump_spot", Command_DumpSpot);
 	
 	AddCommandListener(Listener_TournamentPlayerReadystate, "tournament_player_readystate");
 	
@@ -1195,7 +1209,16 @@ public Action Command_StopManagingBots(int client, int args)
 
 The nest, teleporter and sniper locations in configs/defenderbots/map are all somebody standing on
 the ground they meant and writing down where that was. This prints the line to write down, so the
-map data can be authored in the map instead of guessed from a compiled brush */
+map data can be authored in the map instead of guessed from a compiled brush
+
+Usage: sm_dump_spot <block> [aim]
+
+Standing on the spot is the accurate way and stays the default. The aim mode is for noclip: it
+traces the crosshair to the world and writes down what it hit, so a whole map can be marked from
+above without landing on every spot. It refuses a trace that hits nothing, since a spot in the
+skybox is worse than no spot */
+#define DUMP_SPOT_AIM_RANGE	8192.0
+
 public Action Command_DumpSpot(int client, int args)
 {
 	if (client < 1 || !IsClientInGame(client))
@@ -1209,7 +1232,25 @@ public Action Command_DumpSpot(int client, int args)
 	if (args >= 1)
 		GetCmdArg(1, block, sizeof(block));
 	
-	float origin[3]; GetClientAbsOrigin(client, origin);
+	char mode[16];
+	
+	if (args >= 2)
+		GetCmdArg(2, mode, sizeof(mode));
+	
+	float origin[3];
+	
+	if (StrEqual(mode, "aim", false))
+	{
+		if (!TraceAimToWorld(client, origin))
+		{
+			ReplyToCommand(client, "[SM] Your crosshair is not on anything within %.0f units.", DUMP_SPOT_AIM_RANGE);
+			return Plugin_Handled;
+		}
+	}
+	else
+	{
+		GetClientAbsOrigin(client, origin);
+	}
 	
 	char mapName[PLATFORM_MAX_PATH]; GetCurrentMap(mapName, sizeof(mapName));
 	
@@ -1219,6 +1260,32 @@ public Action Command_DumpSpot(int client, int args)
 	LogMessage("%s %s: \"origin\" \"%.0f %.0f %.0f\"", mapName, block, origin[0], origin[1], origin[2]);
 	
 	return Plugin_Handled;
+}
+
+//The world under the crosshair. Brushes and props only: a spot written down off a teammate's head is a spot nobody can build on
+static bool TraceAimToWorld(int client, float result[3])
+{
+	float eyes[3]; GetClientEyePosition(client, eyes);
+	float angles[3]; GetClientEyeAngles(client, angles);
+	
+	Handle trace = TR_TraceRayFilterEx(eyes, angles, MASK_SOLID, RayType_Infinite, TraceFilter_IgnorePlayers, client);
+	
+	bool hit = TR_DidHit(trace);
+	
+	if (hit)
+		TR_GetEndPosition(result, trace);
+	
+	delete trace;
+	
+	if (!hit || GetVectorDistance(eyes, result) > DUMP_SPOT_AIM_RANGE)
+		return false;
+	
+	return true;
+}
+
+static bool TraceFilter_IgnorePlayers(int entity, int mask, any data)
+{
+	return entity > MaxClients;
 }
 
 public Action Command_ViewBotUpgrades(int client, int args)
@@ -2502,6 +2569,9 @@ void Config_LoadMap()
 	Config_LoadLocations(kv, "EngineerNest", g_arrMapConfig.adtEngineerNestLocation);
 	Config_LoadLocations(kv, "TeleporterEntrance", g_arrMapConfig.adtTeleporterEntranceLocation);
 	Config_LoadLocations(kv, "TeleporterExit", g_arrMapConfig.adtTeleporterExitLocation);
+	Config_LoadLocations(kv, "DispenserSpot", g_arrMapConfig.adtDispenserLocation);
+	Config_LoadLocations(kv, "NestTankOnly", g_arrMapConfig.adtNestTankOnlyLocation);
+	Config_LoadLocations(kv, "NestNoTank", g_arrMapConfig.adtNestNoTankLocation);
 	
 	CloseHandle(kv);
 	
@@ -2510,6 +2580,9 @@ void Config_LoadMap()
 	LogMessage("Config_LoadMap: Found %d locations for EngineerNest", g_arrMapConfig.adtEngineerNestLocation.Length);
 	LogMessage("Config_LoadMap: Found %d locations for TeleporterEntrance", g_arrMapConfig.adtTeleporterEntranceLocation.Length);
 	LogMessage("Config_LoadMap: Found %d locations for TeleporterExit", g_arrMapConfig.adtTeleporterExitLocation.Length);
+	LogMessage("Config_LoadMap: Found %d locations for DispenserSpot", g_arrMapConfig.adtDispenserLocation.Length);
+	LogMessage("Config_LoadMap: Found %d locations for NestTankOnly", g_arrMapConfig.adtNestTankOnlyLocation.Length);
+	LogMessage("Config_LoadMap: Found %d locations for NestNoTank", g_arrMapConfig.adtNestNoTankLocation.Length);
 #endif
 }
 

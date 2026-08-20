@@ -1501,7 +1501,7 @@ bool GetBombInfo(BombInfo_t info)
 		CTFNavArea area = view_as<CTFNavArea>(TheNavAreas.Get(i));
 		
 		//Skip spawn areas
-		if (area.HasAttributeTF(BLUE_SPAWN_ROOM) || area.HasAttributeTF(BLUE_SPAWN_ROOM))
+		if (area.HasAttributeTF(BLUE_SPAWN_ROOM) || area.HasAttributeTF(RED_SPAWN_ROOM))
 		{
 			//PrintToServer("Skip spawn area.. #%i", area.GetID());
 			continue;
@@ -1544,7 +1544,7 @@ bool GetBombInfo(BombInfo_t info)
 		if (area == NULL_AREA)
 			continue;
 		
-		if (area.HasAttributeTF(BLUE_SPAWN_ROOM) || area.HasAttributeTF(BLUE_SPAWN_ROOM))
+		if (area.HasAttributeTF(BLUE_SPAWN_ROOM) || area.HasAttributeTF(RED_SPAWN_ROOM))
 			continue;
 		
 		float m_flBombTargetDistance = GetTravelDistanceToBombTarget(area);
@@ -1636,6 +1636,15 @@ float NestDistanceLimit()
 
 //Where each engineer holds, read by the nest scoring below and written by the engineer behaviours
 CNavArea m_aNestArea[MAXPLAYERS + 1] = {NULL_AREA, ...};
+
+/* Where an engineer's nest is moving to once the wave is over, NULL_AREA when it is staying put
+
+The bomb does not take the same route for a whole mission. Mannhattan opens and closes gates,
+maps drop barricades, and which way the robots come changes from one wave to the next, so ground
+that covered the approach in wave one can be facing a wall in wave three. Written once per
+between-waves period and read by the engineer behaviours, which are the ones that own the
+buildings standing on the old ground */
+CNavArea m_aNestAreaRelocate[MAXPLAYERS + 1] = {NULL_AREA, ...};
 
 /* The engineer items a bot has to play differently to play at all
 
@@ -1866,13 +1875,32 @@ score, which is what spreads several engineers across several of them and what k
 being used when another engineer already holds it */
 CNavArea PickConfiguredNestArea(int client, const float target[3], float SentryRange)
 {
-	ArrayList spots = g_arrMapConfig.adtEngineerNestLocation;
-	
-	if (spots.Length == 0)
-		return NULL_AREA;
-	
 	ArrayList areas = new ArrayList();
 	
+	CollectConfiguredNestAreas(g_arrMapConfig.adtEngineerNestLocation, areas);
+	
+	/* Rottenburg has a spot that only works when a tank is rolling and one that must be left
+	empty when it is: a sentry parked on the tank's path is a sentry the tank drives through.
+	Which of the two lists applies is a property of the wave, so it is asked here rather than
+	baked into the file */
+	if (IsTankWave())
+		CollectConfiguredNestAreas(g_arrMapConfig.adtNestTankOnlyLocation, areas);
+	else
+		CollectConfiguredNestAreas(g_arrMapConfig.adtNestNoTankLocation, areas);
+	
+	CNavArea best = NULL_AREA;
+	
+	if (areas.Length > 0)
+		best = BestNestArea(client, areas, target, SentryRange);
+	
+	delete areas;
+	
+	return best;
+}
+
+//The nav areas under a list of authored origins, appended to out
+static void CollectConfiguredNestAreas(ArrayList spots, ArrayList out)
+{
 	for (int i = 0; i < spots.Length; i++)
 	{
 		float spot[3]; spots.GetArray(i, spot);
@@ -1880,14 +1908,37 @@ CNavArea PickConfiguredNestArea(int client, const float target[3], float SentryR
 		CNavArea area = TheNavMesh.GetNearestNavArea(spot, false, 500.0, false, true, TEAM_ANY);
 		
 		if (area != NULL_AREA)
-			areas.Push(area);
+			out.Push(area);
+	}
+}
+
+/* Does the wave being fought, or the one about to be, contain a tank?
+
+The rest of the mod finds a tank by looking for a live tank_boss, which is the right answer for
+shooting at one and the wrong answer for building. An engineer picks its nest and builds during
+the between-waves period, when no tank exists yet, so asking the world is always a no.
+
+m_iszMannVsMachineWaveClassNames is the row of class icons the wave bar draws. The game fills it
+in before the wave starts, and a wave with a tank in it carries the "tank" icon */
+#define MVM_WAVE_CLASS_ICONS_MAX	12
+#define MVM_TANK_CLASS_ICON			"tank"
+
+bool IsTankWave()
+{
+	int rsrc = FindEntityByClassname(MaxClients + 1, "tf_objective_resource");
+	
+	if (rsrc == -1)
+		return false;
+	
+	for (int i = 0; i < MVM_WAVE_CLASS_ICONS_MAX; i++)
+	{
+		char icon[64]; TF2_GetMannVsMachineWaveClassName(rsrc, i, icon, sizeof(icon));
+		
+		if (StrEqual(icon, MVM_TANK_CLASS_ICON, false))
+			return true;
 	}
 	
-	CNavArea best = BestNestArea(client, areas, target, SentryRange);
-	
-	delete areas;
-	
-	return best;
+	return false;
 }
 
 /* The nest spots the map itself carries, and where they come from
@@ -2077,6 +2128,12 @@ CNavArea PickBuildArea(int client, float SentryRange = 1300.0)
 		
 		//Area in spawn
 		if (area.HasAttributeTF(BLUE_SPAWN_ROOM) || area.HasAttributeTF(RED_SPAWN_ROOM))
+			continue;
+		
+		/* BLOCKED is the one nav attribute that changes during a mission: gates and
+		func_nav_blocker set it. PickBuildAreaPreRound has always checked it and this one never
+		did, so a nest picked after a gate closed could sit on ground the mesh calls unreachable */
+		if (area.HasAttributeTF(BLOCKED))
 			continue;
 		
 		//TODO
@@ -2311,6 +2368,67 @@ CNavArea PickBuildAreaPreRound(int client, float SentryRange = 1300.0)
 	AreasTooClose.Close();
 
 	return bestArea;
+}
+
+/* Whether the ground this engineer holds has stopped being the best ground on offer
+
+Both areas go through ScoreNestArea against the same approach sample, so the two numbers are
+comparable: this asks what the nest picker would choose if it ran again now, and by how much that
+beats what the engineer already has.
+
+The gain has to be worth what moving costs. A relocation is a rebuild or a carry, either of which
+spends the opening of the next wave walking rather than shooting, so the default threshold is half
+of NEST_SIGHT_SCORE: what a nest gains by going from seeing half the approach to seeing all of it.
+Under that the difference is mostly the range and room terms wobbling as the bomb's reset position
+shifts between waves, and that is not a reason to give up a standing level three */
+bool ShouldRelocateNest(int client, CNavArea &destination, float SentryRange = 1300.0)
+{
+	destination = NULL_AREA;
+	
+	CNavArea current = m_aNestArea[client];
+	
+	//No nest yet, so there is nothing to compare against and the ordinary picker will build one
+	if (current == NULL_AREA)
+		return false;
+	
+	float target[3];
+	BombInfo_t bombinfo;
+	
+	if (GetBombInfo(bombinfo))
+	{
+		target[0] = bombinfo.vPosition[0];
+		target[1] = bombinfo.vPosition[1];
+		target[2] = bombinfo.vPosition[2];
+	}
+	else
+	{
+		target = GetBombHatchPosition();
+	}
+	
+	target[2] += 40.0;
+	
+	CNavArea candidate = PickBuildArea(client, SentryRange);
+	
+	if (candidate == NULL_AREA || candidate == current)
+		return false;
+	
+	ArrayList approach = new ArrayList();
+	CollectBombApproachAreas(target, SentryRange, approach);
+	
+	float gain = ScoreNestArea(client, view_as<CTFNavArea>(candidate), target, SentryRange, approach)
+		- ScoreNestArea(client, view_as<CTFNavArea>(current), target, SentryRange, approach);
+	
+	delete approach;
+	
+	if (redbots_manager_debug.BoolValue)
+		PrintToServer("ShouldRelocateNest: %N would gain %.1f by moving", client, gain);
+	
+	if (gain < redbots_manager_engineer_nest_relocate_score_gain_min.FloatValue)
+		return false;
+	
+	destination = candidate;
+	
+	return true;
 }
 
 stock bool DoesAnyPlayerUseThisName(const char[] name)
