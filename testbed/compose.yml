@@ -28,6 +28,7 @@ services:
       BOT_TEAM_COMP: ${TESTBED_BOT_TEAM_COMP:-}
       BOT_CLASS_BLACKLIST: ${TESTBED_BOT_CLASS_BLACKLIST:-}
       BOT_USE_UPGRADES: ${TESTBED_BOT_USE_UPGRADES:-1}
+      BOT_NEST_RELOCATE: ${TESTBED_BOT_NEST_RELOCATE:-0}
       STATS_FILE: ${TESTBED_STATS_FILE:-mvmbots_stats.jsonl}
       TESTBED_HOST: ${TESTBED_HOST:-1}
       # Comma-separated SteamIDs that get root, for walking a map by hand

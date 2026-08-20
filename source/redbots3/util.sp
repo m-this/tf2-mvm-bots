@@ -456,6 +456,54 @@ nothing in the game promises that: the loop reads them all and keeps the closest
 
 Busters still in the spawn room are skipped. One walks the whole length of the map to reach a
 sentry, and a team that starts running when it leaves the door spends the wave running */
+/* A friendly dispenser close enough to the ground being held to hold from instead
+
+The engineers are told where to build. Nobody tells the rest of the team, so a Heavy holding the
+bomb twenty metres from a dispenser walks off to a health pack when he is hurt and the bomb is
+unguarded while he does it. Standing on the dispenser instead is the same guard position, and it
+heals and reloads him without leaving.
+
+Only for a bot that wants it. A healthy bot with full ammo has no business crowding the dispenser
+and giving one rocket two bodies to hit */
+#define DISPENSER_GUARD_RANGE		600.0
+#define DISPENSER_GUARD_HEALTH_RATIO	0.8
+
+int FindFriendlyDispenserNear(int client, const float origin[3], float maxRange = DISPENSER_GUARD_RANGE)
+{
+	float bestDistance = maxRange;
+	int best = -1;
+
+	int dispenser = -1;
+
+	while ((dispenser = FindEntityByClassname(dispenser, "obj_dispenser")) != -1)
+	{
+		if (GetEntProp(dispenser, Prop_Send, "m_bPlacing") || GetEntProp(dispenser, Prop_Send, "m_bBuilding"))
+			continue;
+
+		if (BaseEntity_GetTeamNumber(dispenser) != GetClientTeam(client))
+			continue;
+
+		float distance = GetVectorDistance(GetAbsOrigin(dispenser), origin);
+
+		if (distance < bestDistance)
+		{
+			bestDistance = distance;
+			best = dispenser;
+		}
+	}
+
+	return best;
+}
+
+//Hurt, or short of ammo. Either is a reason to hold the ground from on top of the dispenser
+bool WantsDispenser(int client)
+{
+	if (float(GetClientHealth(client)) < float(TF2Util_GetEntityMaxHealth(client)) * DISPENSER_GUARD_HEALTH_RATIO)
+		return true;
+
+	return IsAmmoLow(client);
+}
+
 int FindSentryBusterNear(const float origin[3], TFTeam enemyTeam, float maxRange)
 {
 	float bestDistance = maxRange;

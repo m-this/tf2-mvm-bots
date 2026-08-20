@@ -200,15 +200,35 @@ Parsing the popfile would know the route before the wave instead of after. It
 is a text parser for a format with no schema, plus a file location problem on
 custom missions, for information that arrives one wave later for free.
 
-## 10. Engineers now keep their buildings across waves. Needs a play-test
+## 10. Nest relocation trips the server watchdog. Open, and it is off
 
-`CTFBotUpgrade_OnEnd` used to detonate the sentry and the dispenser at the end
-of every shopping trip, so no engineer ever kept a building across a wave and
-the nest was silently re-picked every time, with a level 3 rebuilt from
-nothing. That teardown is now gated on whether the nest actually changed.
+`sm_redbots_manager_engineer_nest_relocate` defaults to 0 because turning it on
+kills the server at the first wave transition:
 
-It is what makes item 3's relocation observable, and it is a real change to how
-every map plays. Nobody has watched a mission with it on.
+```
+WatchDog! Server took too long to process (probably infinite loop).
+FATAL ERROR: Host_Error: WatchdogHandler called - server exiting.
+```
+
+Reproduced twice on `mvm_decoy` with two engineers in the lineup, both times
+straight after wave 1. The same mission on 1.5.5-tf2ap.10 plays six waves, and
+so does this build with the convar at 0, so it is this feature and nothing else
+in the release.
+
+What was tried and did not fix it: the evaluation used to run a full nav mesh
+sweep per engineer inside the `mvm_wave_complete` frame, which is a real hazard
+and is now one engineer per timer tick. The crash did not move. So the cost is
+not in `ShouldRelocateNest`, and the next place to look is the relocation branch
+in `CTFBotMvMEngineerIdle_Update`. An action that suspends for another which
+finishes at once and hands control straight back spins inside a single frame,
+which is what the watchdog measures.
+
+The teardown gating rides on the same convar, and getting that wrong is worth
+recording: gating only on "is the nest moving" meant that with the feature off
+nothing ever moved, so the teardown never ran and every engineer held wave one's
+nest for the whole mission. It now asks the convar too, so with the feature off
+`CTFBotUpgrade_OnEnd` detonates after every shopping trip exactly as it did
+before, and nothing else in the release depends on this being fixed.
 
 ## 11. Not this repository
 
