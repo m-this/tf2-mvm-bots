@@ -1,0 +1,128 @@
+#!/bin/bash
+# Install the staged tree into the game volume, write the server configuration,
+# then hand over to the image's own entrypoint.
+#
+# SourceMod is downloaded by that entrypoint, into the volume, on first start,
+# so the install waits for it in the background rather than racing it. It keeps
+# watching for the life of the container because the game auto-updates and
+# SourceMod can be reinstalled under it.
+set -eu
+
+STAGE=/opt/mvmbots
+GAME="${STEAMAPPDIR}/${STEAMAPP}"
+INTERVAL=30
+
+install_addons() {
+	[ -d "$GAME/addons/sourcemod" ] || return 1
+
+	# -u, and the whole test-bed depends on it. This runs every thirty seconds
+	# for as long as the server lives, and cp truncates the destination before
+	# it writes. Truncating a file the running server has mapped invalidates
+	# the pages under it: the next instruction the game executes out of that
+	# extension is SIGBUS, or SIGSEGV once a half written one is executing.
+	#
+	# It reads as a crash in whichever extension happened to be rewritten, on a
+	# stripped binary, every thirty to sixty seconds, with no plugin loaded and
+	# nobody connected. It cost a day. -u compares the timestamp, the staged
+	# tree never changes, so nothing is rewritten after the first copy.
+	cp -ru "$STAGE/addons/." "$GAME/addons/"
+	mkdir -p "$GAME/addons/sourcemod/logs"
+
+	# A seeded volume comes from a server that was running something. The
+	# Archipelago plugin locks classes and weapon slots until a multiworld
+	# hands them over, which is a fine game and a ruined measurement: the bots
+	# would be measured playing with half a loadout for reasons this test-bed
+	# knows nothing about.
+	rm -f "$GAME/addons/sourcemod/plugins/tf2_archipelago.smx" \
+		"$GAME/cfg/sourcemod/tf2_archipelago.cfg" 2>/dev/null || true
+
+	# SourceMod loads every plugin in plugins/. The stack that comes with the
+	# image is not what is being measured, and a plugin that touches the game
+	# is a variable in the experiment.
+	rm -f "$GAME/addons/sourcemod/plugins/funcommands.smx" \
+		"$GAME/addons/sourcemod/plugins/playercommands.smx" \
+		"$GAME/addons/sourcemod/plugins/basecomm.smx" \
+		"$GAME/addons/sourcemod/plugins/nextmap.smx" \
+		"$GAME/addons/sourcemod/plugins/basvotes.smx" \
+		"$GAME/addons/sourcemod/plugins/mapchooser.smx" \
+		"$GAME/addons/sourcemod/plugins/rockthevote.smx" 2>/dev/null || true
+
+	return 0
+}
+
+# The measurements are worth nothing if the run they came from cannot be
+# described, so the configuration is generated here in one place and the run
+# script prints it back.
+install_server_cfg() {
+	target="$GAME/cfg/server.cfg"
+	[ -d "$(dirname "$target")" ] || return 1
+
+	cat >"$target" <<-CFG
+	// Managed by the mvm-bots test-bed. Edits here are replaced on restart.
+	hostname "MvM defender bots test-bed"
+	rcon_password "${SRCDS_RCONPW}"
+	sv_password ""
+	sv_lan 1
+
+	// Nobody is going to join, so nothing waits for anybody. One ready player
+	// starts a wave, and the bots ready themselves up.
+	tf_mvm_min_players_to_start 1
+
+	// An empty server hibernates: it stops simulating, no timer runs, and
+	// nothing ever adds a bot. Every server this mod runs on has a person on
+	// it keeping it awake. This one never will, so hibernation has to go, and
+	// without it there is no test-bed at all.
+	//
+	// tf_allow_server_hibernation, not sv_hibernate_when_empty: the generic
+	// Source convar does not exist in Team Fortress 2, and setting it is a
+	// line in a config file that quietly does nothing.
+	tf_allow_server_hibernation 0
+	mp_idlemaxtime 0
+	mp_idledealmethod 0
+	sv_pure 0
+	sv_pausable 0
+	setpause 0
+
+	// The bots. Mode 1 is READY_BOTS: RED is filled between waves, which is
+	// what lets a wave start with no human on the server at all. Mode 2 waits
+	// for the wave to begin before filling, and with nobody to begin it that
+	// is a server that sits still.
+	//
+	// min_players -1 turns off the mod's own ready-up gate, which otherwise
+	// counts RED before the bots exist and blocks the ready that would have
+	// spawned them.
+	sm_redbots_manager_mode 1
+	sm_redbots_manager_defender_team_size ${BOT_TEAM_SIZE:-6}
+	sm_redbots_manager_min_players -1
+	sm_redbots_manager_kick_bots 0
+	sm_redbots_manager_bot_use_upgrades ${BOT_USE_UPGRADES:-1}
+	sm_redbots_manager_class_blacklist "${BOT_CLASS_BLACKLIST:-}"
+	sm_redbots_manager_team_composition "${BOT_TEAM_COMP:-}"
+
+	// The fake client that holds a seat on RED and readies up. Without it
+	// nothing ever starts a wave: the mod adds its bots in response to a human
+	// pressing F4, and the game will not begin a wave with nobody ready.
+	mvmbots_host_enabled ${TESTBED_HOST:-1}
+
+	// Where the wave results are written. The run script reads this file.
+	mvmbots_stats_path "logs/${STATS_FILE:-mvmbots_stats.jsonl}"
+	CFG
+
+	return 0
+}
+
+supervise() {
+	while true; do
+		if install_addons && install_server_cfg; then
+			echo "[test-bed] installed the bots and the statistics plugin"
+		fi
+		sleep "$INTERVAL"
+	done
+}
+
+supervise &
+
+# The image's own entrypoint owns the command line, and reads SRCDS_STARTMAP,
+# SRCDS_MAXPLAYERS and the rest from the environment. The mission is not set
+# here: tf_mvm_popfile only works once a map is loaded, so run.sh sends it.
+exec bash "${HOMEDIR}/entry.sh"

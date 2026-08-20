@@ -1,0 +1,46 @@
+# One Team Fortress 2 server, running this working tree's bots, with nobody
+# playing on it.
+#
+# Run it with testbed/run.sh rather than by hand: the run script sends the
+# mission, waits for the waves and reads the results out.
+#
+# The project name is pinned so the game volume survives a rebuild.
+# Re-downloading the game because a directory was renamed is not a mistake
+# worth being able to make.
+name: mvmbots-testbed
+
+services:
+  srcds:
+    build:
+      context: ..
+      dockerfile: testbed/Dockerfile
+    environment:
+      # Read by the base image's entrypoint
+      SRCDS_STARTMAP: ${TESTBED_MAP:-mvm_decoy}
+      SRCDS_MAXPLAYERS: 32
+      SRCDS_PORT: ${TESTBED_PORT:-27025}
+      SRCDS_RCONPW: ${TESTBED_RCONPW:-testbed}
+      # "0" rather than empty: the image passes this to +sv_setsteamaccount
+      SRCDS_TOKEN: "0"
+      SRCDS_FPSMAX: 0
+      # Read by our entrypoint, and written into server.cfg
+      BOT_TEAM_SIZE: ${TESTBED_BOT_TEAM_SIZE:-6}
+      BOT_TEAM_COMP: ${TESTBED_BOT_TEAM_COMP:-}
+      BOT_CLASS_BLACKLIST: ${TESTBED_BOT_CLASS_BLACKLIST:-}
+      BOT_USE_UPGRADES: ${TESTBED_BOT_USE_UPGRADES:-1}
+      STATS_FILE: ${TESTBED_STATS_FILE:-mvmbots_stats.jsonl}
+      TESTBED_HOST: ${TESTBED_HOST:-1}
+    ports:
+      # 27025, not 27015: a machine that already runs a game server is a machine
+      # whose game port is taken, and the whole reason the game is already
+      # downloaded here is that a server is using it.
+      #
+      # Loopback only. This server has no password, no Steam session and a
+      # known rcon password, and it exists to be shouted at by a script.
+      - "127.0.0.1:${TESTBED_PORT:-27025}:${TESTBED_PORT:-27025}/udp"
+      - "127.0.0.1:${TESTBED_PORT:-27025}:${TESTBED_PORT:-27025}/tcp"
+    volumes:
+      - tf2game:/home/steam/tf-dedicated
+
+volumes:
+  tf2game:

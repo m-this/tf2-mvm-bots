@@ -1,0 +1,3 @@
+# Working directories: the staged build and whatever the last run measured.
+build/
+results/
