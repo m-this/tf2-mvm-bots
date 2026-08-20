@@ -456,6 +456,33 @@ nothing in the game promises that: the loop reads them all and keeps the closest
 
 Busters still in the spawn room are skipped. One walks the whole length of the map to reach a
 sentry, and a team that starts running when it leaves the door spends the wave running */
+/* Somebody for the medic to point the medigun at
+
+The beam already attached is the plain answer, and it is what the game itself tracks. Without one,
+anybody alive and close enough to catch the beam counts, so he keeps the medigun out while walking
+into range rather than swapping twice on the way */
+#define MEDIGUN_HEAL_RANGE	450.0
+
+bool MedicHasPatient(int client, int medigun)
+{
+	if (GetEntPropEnt(medigun, Prop_Send, "m_hHealingTarget") != -1)
+		return true;
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (i == client || !IsClientInGame(i) || !IsPlayerAlive(i))
+			continue;
+
+		if (GetClientTeam(i) != GetClientTeam(client))
+			continue;
+
+		if (GetVectorDistance(WorldSpaceCenter(client), WorldSpaceCenter(i)) < MEDIGUN_HEAL_RANGE)
+			return true;
+	}
+
+	return false;
+}
+
 /* A friendly dispenser close enough to the ground being held to hold from instead
 
 The engineers are told where to build. Nobody tells the rest of the team, so a Heavy holding the
