@@ -10,6 +10,7 @@ void InitGameEventHooks()
 	HookEvent("player_team", Event_PlayerTeam);
 	HookEvent("mvm_mission_update", Event_MvmMissionUpdate, EventHookMode_Pre);
 	HookEvent("teamplay_round_start", Event_TeamplayRoundStart);
+	HookEvent("player_death", Event_PlayerDeath);
 }
 
 static void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
@@ -167,11 +168,35 @@ static Action Event_MvmMissionUpdate(Event event, const char[] name, bool dontBr
 
 static void Event_TeamplayRoundStart(Event event, const char[] name, bool dontBroadcast)
 {
+	//A new wave has its own Spies, and the last wave's paranoia is not evidence about this one
+	ResetSpyIntel();
+	
 	//Was the map reset?
 	if (event.GetBool("full_reset"))
 	{
 		SetupSniperSpotHints();
 	}
+}
+
+/* A Spy who kills somebody has told the team he exists
+
+The cheapest honest sighting there is, and the one that matters: a team that has just lost
+somebody to a knife knows where the knife was. Everything the bots do about Spies grows out of
+this and out of seeing one undisguised, and nothing else */
+static void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
+{
+	int attacker = GetClientOfUserId(event.GetInt("attacker"));
+	int victim = GetClientOfUserId(event.GetInt("userid"));
+	
+	if (!IsValidClientIndex(attacker) || !IsValidClientIndex(victim) || attacker == victim)
+		return;
+	
+	if (TF2_GetPlayerClass(attacker) != TFClass_Spy || TF2_GetClientTeam(attacker) == TF2_GetClientTeam(victim))
+		return;
+	
+	float origin[3]; GetClientAbsOrigin(victim, origin);
+	
+	NoteSpySighting(origin);
 }
 
 static Action Timer_PlayerSpawn(Handle timer, int data)

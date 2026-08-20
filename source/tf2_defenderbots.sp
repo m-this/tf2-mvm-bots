@@ -195,7 +195,6 @@ ConVar tf_bot_health_ok_ratio;
 ConVar tf_bot_ammo_search_range;
 ConVar tf_bot_health_search_far_range;
 ConVar tf_bot_health_search_near_range;
-ConVar tf_bot_suicide_bomb_range;
 
 #if defined METHOD_MVM_UPGRADES
 Address g_pMannVsMachineUpgrades;
@@ -203,6 +202,8 @@ Address g_pMannVsMachineUpgrades;
 
 #include "redbots3/util.sp"
 #include "redbots3/weapon_tuning.sp"
+#include "redbots3/medic_uber.sp"
+#include "redbots3/demoman_stickies.sp"
 #include "redbots3/offsets.sp"
 #include "redbots3/sdkcalls.sp"
 #include "redbots3/loadouts.sp"
@@ -379,6 +380,8 @@ public void OnMapStart()
 	g_flNextReadyTime = 0.0;
 	g_bBotClassesLocked = false;
 	g_bAllowBotTeamRedo = false;
+	
+	ResetMapHintNests();
 	
 	Config_LoadMap();
 	Config_LoadBotNames();
@@ -1629,7 +1632,6 @@ void FindGameConsoleVariables()
 	tf_bot_ammo_search_range = FindConVar("tf_bot_ammo_search_range");
 	tf_bot_health_search_far_range = FindConVar("tf_bot_health_search_far_range");
 	tf_bot_health_search_near_range = FindConVar("tf_bot_health_search_near_range");
-	tf_bot_suicide_bomb_range = FindConVar("tf_bot_suicide_bomb_range");
 }
 
 bool FakeClientCommandThrottled(int client, const char[] command)

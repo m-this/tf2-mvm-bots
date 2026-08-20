@@ -14,6 +14,15 @@ float m_ctRecomputePathMvMEngiIdle[MAXPLAYERS + 1];
 bool g_bGoingToGrabBuilding[MAXPLAYERS + 1];
 int m_hBuildingToGrab[MAXPLAYERS + 1];
 
+//The nest an engineer was holding before a buster moved him off it, NULL_AREA when he is on it
+CNavArea m_aNestAreaBeforeHaul[MAXPLAYERS + 1] = {NULL_AREA, ...};
+
+float m_ctSentryUnderFire[MAXPLAYERS + 1];
+int m_iSentryHealthLast[MAXPLAYERS + 1];
+
+//How long a sentry counts as under fire after the last health it lost
+#define SENTRY_UNDER_FIRE_TIME	3.0
+
 BehaviorAction CTFBotMvMEngineerIdle()
 {
 	BehaviorAction action = ActionsManager.Create("DefenderEngineerIdle");
@@ -30,6 +39,10 @@ static Action CTFBotMvMEngineerIdle_OnStart(BehaviorAction action, int actor, Be
 {
 	m_pPath[actor].SetMinLookAheadDistance(GetDesiredPathLookAheadRange(actor));
 	
+	//A fresh engineer holds no ground yet, so there is nowhere for a buster to have moved him off
+	m_aNestAreaBeforeHaul[actor] = NULL_AREA;
+	m_iSentryHealthLast[actor] = 0;
+	
 	CTFBotMvMEngineerIdle_ResetProperties(actor);
 	
 	return action.Continue();
@@ -41,7 +54,63 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 	int dispenser = GetObjectOfType(actor, TFObject_Dispenser);
 	
 	bool bShouldAdvance = CTFBotMvMEngineerIdle_ShouldAdvanceNestSpot(actor);
-	
+
+	/* A buster is walking at the nest, so the nest stops being where the engineer wants to be
+	Handled before the advance below and before anything else this action does, because the whole
+	value of it is spending the walk the buster still has left. It reuses the carry machinery that
+	advancing already uses: the goal area is somewhere out of the blast rather than a better nest,
+	and the engineer picks the sentry up and walks it there the same way */
+	int buster = -1;
+
+	if (!g_bGoingToGrabBuilding[actor] && ShouldHaulFromSentryBuster(actor, sentry, buster))
+	{
+		CNavArea retreat = PickBusterRetreatArea(sentry, buster);
+
+		if (retreat != NULL_AREA)
+		{
+			if (redbots_manager_debug_actions.BoolValue)
+				PrintToServer("CTFBotMvMEngineerIdle_Update: HAUL FROM BUSTER");
+
+			BaseMultiplayerPlayer_SpeakConceptIfAllowed(actor, MP_CONCEPT_PLAYER_INCOMING);
+
+			/* The nest this engineer is leaving, so that it goes back to it
+			Without this the spot the sentry was carried to becomes the nest for the rest of the
+			wave, and a spot chosen for being far from one robot is not a spot to hold ground from */
+			m_aNestAreaBeforeHaul[actor] = m_aNestArea[actor];
+
+			CTFBotMvMEngineerIdle_ResetProperties(actor);
+
+			m_aNestArea[actor] = retreat;
+
+			g_bGoingToGrabBuilding[actor] = true;
+			m_hBuildingToGrab[actor] = EntIndexToEntRef(sentry);
+
+			g_arrPluginBot[actor].SetPathGoalEntity(sentry);
+
+			return action.Continue();
+		}
+	}
+
+	/* The buster is gone and the sentry is standing somewhere it was carried to, not somewhere
+	chosen to shoot from. Going back is the same walk in the other direction */
+	if (m_aNestAreaBeforeHaul[actor] != NULL_AREA && buster == -1 && !g_bGoingToGrabBuilding[actor] && sentry != INVALID_ENT_REFERENCE)
+	{
+		CNavArea home = m_aNestAreaBeforeHaul[actor];
+
+		m_aNestAreaBeforeHaul[actor] = NULL_AREA;
+
+		CTFBotMvMEngineerIdle_ResetProperties(actor);
+
+		m_aNestArea[actor] = home;
+
+		g_bGoingToGrabBuilding[actor] = true;
+		m_hBuildingToGrab[actor] = EntIndexToEntRef(sentry);
+
+		g_arrPluginBot[actor].SetPathGoalEntity(sentry);
+
+		return action.Continue();
+	}
+
 	if (bShouldAdvance && !g_bGoingToGrabBuilding[actor])
 	{
 		//DetonateObjectOfType(actor, TFObject_Sentry);
@@ -175,21 +244,34 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 	if (bShouldAdvance)
 		return action.Continue();
 	
-	if (sentry != -1 && dispenser != -1)
+	UpdateSentryUnderFire(actor, sentry);
+
+	if (sentry != -1)
 	{
-		if (m_ctSentrySafe[actor] > GetGameTime() && !g_bGoingToGrabBuilding[actor])
+		if ((m_ctSentrySafe[actor] > GetGameTime() || m_ctSentryUnderFire[actor] > GetGameTime()) && !g_bGoingToGrabBuilding[actor])
 		{
 			int mySecondary = GetPlayerWeaponSlot(actor, TFWeaponSlot_Secondary);
-			
+
 			if (mySecondary != -1 && TF2Util_GetWeaponID(mySecondary) == TF_WEAPON_LASER_POINTER && myNextbot.IsRangeLessThan(sentry, 180.0))
 			{
 				CKnownEntity threat = myNextbot.GetVisionInterface().GetPrimaryKnownThreat(false);
-				
+
 				if (threat)
 				{
 					int iThreat = threat.GetEntity();
-					
-					if (GetVectorDistance(GetAbsOrigin(sentry), GetAbsOrigin(iThreat)) > SENTRY_MAX_RANGE && IsLineOfFireClearEntity(actor, GetEyePosition(actor), iThreat))
+
+					/* Two reasons to hold the wrangler, and the shield is the one that was missing
+
+					Out of range, the wrangler is the only way the sentry reaches the threat at all,
+					which is what this did and all it did. Under fire, it is worth holding for the
+					shield alone: two thirds of the damage aimed at the sentry stops there, and a
+					sentry that survives the giant is worth more than the seconds of aim it costs.
+
+					Both want the same thing of the bot, so both run the same code: point it at the
+					threat and hold the buttons */
+					bool defending = m_ctSentryUnderFire[actor] > GetGameTime();
+
+					if ((defending || GetVectorDistance(GetAbsOrigin(sentry), GetAbsOrigin(iThreat)) > SENTRY_MAX_RANGE) && IsLineOfFireClearEntity(actor, GetEyePosition(actor), iThreat))
 					{
 						AimHeadTowards(myBody, WorldSpaceCenter(iThreat), MANDATORY, 0.1, _, "Aiming!");
 						TF2Util_SetPlayerActiveWeapon(actor, mySecondary);
@@ -387,6 +469,63 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 	}
 	
 	return action.Continue();
+}
+
+/* Whether the sentry is being shot at, from the only thing that says so without a damage hook
+
+Health that went down since the last frame. A repair puts it back up and does not clear the
+timer, which is the point: an engineer wrenching a sentry that keeps losing health is an engineer
+who should be holding the wrangler instead */
+static void UpdateSentryUnderFire(int actor, int sentry)
+{
+	if (sentry == INVALID_ENT_REFERENCE)
+	{
+		m_iSentryHealthLast[actor] = 0;
+		return;
+	}
+
+	int health = BaseEntity_GetHealth(sentry);
+
+	if (m_iSentryHealthLast[actor] > 0 && health < m_iSentryHealthLast[actor])
+		m_ctSentryUnderFire[actor] = GetGameTime() + SENTRY_UNDER_FIRE_TIME;
+
+	m_iSentryHealthLast[actor] = health;
+}
+
+/* Whether to pick the sentry up and walk it away from a buster, and which buster
+
+Only worth doing while the buster still has ground to cover. Inside flee range the engineer is
+better off running than carrying, which is what CTFBotEvadeBuster does with him, and a buster
+already detonating cannot be walked away from at all.
+
+A mini sentry is not carried. It costs 100 metal and two seconds, so a Gunslinger engineer lets
+the buster have it and builds another one behind the blast */
+static bool ShouldHaulFromSentryBuster(int actor, int sentry, int &buster)
+{
+	buster = -1;
+
+	if (sentry == INVALID_ENT_REFERENCE)
+		return false;
+
+	if (GameRules_GetRoundState() != RoundState_RoundRunning)
+		return false;
+
+	if (TF2_IsCarryingObject(actor) || TF2_IsBuilding(sentry))
+		return false;
+
+	buster = FindSentryBusterNear(GetAbsOrigin(sentry), GetPlayerEnemyTeam(actor), BUSTER_HAUL_RANGE);
+
+	if (buster == -1)
+		return false;
+
+	if (TF2_IsMiniBuilding(sentry))
+		return false;
+
+	//Close enough that carrying is slower than the buster is
+	if (GetVectorDistance(GetAbsOrigin(sentry), WorldSpaceCenter(buster)) < BUSTER_FLEE_RANGE)
+		return false;
+
+	return true;
 }
 
 /* Whether there is anything the wrench can still do for this sentry

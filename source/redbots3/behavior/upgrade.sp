@@ -189,6 +189,16 @@ void CollectUpgrades(int client)
 		iArraySlots.Push(TF_LOADOUT_SLOT_MELEE);
 		iArraySlots.Push(TF_LOADOUT_SLOT_BUILDING);
 		iArraySlots.Push(TF_LOADOUT_SLOT_PDA);
+
+		/* The gun the engineer defends the nest with, which used to buy nothing at all
+		A Widowmaker engineer spends metal the sentry needs on every shot and got no damage back
+		for it. A Rescue Ranger engineer had a rule written for it in LoadoutUpgradePriority that
+		nothing could ever reach. Both are the weapon the loadout was chosen for.
+
+		The sentry still outranks all of it: everything these two slots can buy is ranked below
+		the sentry lines in ClassUpgradePriority, so the shotgun is bought with what is left */
+		iArraySlots.Push(TF_LOADOUT_SLOT_PRIMARY);
+		iArraySlots.Push(TF_LOADOUT_SLOT_SECONDARY);
 	}
 	else
 	{
@@ -430,9 +440,21 @@ Zero when the weapon in that slot has no opinion, which is most of them: this on
 where the loadout, not the class, decides what to buy first */
 static int LoadoutUpgradePriority(int client, int slot, const char[] attribute)
 {
+	/* An engineer whose gun is paid for in metal
+
+	The metal upgrades do not hang off the gun, so the switch below cannot answer for them however
+	the loadout is put together. A Widowmaker engineer without them fights the wave out of the same
+	supply the sentry is repaired from, and runs out of both. Under the sentry's own fire rate,
+	above everything else the class buys */
+	if (TF2_GetPlayerClass(client) == TFClass_Engineer && EngineerGunSpendsMetal(client))
+	{
+		if (StrEqual(attribute, "maxammo metal increased")) return 310;
+		if (StrEqual(attribute, "metal regen")) return 305;
+	}
+
 	if (slot < TF_LOADOUT_SLOT_PRIMARY || slot > TF_LOADOUT_SLOT_MELEE)
 		return 0;
-	
+
 	int weapon = GetPlayerWeaponSlot(client, slot);
 	
 	if (weapon < 1 || !HasEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex"))
@@ -474,6 +496,21 @@ static int LoadoutUpgradePriority(int client, int slot, const char[] attribute)
 			if (StrEqual(attribute, "metal regen")) return 300;
 			if (StrEqual(attribute, "maxammo metal increased")) return 290;
 		}
+		case 527: //Widowmaker: the shot is paid for in metal and paid back in damage dealt
+		{
+			if (StrEqual(attribute, "damage bonus")) return 300;
+			if (StrEqual(attribute, "fire rate bonus")) return 250;
+		}
+		case 528: //Short Circuit: it eats projectiles rather than robots, and eats metal doing it
+		{
+			if (StrEqual(attribute, "metal regen")) return 300;
+		}
+		case 141: //Frontier Justice: the crits are banked by the sentry, so the clip is what holds them
+		{
+			if (StrEqual(attribute, "clip size upgrade atomic")) return 260;
+			if (StrEqual(attribute, "clip size bonus upgrade")) return 260;
+			if (StrEqual(attribute, "damage bonus")) return 250;
+		}
 	}
 	
 	return 0;
@@ -486,6 +523,26 @@ static int ClassUpgradePriority(TFClassType pclass, int slot, const char[] attri
 	{
 		case TFClass_Engineer:
 		{
+			/* The gun, which is bought with what the nest leaves over
+
+			Handled before the sentry lines below, and ranked under every one of them, because
+			the general table would otherwise put "damage bonus" at 260 and buy shotgun damage
+			ahead of the metal that keeps the sentry firing. A weapon that is the reason to carry
+			the loadout says so in LoadoutUpgradePriority instead, which runs before this */
+			if (slot == TF_LOADOUT_SLOT_PRIMARY || slot == TF_LOADOUT_SLOT_SECONDARY)
+			{
+				if (StrEqual(attribute, "damage bonus")) return 200;
+				if (StrEqual(attribute, "fire rate bonus")) return 190;
+				if (StrEqual(attribute, "clip size upgrade atomic")) return 150;
+				if (StrEqual(attribute, "clip size bonus upgrade")) return 150;
+				if (StrEqual(attribute, "faster reload rate")) return 140;
+				if (StrEqual(attribute, "maxammo primary increased")) return 130;
+				if (StrEqual(attribute, "maxammo secondary increased")) return 120;
+
+				//Anything else on the gun is worth less than the cheapest thing the nest wants
+				return 50;
+			}
+
 			//The sentry is the damage. The shotgun only defends it
 			if (StrEqual(attribute, "engy sentry fire rate increased")) return 320;
 			if (StrEqual(attribute, "engy building health bonus")) return 260;
@@ -714,23 +771,51 @@ JSONObject CTFBotPurchaseUpgrades_ChooseUpgrade(int actor)
 	return null;
 }
 
-/* False when the credits never moved, which is the game turning the purchase down
+/* Every tier of one upgrade the bot can afford, in one purchase
 
-An upgrade that costs nothing cannot be told apart this way, so it counts as bought */
+The game takes a count and applies it, refusing each step it cannot. Buying one step per interval
+instead is what a play-test heard as a bot announcing the same upgrade over and over, because
+each step is announced and four steps of one attribute all read the same. It is also most of what
+made the chat unreadable while six bots shopped.
+
+Nothing about what gets bought changes. The list is a strict priority and the top of it stays the
+top until it maxes out, so the steps bought here in one go are the ones the next four intervals
+would have bought anyway. The bot just finishes sooner and says so once */
+
+//No stock upgrade has more steps than this, and asking for steps that do not exist buys nothing
+#define UPGRADE_TIERS_MAX	4
+
 bool CTFBotPurchaseUpgrades_PurchaseUpgrade(int actor, JSONObject info)
 {
 	int slot = info.GetInt("slot");
 	int index = info.GetInt("index");
 	int cost = GetCostForUpgrade(CMannVsMachineUpgradeManager().GetUpgradeByIndex(index).Address, slot, info.GetInt("pclass"), actor);
 	int currencyBefore = TF2_GetCurrency(actor);
-	
-	KV_MVM_Upgrade(actor, 1, slot, index);
-	
-	if (cost > 0 && TF2_GetCurrency(actor) == currencyBefore)
+
+	int count = 1;
+
+	if (cost > 0)
+	{
+		count = currencyBefore / cost;
+
+		if (count > UPGRADE_TIERS_MAX)
+			count = UPGRADE_TIERS_MAX;
+
+		if (count < 1)
+			count = 1;
+	}
+
+	KV_MVM_Upgrade(actor, count, slot, index);
+
+	int spent = currencyBefore - TF2_GetCurrency(actor);
+
+	//The credits never moved, which is the game turning the purchase down
+	if (cost > 0 && spent <= 0)
 		return false;
-	
-	++m_nPurchasedUpgrades[actor];
-	
+
+	//An upgrade that costs nothing cannot be counted this way, so it counts as one
+	m_nPurchasedUpgrades[actor] += cost > 0 ? spent / cost : 1;
+
 	return true;
 }
 
