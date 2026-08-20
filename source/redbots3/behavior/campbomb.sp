@@ -67,13 +67,26 @@ public Action CTFBotCampBomb_Update(BehaviorAction action, int actor, float inte
 		}
 	}
 	
-	//Move towards the bomb's current area if we're too far or can't see it
-	if (myBot.IsRangeGreaterThanEx(bombPosition, BOMB_GUARD_RADIUS) || !IsLineOfFireClearPosition(actor, GetEyePosition(actor), bombPosition))
+	/* Guard from the dispenser when there is one on this ground and the bot has a reason to want
+	it. Same bomb, same fight, and he heals and reloads without walking away from either */
+	float guardPosition[3];
+	guardPosition = bombPosition;
+	
+	if (WantsDispenser(actor))
+	{
+		int dispenser = FindFriendlyDispenserNear(actor, bombPosition);
+		
+		if (dispenser != -1)
+			guardPosition = GetAbsOrigin(dispenser);
+	}
+	
+	//Move towards the ground we are holding if we're too far or can't see the bomb
+	if (myBot.IsRangeGreaterThanEx(guardPosition, BOMB_GUARD_RADIUS) || !IsLineOfFireClearPosition(actor, GetEyePosition(actor), bombPosition))
 	{
 		if (m_flRepathTime[actor] <= GetGameTime())
 		{
 			m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(1.0, 2.0);
-			m_pPath[actor].ComputeToPos(myBot, bombPosition);
+			m_pPath[actor].ComputeToPos(myBot, guardPosition);
 		}
 		
 		m_pPath[actor].Update(myBot);

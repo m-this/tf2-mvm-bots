@@ -110,6 +110,9 @@ static void Event_RevivePlayerNotify(Event event, const char[] name, bool dontBr
 
 static void Event_MvmWaveBegin(Event event, const char[] name, bool dontBroadcast)
 {
+	//Whatever the queue has left is about a bomb that is about to move
+	EngineerNestRelocation_StopEvaluating();
+	
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (IsClientInGame(i) && g_bIsDefenderBot[i] && IsPlayerAlive(i))

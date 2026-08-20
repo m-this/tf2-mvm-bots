@@ -747,41 +747,97 @@ carrying a sentry while the robots walk in.
 An engineer with no nest, a dead one, or one whose sentry is still going up is left alone. There is
 nothing to compare against in the first two cases, and in the third nobody yet knows what the
 building is worth */
+/* Deciding this costs a full nav mesh sweep per engineer
+
+GetBombInfo walks every area, PickBuildArea walks every area and scores what survives, and the
+sight score traces from each candidate to every sampled approach area. Doing that for six
+engineers inside the wave_complete frame is how the server's watchdog gets tripped: it does not
+care that the work is finite, only that the frame took seconds.
+
+So one engineer per timer tick. The shopping period is a minute and the queue is at most the
+server's player count, which is a rounding error against that. */
+#define NEST_RELOCATE_EVAL_INTERVAL	0.1
+
+static int m_iNestRelocateEvalNext;
+static Handle m_hNestRelocateEvalTimer;
+
 void EngineerNestRelocation_OnWaveComplete()
 {
 	for (int i = 1; i <= MaxClients; i++)
-	{
 		m_aNestAreaRelocate[i] = NULL_AREA;
-		
-		if (!IsClientInGame(i) || !g_bIsDefenderBot[i] || !IsPlayerAlive(i))
-			continue;
-		
-		if (TF2_GetPlayerClass(i) != TFClass_Engineer)
-			continue;
-		
-		if (TF2_IsCarryingObject(i))
-			continue;
-		
-		int sentry = GetObjectOfType(i, TFObject_Sentry);
-		
-		if (sentry != INVALID_ENT_REFERENCE && TF2_IsBuilding(sentry))
-			continue;
-		
-		CNavArea destination;
-		
-		if (!ShouldRelocateNest(i, destination))
-			continue;
-		
-		m_aNestAreaRelocate[i] = destination;
-		
-		if (redbots_manager_debug.BoolValue)
-			PrintToServer("EngineerNestRelocation_OnWaveComplete: %N is moving nest", i);
+	
+	StopNestRelocateEval();
+	
+	if (!redbots_manager_engineer_nest_relocate.BoolValue)
+		return;
+	
+	m_iNestRelocateEvalNext = 1;
+	m_hNestRelocateEvalTimer = CreateTimer(NEST_RELOCATE_EVAL_INTERVAL, Timer_EvaluateNestRelocation, _, TIMER_REPEAT);
+}
+
+//The wave started, or the round did: whatever the queue had left is about a bomb that has moved
+void EngineerNestRelocation_StopEvaluating()
+{
+	StopNestRelocateEval();
+}
+
+static void StopNestRelocateEval()
+{
+	m_iNestRelocateEvalNext = 1;
+	
+	if (m_hNestRelocateEvalTimer != null)
+	{
+		KillTimer(m_hNestRelocateEvalTimer);
+		m_hNestRelocateEvalTimer = null;
 	}
 }
 
-//A wave that has to be replayed is a wave down the same route, so the pending answer is thrown away
+static Action Timer_EvaluateNestRelocation(Handle timer)
+{
+	if (m_iNestRelocateEvalNext > MaxClients)
+	{
+		m_hNestRelocateEvalTimer = null;
+		return Plugin_Stop;
+	}
+	
+	int client = m_iNestRelocateEvalNext++;
+	
+	if (!ShouldEvaluateNestRelocation(client))
+		return Plugin_Continue;
+	
+	CNavArea destination;
+	
+	if (!ShouldRelocateNest(client, destination))
+		return Plugin_Continue;
+	
+	m_aNestAreaRelocate[client] = destination;
+	
+	if (redbots_manager_debug.BoolValue)
+		PrintToServer("EngineerNestRelocation: %N is moving nest", client);
+	
+	return Plugin_Continue;
+}
+
+static bool ShouldEvaluateNestRelocation(int client)
+{
+	if (!IsClientInGame(client) || !g_bIsDefenderBot[client] || !IsPlayerAlive(client))
+		return false;
+	
+	if (TF2_GetPlayerClass(client) != TFClass_Engineer)
+		return false;
+	
+	if (TF2_IsCarryingObject(client))
+		return false;
+	
+	int sentry = GetObjectOfType(client, TFObject_Sentry);
+	
+	return !(sentry != INVALID_ENT_REFERENCE && TF2_IsBuilding(sentry));
+}
+
 void EngineerNestRelocation_ResetAll()
 {
+	StopNestRelocateEval();
+	
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		m_aNestAreaRelocate[i] = NULL_AREA;

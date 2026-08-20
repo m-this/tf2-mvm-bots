@@ -152,6 +152,7 @@ install_server_cfg() {
 	sm_redbots_manager_min_players -1
 	sm_redbots_manager_kick_bots 0
 	sm_redbots_manager_bot_use_upgrades ${BOT_USE_UPGRADES:-1}
+	sm_redbots_manager_engineer_nest_relocate ${BOT_NEST_RELOCATE:-0}
 	sm_redbots_manager_class_blacklist "${BOT_CLASS_BLACKLIST:-}"
 	sm_redbots_manager_team_composition "${BOT_TEAM_COMP:-}"
 

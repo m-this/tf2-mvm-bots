@@ -145,20 +145,31 @@ public void CTFBotUpgrade_OnEnd(BehaviorAction action, int actor, BehaviorAction
 	
 	KV_MvM_UpgradesDone(actor);
 	
-	/* Buildings come down only when the nest is moving
+	/* Buildings come down after shopping, unless the engineer is staying put
 
-	This used to tear them down after every between-waves shopping trip, which is a level three
-	rebuilt from nothing at the start of every wave. The between-waves re-evaluation now says
-	whether the ground stopped being good: when it did, the buildings are standing in the wrong
-	place and rebuilding at the new nest is cheaper than walking one back across the map; when it
-	did not, the engineer walks back to a sentry that is already up */
-	if (TF2_GetPlayerClass(actor) == TFClass_Engineer && GameRules_GetRoundState() == RoundState_BetweenRounds && m_aNestAreaRelocate[actor] != NULL_AREA)
+	Tearing them down every time is a level three rebuilt from nothing at the start of every wave.
+	The between-waves re-evaluation is what says whether the ground stopped being good: when it
+	did, rebuilding at the new nest beats walking a sentry across the map; when it did not, the
+	engineer walks back to one that is already up.
+
+	Without that re-evaluation there is nothing to ask, so the old unconditional teardown stands.
+	Keeping the buildings on the strength of a question nobody asked would leave every engineer
+	holding wave one's nest for the whole mission */
+	if (TF2_GetPlayerClass(actor) == TFClass_Engineer && GameRules_GetRoundState() == RoundState_BetweenRounds)
 	{
-		m_aNestArea[actor] = m_aNestAreaRelocate[actor];
-		m_aNestAreaRelocate[actor] = NULL_AREA;
+		bool relocating = m_aNestAreaRelocate[actor] != NULL_AREA;
 		
-		DetonateObjectOfType(actor, TFObject_Sentry);
-		DetonateObjectOfType(actor, TFObject_Dispenser);
+		if (relocating)
+		{
+			m_aNestArea[actor] = m_aNestAreaRelocate[actor];
+			m_aNestAreaRelocate[actor] = NULL_AREA;
+		}
+		
+		if (relocating || !redbots_manager_engineer_nest_relocate.BoolValue)
+		{
+			DetonateObjectOfType(actor, TFObject_Sentry);
+			DetonateObjectOfType(actor, TFObject_Dispenser);
+		}
 	}
 	
 	// UpdateLookAroundForEnemies(actor, true);
