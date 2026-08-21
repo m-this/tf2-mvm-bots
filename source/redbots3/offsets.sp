@@ -105,8 +105,16 @@ void GetTurretAngles(int sentry, float buffer[3])
 	GetEntDataVector(sentry, GetOffset("CObjectSentrygun", "m_vecCurAngles"), buffer);
 }
 
+/* Whether the game's own bot code looks around for something to shoot
+
+Guarded, because an action's OnEnd runs after its actor may already be gone. The server hibernates
+at the end of a mission and punts every bot on the way, and the engineer's build actions end after
+that: three exceptions a map, all of them this, writing into an entity index that is nobody. */
 void SetLookingAroundForEnemies(int client, bool shouldLook)
 {
+	if (client < 1 || client > MaxClients || !IsClientInGame(client))
+		return;
+	
 	SetEntData(client, GetOffset("CTFBot", "m_isLookingAroundForEnemies"), shouldLook, 1);
 }
 
