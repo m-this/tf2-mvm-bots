@@ -112,10 +112,12 @@ mvm_rottenburg  TeleporterExit           1723 -199 -407   the tele exit, opposit
 
 ## Mannworks: the wave starts inside
 
-Told in play-testing, and it explains why the test-bed cannot tell two builds apart
-on this map: every run clears one wave and stops. The four authored nests are all on
-the open ground to the north, and the fight begins indoors, so the engineers set up
-where the robots are not.
+Told in play-testing. Every test-bed run on this map clears one wave and stops, on
+both builds, so the mission does not tell two builds apart.
 
-The map file has no interior nest. Walking one is the fix, and until then Mannworks
-is not a mission that measures anything.
+An earlier version of this note said none of the four nests was inside and that the
+map needed an interior one. That was wrong: it was read off the coordinates by
+somebody who has not seen the building, and there are interior nests among them.
+What is still not written down is which ones, and that is worth recording next time
+somebody walks it, because "this nest covers the inside" is the fact the picker
+would need.
