@@ -124,3 +124,13 @@ dispenser at `999 551 256` next to it, and the teleporter exit at `417 663 384` 
 the upper floor. The earlier spots are the open ground to the north. So the map data
 already covers the inside, and the reason the mission does not tell two builds apart
 is something else.
+
+## Mannhattan: which teleporter exit is where
+
+The highest, `-61 -1351 204`, is outside in the gate courtyard. The lowest,
+`167 -3224 -235`, is inside on the warehouse's lower floor, under the sentry ground
+and beside the dispenser at `-414 -3222 -240`. The third sits between the two.
+
+That matters because an exit is only worth building if it puts somebody where the
+fight is. The inside one delivers under the nest; the outside one delivers to the
+gates.
