@@ -109,3 +109,13 @@ mvm_rottenburg  NestNoTank               1476 -1074 -539  behind the fence: do N
 mvm_rottenburg  NestTankOnly             1855 -720 -415   the wooden platform: tank waves only (confirmed)
 mvm_rottenburg  TeleporterExit           1723 -199 -407   the tele exit, opposite the upgrade station (confirmed)
 ```
+
+## Mannworks: the wave starts inside
+
+Told in play-testing, and it explains why the test-bed cannot tell two builds apart
+on this map: every run clears one wave and stops. The four authored nests are all on
+the open ground to the north, and the fight begins indoors, so the engineers set up
+where the robots are not.
+
+The map file has no interior nest. Walking one is the fix, and until then Mannworks
+is not a mission that measures anything.

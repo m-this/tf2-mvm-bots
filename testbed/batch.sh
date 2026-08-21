@@ -19,6 +19,9 @@ mkdir -p "$out"
 # The lineup both builds are forced to play, so the run measures the code and
 # not the team. Set COMP to empty to let each build choose for itself, which is
 # how the per-map Composition is measured against whatever the old one did.
+#
+# Always leave an engineer in it. Half of what this mod does is engineer
+# behaviour, and a run without one measures none of it.
 comp=${COMP-scout,soldier,demoman,heavyweapons,engineer,medic}
 
 play() {
