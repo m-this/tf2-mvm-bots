@@ -2094,6 +2094,47 @@ void UtilizeCompressionBlast(int client, INextBot bot, const CKnownEntity threat
 	}
 }
 
+/* What a canteen is worth to this bot, and nothing is what several of them are worth
+
+The type was picked at random out of everything affordable. A play-test bundle came back with nine
+purchases of Return to Spawn and twelve of ammo, on a run where the crit boost that kills a tank
+was never bought once.
+
+This is ShouldUseActionSlotItem read backwards. A canteen a class has no rule for is worth nothing
+and is not bought at all: the medic cannot share a recall and the engineer will not leave his nest
+for one, both of which that switch says out loud, and the case for Buildings Instant Upgrade is
+still a TODO, so nobody uses it however many are bought. */
+static int CanteenValue(int client, const char[] attribute)
+{
+	TFClassType playerClass = TF2_GetPlayerClass(client);
+	
+	if (StrEqual(attribute, "building instant upgrade"))
+		return 0;
+	
+	if (StrEqual(attribute, "recall"))
+	{
+		if (playerClass == TFClass_Medic || playerClass == TFClass_Engineer)
+			return 0;
+		
+		//A last stand at the hatch: a real case, and a rare one
+		return 20;
+	}
+	
+	//A tank or a boss dies to this and to nothing else in the bottle
+	if (StrEqual(attribute, "critboost"))
+		return playerClass == TFClass_Medic ? 60 : 100;
+	
+	//Whoever carries it, this is the answer to being about to die
+	if (StrEqual(attribute, "ubercharge"))
+		return 80;
+	
+	//Only ever used with the primary dry, which happens to a heavy and to nobody else much
+	if (StrEqual(attribute, "refill_ammo"))
+		return 40;
+	
+	return 10;
+}
+
 void PurchaseAffordableCanteens(int client, int count = 3)
 {
 	int bottle = GetPowerupBottle(client);
@@ -2127,9 +2168,15 @@ void PurchaseAffordableCanteens(int client, int count = 3)
 	int currency = TF2_GetCurrency(client);
 	const int slot = TF_LOADOUT_SLOT_ACTION;
 	int iClass = view_as<int>(TF2_GetPlayerClass(client));
-	ArrayList adtAffordableCanteens = new ArrayList();
 	
-	for (int i = 0; i < MAX_UPGRADES; i++)
+	//The best affordable type rather than any of them, and a coin toss between equals
+	int selectedUpgradeIndex = -1;
+	int bestValue = 0;
+	int tied = 0;
+	
+	int upgradeCount = UpgradeCount();
+	
+	for (int i = 0; i < upgradeCount; i++)
 	{
 		CMannVsMachineUpgrades upgrades = CMannVsMachineUpgradeManager().GetUpgradeByIndex(i);
 		
@@ -2186,19 +2233,27 @@ void PurchaseAffordableCanteens(int client, int count = 3)
 		if (cost > currency)
 			continue;
 		
-		adtAffordableCanteens.Push(i);
+		int value = CanteenValue(client, attributeName);
+		
+		//Nobody here has a rule that would ever use it
+		if (value < 1)
+			continue;
+		
+		if (value > bestValue)
+		{
+			bestValue = value;
+			selectedUpgradeIndex = i;
+			tied = 1;
+		}
+		else if (value == bestValue && GetRandomInt(1, ++tied) == 1)
+		{
+			selectedUpgradeIndex = i;
+		}
 	}
 	
-	if (adtAffordableCanteens.Length == 0)
-	{
-		//We could not afford anything at this time
-		delete adtAffordableCanteens;
+	//We could not afford anything worth having at this time
+	if (selectedUpgradeIndex == -1)
 		return;
-	}
-	
-	//Randomly pick an affordable charge type
-	int selectedUpgradeIndex = adtAffordableCanteens.Get(GetRandomInt(0, adtAffordableCanteens.Length - 1));
-	delete adtAffordableCanteens;
 	
 	CMannVsMachineUpgrades selectedUpgrade = CMannVsMachineUpgradeManager().GetUpgradeByIndex(selectedUpgradeIndex);
 	int selectedCost = GetCostForUpgrade(selectedUpgrade.Address, slot, iClass, client);

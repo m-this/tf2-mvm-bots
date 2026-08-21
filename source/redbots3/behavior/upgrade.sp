@@ -20,9 +20,44 @@ BehaviorAction CTFBotUpgrade()
 	return action;
 }
 
+/* How much of one shopping trip a single attribute may take
+
+A play-test bundle came back with a medic who bought ubercharge rate twenty five times across a
+mission, ten of them inside thirty seconds, and nothing else all run: no health, no resistance,
+no other line on the medigun. Whether the game is failing to refuse the tiers or the ranking is
+never getting past the first line, a bot that spends a whole wallet on one attribute has bought
+the wrong thing, and this stops it either way.
+
+Half, and never less than two steps of whatever it is: a small wallet that could only afford one
+thing would otherwise buy nothing at all. */
+#define UPGRADE_ATTRIBUTE_SHARE	0.5
+
+static int m_iSessionWallet[MAXPLAYERS + 1];
+static int m_iSpentOnUpgrade[MAXPLAYERS + 1][MAX_UPGRADES];
+
+//What one more step of this upgrade would take the bot past, or false when it would not
+static bool WithinAttributeShare(int client, int index, int cost)
+{
+	if (index < 0 || index >= MAX_UPGRADES)
+		return true;
+	
+	int allowed = RoundToNearest(float(m_iSessionWallet[client]) * UPGRADE_ATTRIBUTE_SHARE);
+	
+	if (allowed < cost * 2)
+		allowed = cost * 2;
+	
+	return m_iSpentOnUpgrade[client][index] + cost <= allowed;
+}
+
 public Action CTFBotUpgrade_OnStart(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
 {
 	m_pPath[actor].SetMinLookAheadDistance(GetDesiredPathLookAheadRange(actor));
+	
+	//The wallet this trip is measured against, and nothing spent out of it yet
+	m_iSessionWallet[actor] = TF2_GetCurrency(actor);
+	
+	for (int index = 0; index < MAX_UPGRADES; index++)
+		m_iSpentOnUpgrade[actor][index] = 0;
 	
 	if (!TF2_IsInUpgradeZone(actor)) 
 		return action.ChangeTo(CTFBotGotoUpgrade(), "Not standing at an upgrade station!");
@@ -266,7 +301,9 @@ void CollectUpgrades(int client)
 	{
 		int slot = iArraySlots.Get(i);
 	
-		for (int index = 0; index < MAX_UPGRADES; index++)
+		int upgradeCount = UpgradeCount();
+		
+		for (int index = 0; index < upgradeCount; index++)
 		{
 			CMannVsMachineUpgrades upgrades = CMannVsMachineUpgradeManager().GetUpgradeByIndex(index);
 			
@@ -859,6 +896,14 @@ JSONObject CTFBotPurchaseUpgrades_ChooseUpgrade(int actor)
 		}
 		
 		int iCost = GetCostForUpgrade(upgrades.Address, info.GetInt("slot"), info.GetInt("pclass"), actor);
+		
+		//This one has had its share of the wallet already
+		if (!WithinAttributeShare(actor, info.GetInt("index"), iCost))
+		{
+			delete info;
+			continue;
+		}
+		
 		if (iCost > currency)
 		{
 			//PrintToServer("upgrade %d/%d: cost $%d > $%d", info.GetInt("slot"), info.GetInt("index"), iCost, currency);
@@ -967,6 +1012,9 @@ bool CTFBotPurchaseUpgrades_PurchaseUpgrade(int actor, JSONObject info)
 
 	//An upgrade that costs nothing cannot be counted this way, so it counts as one
 	m_nPurchasedUpgrades[actor] += cost > 0 ? spent / cost : 1;
+	
+	if (index >= 0 && index < MAX_UPGRADES)
+		m_iSpentOnUpgrade[actor][index] += spent;
 
 	return true;
 }
