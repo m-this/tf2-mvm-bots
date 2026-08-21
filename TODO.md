@@ -37,6 +37,8 @@ One line each. The spec has the detail and the reasoning.
 - `PickBuildArea` skips `BLOCKED` areas. Only `PickBuildAreaPreRound` did.
 - `GetBombInfo` tested `BLUE_SPAWN_ROOM` twice where it meant `RED_SPAWN_ROOM`,
   in two places, so RED spawn counted toward the length of the bomb path.
+- The loadout file can name a seat of `sm_redbots_manager_team_composition` and
+  not only a class, so seat 1 holds the wrangler and seat 2 need not.
 
 ## 1. The crash. Fixed, and it was the test-bed's own entrypoint
 

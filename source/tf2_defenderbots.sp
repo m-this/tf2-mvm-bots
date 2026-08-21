@@ -136,6 +136,11 @@ float g_flAddingBotTime;
 float g_flNextReadyTime;
 int g_iDetonatingPlayer = -1;
 ArrayList g_adtChosenBotClasses;
+
+/* The seat of the team composition each of those classes was named in, index for index
+Only the composition names seats, and the lineup mode's classes are appended after its own, so this
+list is the shorter of the two and an index past its end is a bot sitting in no seat */
+ArrayList g_adtChosenBotSeats;
 bool g_bBotClassesLocked;
 int g_iUIDBotSummoner = 0;
 bool g_bAllowBotTeamRedo;
@@ -385,6 +390,7 @@ public void OnPluginStart()
 	LoadPreferencesData();
 	
 	g_adtChosenBotClasses = new ArrayList(TF2_CLASS_MAX_NAME_LENGTH);
+	g_adtChosenBotSeats = new ArrayList();
 	m_adtBotNames = new ArrayList(MAX_NAME_LENGTH);
 	g_arrMapConfig.Initialize();
 	
@@ -445,6 +451,7 @@ public void OnClientDisconnect(int client)
 	g_bChoosingBotClasses[client] = false;
 	
 	ResetLoadouts(client);
+	ForgetBotSeat(client);
 	ForgetBotCosmetics(client);
 }
 
@@ -453,6 +460,10 @@ public void OnClientPutInServer(int client)
 	if (!IsFakeClient(client))
 		MakeRoomForHumanPlayer(client);
 	
+	//The name is set at tf_bot_add, so one of ours is known here, before it picks its loadout
+	if (IsDefenderBot(client))
+		TakeBotSeat(client);
+
 	g_bHasUpgraded[client] = false;
 	g_arrExtraButtons[client].Reset();
 	m_flDeadRethinkTime[client] = 0.0;
@@ -2144,8 +2155,11 @@ them. Zero when the convar is empty, and the caller falls back to the lineup mod
 The list is what the team should look like, not what to add: every call counts the bots already on
 RED against it first and names only what is missing. So a top-up in the middle of a wave converges on
 the same team as the first fill, whatever order the seats emptied in. A list shorter than the seats
-leaves the rest to the lineup mode */
-int CollectMissingTeamComposition(ArrayList classes, int count)
+leaves the rest to the lineup mode.
+
+A seat is where a class sits in that list, counted from 1, and it comes out alongside the class name
+because the loadout file can name one seat rather than every engineer at once */
+int CollectMissingTeamComposition(ArrayList classes, ArrayList seats, int count)
 {
 	char list[128]; GetWantedTeamComposition(list, sizeof(list));
 
@@ -2180,6 +2194,7 @@ int CollectMissingTeamComposition(ArrayList classes, int count)
 		}
 
 		classes.PushString(wanted[i]);
+		seats.Push(i + 1);
 		collected++;
 	}
 
@@ -2191,17 +2206,20 @@ False when the convar named nothing to add, and the caller falls back to the lin
 bool AddBotsFromTeamComposition(int count)
 {
 	ArrayList classes = new ArrayList(TF2_CLASS_MAX_NAME_LENGTH);
-	int added = CollectMissingTeamComposition(classes, count);
+	ArrayList seats = new ArrayList();
+	int added = CollectMissingTeamComposition(classes, seats, count);
 
 	char class[TF2_CLASS_MAX_NAME_LENGTH];
 
 	for (int i = 0; i < classes.Length; i++)
 	{
 		classes.GetString(i, class, sizeof(class));
+		NoteBotSeatPending(seats.Get(i));
 		AddDefenderTFBot(1, class, "red", "expert");
 	}
 
 	delete classes;
+	delete seats;
 
 	if (added > 0)
 		PrintToChatAll("%s Adding %d bot(s)...", PLUGIN_PREFIX, added);
@@ -2483,6 +2501,7 @@ bool HavePlayersChosenBotTeam()
 void FreeChosenBotTeam(bool bAnnounce = false)
 {
 	g_adtChosenBotClasses.Clear();
+	g_adtChosenBotSeats.Clear();
 	g_bBotClassesLocked = false;
 	
 	if (bAnnounce)
@@ -2510,6 +2529,7 @@ void UpdateChosenBotTeamComposition(int caller = -1)
 	}
 	
 	g_adtChosenBotClasses.Clear();
+	g_adtChosenBotSeats.Clear();
 	
 	int newBotsToAdd = redbots_manager_defender_team_size.IntValue - GetHumanAndDefenderBotCount(TFTeam_Red);
 	
@@ -2519,7 +2539,7 @@ void UpdateChosenBotTeamComposition(int caller = -1)
 	/* The named team is decided here, where every lineup is decided, and not where the bots are added
 	The wave begins by adding this list and nothing else, so a team named in the convar that only the
 	top-up timer ever read was a team that never played */
-	newBotsToAdd -= CollectMissingTeamComposition(g_adtChosenBotClasses, newBotsToAdd);
+	newBotsToAdd -= CollectMissingTeamComposition(g_adtChosenBotClasses, g_adtChosenBotSeats, newBotsToAdd);
 	
 	//Whatever seats the named team left over are the lineup mode's to fill
 	if (newBotsToAdd > 0)
@@ -2580,6 +2600,7 @@ void AddBotsFromChosenTeamComposition()
 	for (int i = 0; i < g_adtChosenBotClasses.Length; i++)
 	{
 		g_adtChosenBotClasses.GetString(i, class, sizeof(class));
+		NoteBotSeatPending(i < g_adtChosenBotSeats.Length ? g_adtChosenBotSeats.Get(i) : 0);
 		AddDefenderTFBot(1, class, "red", "expert");
 	}
 	
