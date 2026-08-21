@@ -118,9 +118,11 @@ public Action Command_DumpMedic(int client, int args)
 
 		float theirs[3]; theirs = GetAbsOrigin(patient);
 
-		ReplyToCommand(client, "%N: healing %N, %.0f behind him, %.0f from the bomb, he is %.0f from it",
+		ReplyToCommand(client, "%N: healing %N, %.0f behind him, %.0f from the bomb, he is %.0f from it, %s, %s",
 			i, patient, GetVectorDistance(mine, theirs), fromBomb,
-			haveBomb ? GetVectorDistance(theirs, bomb.vPosition) : -1.0);
+			haveBomb ? GetVectorDistance(theirs, bomb.vPosition) : -1.0,
+			ActionsManager.LookupEntityActionByName(i, "DefenderMedicHeal") != INVALID_ACTION ? "healing action up" : "healing action down",
+			g_arrPluginBot[i].bPathing ? "walking" : "stood still");
 	}
 
 	return Plugin_Handled;
