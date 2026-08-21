@@ -266,8 +266,29 @@ causing it alone. Rates seen so far, all on `mvm_decoy` with six bots:
 | this branch, Gas Passer | 4 in 6 |
 | this branch, shotgun | 0 in 5 |
 
-Finding the underlying one wants a run under gdb rather than more sampling. The
-note in item 1 says how to attach to a stripped 32-bit server.
+The core dumps answered it, and the answer is pathfinding. Backtrace from
+core.417, taken with the game copied out of the volume:
+
+```
+WatchDogHandler <- Sys_Error <- Host_Error
+ <signal handler called>
+CTFBotPathCost::operator()
+NavAreaBuildPath
+Path::Compute
+ChasePath::RefreshPath
+ChasePath::Update
+```
+
+So the frame the watchdog killed was inside path computation, not an infinite
+loop in this mod. Anything that asks for a path every tick, for several bots at
+once, can push a frame past the watchdog on a machine with nothing spare.
+
+One of those was ours and is fixed: `ConfiguredDispenserSpot` called
+`IsPathToVectorPossible` for every configured spot, every tick, per engineer.
+The spot is chosen once when the action starts now.
+
+Worth knowing for the next one: `IsPathToVectorPossible` is a full
+`NavAreaBuildPath`, and it reads like a cheap predicate.
 
 ## 13. The test-bed needs a machine with memory free. Open
 
