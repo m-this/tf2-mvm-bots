@@ -331,6 +331,7 @@ public void OnPluginStart()
 	//an admin entry to write down a nest spot is a gate in front of the only way to author one
 	RegConsoleCmd("sm_dump_spot", Command_DumpSpot);
 	RegAdminCmd("sm_dump_upgrades", Command_DumpUpgrades, ADMFLAG_GENERIC);
+	RegAdminCmd("sm_dump_hats", Command_DumpHats, ADMFLAG_GENERIC);
 	
 	AddCommandListener(Listener_TournamentPlayerReadystate, "tournament_player_readystate");
 	
