@@ -98,6 +98,19 @@ methodmap CMannVsMachineUpgradeManager < CMannVsMachineUpgrades
 		return view_as<CMannVsMachineUpgradeManager>(g_pMannVsMachineUpgrades);
 	}
 	
+	/* How many upgrades the game actually holds
+
+	m_Upgrades is a CUtlVector, and GetUpgradeByIndex below reads its m_pMemory at offset zero to
+	find the elements. m_Size is the fourth int of that structure, after the pointer, the
+	allocation count and the growth size, which puts it twelve bytes in.
+
+	Read rather than assumed, because the whole point of asking is that nobody should be counting
+	lines in a text file and hoping the game agrees. */
+	public int Count()
+	{
+		return LoadFromAddress(this.Address + view_as<Address>(m_Upgrades + 12), NumberType_Int32);
+	}
+	
 	public CMannVsMachineUpgrades GetUpgradeByIndex(int index)
 	{
 		Address rawUpgrades = this.Address + view_as<Address>(m_Upgrades);
