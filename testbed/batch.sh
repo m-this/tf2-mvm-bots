@@ -61,6 +61,6 @@ echo
 echo "=== every run"
 for f in "$out"/*.jsonl; do
 	printf '%s  ' "$(basename "$f" .jsonl)"
-	python3 "$here/report.py" "$f" 2>/dev/null | tr '\n' ' '
+	go run "$here/report" "$f" 2>/dev/null | tr "\n" " "
 	echo
 done
