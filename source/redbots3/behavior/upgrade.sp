@@ -145,31 +145,24 @@ public void CTFBotUpgrade_OnEnd(BehaviorAction action, int actor, BehaviorAction
 	
 	KV_MvM_UpgradesDone(actor);
 	
-	/* Buildings come down after shopping, unless the engineer is staying put
+	/* Buildings come down after every shopping trip
 
-	Tearing them down every time is a level three rebuilt from nothing at the start of every wave.
-	The between-waves re-evaluation is what says whether the ground stopped being good: when it
-	did, rebuilding at the new nest beats walking a sentry across the map; when it did not, the
-	engineer walks back to one that is already up.
+	Keeping them was tried and reverted: an engineer that keeps a level 1 keeps it, and the wave
+	starts with a level 1 in front of it instead of the level 3 it would have rebuilt. Rebuilding
+	from nothing costs a walk and some metal, and a level 3 is worth both.
 
-	Without that re-evaluation there is nothing to ask, so the old unconditional teardown stands.
-	Keeping the buildings on the strength of a question nobody asked would leave every engineer
-	holding wave one's nest for the whole mission */
+	The relocation work wanted this gated on whether the nest moved. That gate is what left the
+	level 1 standing, so it is gone rather than made conditional again */
 	if (TF2_GetPlayerClass(actor) == TFClass_Engineer && GameRules_GetRoundState() == RoundState_BetweenRounds)
 	{
-		bool relocating = m_aNestAreaRelocate[actor] != NULL_AREA;
-		
-		if (relocating)
+		if (m_aNestAreaRelocate[actor] != NULL_AREA)
 		{
 			m_aNestArea[actor] = m_aNestAreaRelocate[actor];
 			m_aNestAreaRelocate[actor] = NULL_AREA;
 		}
 		
-		if (relocating || !redbots_manager_engineer_nest_relocate.BoolValue)
-		{
-			DetonateObjectOfType(actor, TFObject_Sentry);
-			DetonateObjectOfType(actor, TFObject_Dispenser);
-		}
+		DetonateObjectOfType(actor, TFObject_Sentry);
+		DetonateObjectOfType(actor, TFObject_Dispenser);
 	}
 	
 	// UpdateLookAroundForEnemies(actor, true);
