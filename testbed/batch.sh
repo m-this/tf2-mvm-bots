@@ -13,6 +13,9 @@ runs=${1:-3}
 base=${2:-}
 map=${MAP:-mvm_decoy}
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+# Never delete what earlier runs produced. A crashed run still holds the waves
+# that finished before it died, and those are data; a session that clears the
+# directory each time throws away the sample it is trying to build.
 out=$here/results/batch
 mkdir -p "$out"
 
