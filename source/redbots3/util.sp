@@ -469,10 +469,14 @@ because somebody stood on it. Anything else falls back to the centre */
 
 void NestBuildPosition(CNavArea area, float out[3])
 {
-	area.GetCenter(out);
-
+	//Before the GetCenter, not after it: reading the centre of a null area reads through a null
 	if (area == NULL_AREA)
+	{
+		out[0] = 0.0; out[1] = 0.0; out[2] = 0.0;
 		return;
+	}
+
+	area.GetCenter(out);
 
 	float best = NEST_SPOT_MATCH_RANGE;
 
