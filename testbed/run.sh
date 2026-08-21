@@ -148,7 +148,13 @@ while [ "$results" -lt "$waves" ]; do
 	# A crashing server looks exactly like a slow one from out here: no new
 	# results, for as long as the timeout allows. It is worth ten characters of
 	# grep to be told which it is.
-	crashes=$($compose logs srcds 2>&1 | grep -ciE 'core dumped|Segmentation fault|Bus error' || true)
+	#
+	# This run's logs only. The container keeps everything it has ever printed,
+	# across every restart, so one crash in the morning read as a crash in every
+	# run for the rest of the day: each of them stopped twenty seconds in and
+	# wrote a results file with nothing in it.
+	crashes=$($compose logs --since "$((now - start + 5))s" srcds 2>&1 |
+		grep -ciE 'core dumped|Segmentation fault|Bus error' || true)
 
 	if [ "${crashes:-0}" -gt 0 ]; then
 		say "the game server has crashed ${crashes} time(s): that is a bug in what is being measured, not a slow wave"
