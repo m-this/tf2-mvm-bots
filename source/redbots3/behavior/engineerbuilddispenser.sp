@@ -1,5 +1,19 @@
 #define DISPENSER_SPOT_TAKEN_RANGE	150.0
 
+/* How long an engineer may spend walking to where the dispenser goes
+
+Reported on Rottenburg: engineers stuck on a rock trying to build one. The action pathed to a
+spot and, if the geometry would not let it arrive, asked again next frame forever. A nav mesh
+says ground is connected; it does not promise a bot can squeeze past a boulder to reach the
+middle of it.
+
+Past the deadline the dispenser goes down where the engineer is standing. A dispenser two metres
+from the intended spot is worth all of one that never gets built, and the engineer is back in the
+wave instead of walking into a rock for the rest of it. */
+#define DISPENSER_REACH_TIME	12.0
+
+static float m_ctDispenserReachDeadline[MAXPLAYERS + 1];
+
 BehaviorAction CTFBotMvMEngineerBuildDispenser()
 {
 	BehaviorAction action = ActionsManager.Create("DefenderBuildDispenser");
@@ -14,6 +28,8 @@ BehaviorAction CTFBotMvMEngineerBuildDispenser()
 public Action CTFBotMvMEngineerBuildDispenser_OnStart(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
 {
 	UpdateLookAroundForEnemies(actor, true);
+	
+	m_ctDispenserReachDeadline[actor] = GetGameTime() + DISPENSER_REACH_TIME;
 	
 	return action.Continue();
 }
@@ -51,6 +67,10 @@ public Action CTFBotMvMEngineerBuildDispenser_Update(BehaviorAction action, int 
 	
 	if (!ConfiguredDispenserSpot(actor, areaCenter))
 		CNavArea_GetRandomPoint(m_aNestArea[actor], areaCenter);
+	
+	//The walk ran out of time, so here is where it goes
+	if (m_ctDispenserReachDeadline[actor] > 0.0 && GetGameTime() > m_ctDispenserReachDeadline[actor])
+		areaCenter = GetAbsOrigin(actor);
 	
 	float range_to_hint = GetVectorDistance(GetAbsOrigin(actor), areaCenter);
 	
@@ -126,8 +146,11 @@ bool ConfiguredDispenserSpot(int actor, float spot[3])
 	{
 		float candidate[3]; spots.GetArray(i, candidate);
 		
-		if (!IsDispenserSpotTaken(actor, candidate))
-			free.PushArray(candidate);
+		//A spot the engineer cannot walk to is not a spot. Rottenburg has a rock in front of one
+		if (IsDispenserSpotTaken(actor, candidate) || !IsPathToVectorPossible(actor, candidate))
+			continue;
+		
+		free.PushArray(candidate);
 	}
 	
 	float nest[3]; m_aNestArea[actor].GetCenter(nest);
