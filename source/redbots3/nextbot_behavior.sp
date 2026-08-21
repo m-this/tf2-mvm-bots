@@ -74,6 +74,7 @@ esPluginBot g_arrPluginBot[MAXPLAYERS + 1];
 #include "behavior/spysap.sp"
 #include "behavior/spysapplayer.sp"
 #include "behavior/medicrevive.sp"
+#include "behavior/medicheal.sp"
 #include "behavior/attackforuber.sp"
 #include "behavior/evadebuster.sp"
 #include "behavior/campbomb.sp"
@@ -866,7 +867,7 @@ follows the crossings and heals neither. */
 
 static float m_ctNextPatientCheck[MAXPLAYERS + 1];
 
-static float HealthFraction(int client)
+float HealthFraction(int client)
 {
 	return float(GetClientHealth(client)) / float(TF2Util_GetEntityMaxHealth(client));
 }
@@ -876,7 +877,7 @@ static float HealthFraction(int client)
 It decides both which patient is picked and whether the beam moves off the one it already has.
 Two orderings would eventually disagree, and the way they disagree is a beam that swaps target
 every check, or a tie-break that can never be reached. */
-static bool IsBetterPatient(int candidate, int incumbent)
+bool IsBetterPatient(int candidate, int incumbent)
 {
 	if (incumbent <= 0 || !IsClientInGame(incumbent) || !IsPlayerAlive(incumbent))
 		return true;
@@ -890,7 +891,7 @@ static bool IsBetterPatient(int candidate, int incumbent)
 	return HealthFraction(candidate) < HealthFraction(incumbent) - MEDIC_PATIENT_MARGIN;
 }
 
-static int PreferredPatient(int medic)
+int PreferredPatient(int medic)
 {
 	int best = -1;
 
@@ -957,6 +958,32 @@ static void UpdateMedicPatient(BehaviorAction action, int actor)
 		PrintToServer("UpdateMedicPatient: %N would rather heal %N", actor, wanted);
 }
 
+/* The charge and the resistance, whoever is doing the healing
+
+Written for the game's heal action and called from the mod's own as well, because suspending an
+action stops its update running and these two are not the part worth reimplementing.
+
+The charge is pressed rather than set: the deploy belongs to the game, and this only ever asks
+for it sooner than the game's own dying-patient rule would have. */
+void MedicUberAndResist(int actor, int medigun, int patient)
+{
+	if (ShouldDeployUber(actor, medigun, patient))
+		VS_PressAltFireButton(actor);
+	
+	if (patient <= 0 || GetMedigunType(medigun) != MEDIGUN_RESIST)
+		return;
+	
+	int iResistType = GetResistType(medigun);
+	int iLastDmgType = GetLastDamageType(patient);
+	
+	if (iLastDmgType & DMG_BULLET && iResistType != MEDIGUN_BULLET_RESIST)
+		g_arrExtraButtons[actor].PressButtons(IN_RELOAD);
+	else if (iLastDmgType & DMG_BLAST && iResistType != MEDIGUN_BLAST_RESIST)
+		g_arrExtraButtons[actor].PressButtons(IN_RELOAD);
+	else if (iLastDmgType & DMG_BURN && iResistType != MEDIGUN_FIRE_RESIST)
+		g_arrExtraButtons[actor].PressButtons(IN_RELOAD);
+}
+
 public Action CTFBotMedicHeal_UpdatePost(BehaviorAction action, int actor, float interval, ActionResult result)
 {
 	if (g_bIsDefenderBot[actor] == false)
@@ -985,38 +1012,20 @@ public Action CTFBotMedicHeal_UpdatePost(BehaviorAction action, int actor, float
 	if (CTFBotMedicRevive_IsPossible(actor))
 		return action.SuspendFor(CTFBotMedicRevive(), "Revive teammate");
 	
+	/* The mod does the healing itself while there is somebody worth healing
+	
+	The game's action picks its own patient and there is no safe way to tell it otherwise, so it
+	is stood down rather than argued with. It gets the medic back the moment nobody is left to
+	heal, which is where its own answer for that, walking to the bomb, is redirected above. */
+	if (PreferredPatient(actor) > 0)
+		return action.SuspendFor(CTFBotDefenderMedicHeal(), "Heal the biggest body");
+	
 	UpdateMedicPatient(action, actor);
 
 	int myWeapon = BaseCombatCharacter_GetActiveWeapon(actor);
 
 	if (myWeapon != -1 && TF2Util_GetWeaponID(myWeapon) == TF_WEAPON_MEDIGUN)
-	{
-		int patient = action.GetHandleEntity(ACTION_HEAL_PATIENT_OFFSET);
-
-		/* The charge, which nothing here used to decide
-		Pressed rather than set: the deploy belongs to the game, and this only ever asks for it
-		sooner than the game's own dying-patient rule would have */
-		if (ShouldDeployUber(actor, myWeapon, patient))
-			VS_PressAltFireButton(actor);
-	}
-
-	if (myWeapon != -1 && TF2Util_GetWeaponID(myWeapon) == TF_WEAPON_MEDIGUN && GetMedigunType(myWeapon) == MEDIGUN_RESIST)
-	{
-		int myPatient = action.GetHandleEntity(ACTION_HEAL_PATIENT_OFFSET);
-
-		if (myPatient > 0)
-		{
-			int iResistType = GetResistType(myWeapon);
-			int iLastDmgType = GetLastDamageType(myPatient);
-			
-			if (iLastDmgType & DMG_BULLET && iResistType != MEDIGUN_BULLET_RESIST)
-				g_arrExtraButtons[actor].PressButtons(IN_RELOAD);
-			else if (iLastDmgType & DMG_BLAST && iResistType != MEDIGUN_BLAST_RESIST)
-				g_arrExtraButtons[actor].PressButtons(IN_RELOAD);
-			else if (iLastDmgType & DMG_BURN && iResistType != MEDIGUN_FIRE_RESIST)
-				g_arrExtraButtons[actor].PressButtons(IN_RELOAD);
-		}
-	}
+		MedicUberAndResist(actor, myWeapon, action.GetHandleEntity(ACTION_HEAL_PATIENT_OFFSET));
 	
 	return Plugin_Continue;
 }
