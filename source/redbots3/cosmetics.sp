@@ -169,6 +169,9 @@ static void WearHat(int client)
 	TF2Util_EquipPlayerWearable(client, hat);
 	
 	g_iBotHat[client] = EntIndexToEntRef(hat);
+	
+	if (redbots_manager_debug.BoolValue)
+		LogMessage("[WearHat] %N puts item %d back on", client, itemDefinition);
 }
 
 /* Take the hat off the way the game does it
