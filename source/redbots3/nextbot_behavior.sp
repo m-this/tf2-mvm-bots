@@ -856,7 +856,6 @@ hurt worst, which is the only part of this the game was already right about.
 Throttled, and only for a genuinely better patient: a medigun beam that changes target every
 frame heals nobody, and the game re-picks on its own between our checks. */
 #define MEDIC_PATIENT_INTERVAL	2.0
-#define MEDIC_PATIENT_RANGE		900.0
 
 /* How much worse off a tied patient has to be before the beam moves to him
 
@@ -866,6 +865,7 @@ follows the crossings and heals neither. */
 #define MEDIC_PATIENT_MARGIN	0.15
 
 static float m_ctNextPatientCheck[MAXPLAYERS + 1];
+static int m_iPreferredPatient[MAXPLAYERS + 1];
 
 float HealthFraction(int client)
 {
@@ -891,11 +891,32 @@ bool IsBetterPatient(int candidate, int incumbent)
 	return HealthFraction(candidate) < HealthFraction(incumbent) - MEDIC_PATIENT_MARGIN;
 }
 
+/* Who the medigun should be on, held between asks
+
+The list is the whole team. It used to be the team within nine metres, and that is what left the
+medic standing in the house in the middle of Coaltown: the Heavy walked out of that range, so the
+ask came back with the engineer at his nest and could never come back with anybody else again, and
+the beam stayed on a man already standing on his own dispenser while the wave was fought somewhere
+else. A patient out of range is a patient to walk to, not a patient who stops existing.
+
+Held rather than answered fresh, because the gate that decides whether the medic heals at all asks
+this every frame, and every ask is a path computation per teammate. The held patient is dropped
+when he stops being a candidate at all, and only then, so the beam does not follow the ranking
+across ties. */
 int PreferredPatient(int medic)
 {
-	int best = -1;
+	int held = m_iPreferredPatient[medic];
 
-	float myOrigin[3]; GetClientAbsOrigin(medic, myOrigin);
+	if (held > 0 && (!IsClientInGame(held) || !IsPlayerAlive(held) || GetClientTeam(held) != GetClientTeam(medic)))
+		held = -1;
+
+	if (m_ctNextPatientCheck[medic] > GetGameTime())
+		return held;
+
+	m_ctNextPatientCheck[medic] = GetGameTime() + MEDIC_PATIENT_INTERVAL;
+
+	int best = -1;
+	bool heldIsStillOne = false;
 
 	for (int i = 1; i <= MaxClients; i++)
 	{
@@ -909,53 +930,28 @@ int PreferredPatient(int medic)
 		if (TF2_GetPlayerClass(i) == TFClass_Medic)
 			continue;
 
-		float theirOrigin[3]; GetClientAbsOrigin(i, theirOrigin);
-
-		if (GetVectorDistance(myOrigin, theirOrigin) > MEDIC_PATIENT_RANGE)
+		/* An engineer at full health is his own dispenser's patient
+		Beaming him is a medic parked at the nest, behind wherever the wave is being fought, doing
+		a job the dispenser beside him was going to do for nothing */
+		if (TF2_GetPlayerClass(i) == TFClass_Engineer && HealthFraction(i) >= 1.0)
 			continue;
 
-		if (!IsPathToVectorPossible(medic, theirOrigin))
+		if (!IsPathToVectorPossible(medic, GetAbsOrigin(i)))
 			continue;
+
+		if (i == held)
+			heldIsStillOne = true;
 
 		if (IsBetterPatient(i, best))
 			best = i;
 	}
 
-	return best;
-}
+	if (!heldIsStillOne || (best > 0 && IsBetterPatient(best, held)))
+		held = best;
 
-static void UpdateMedicPatient(BehaviorAction action, int actor)
-{
-	if (m_ctNextPatientCheck[actor] > GetGameTime())
-		return;
+	m_iPreferredPatient[medic] = held;
 
-	m_ctNextPatientCheck[actor] = GetGameTime() + MEDIC_PATIENT_INTERVAL;
-
-	int wanted = PreferredPatient(actor);
-
-	if (wanted == -1)
-		return;
-
-	int patient = action.GetHandleEntity(ACTION_HEAL_PATIENT_OFFSET);
-
-	if (patient == wanted)
-		return;
-
-	//Only for a better patient than the beam already has, by the same ranking that picked him
-	if (!IsBetterPatient(wanted, patient))
-		return;
-
-	/* Writing the patient back is off, and the reason is worth keeping
-
-	SetHandleEntity on this offset segfaulted the server on the first Mannhattan run, with no
-	watchdog line, which is a memory fault rather than a slow frame. The offset is a hardcoded
-	field inside a game action and everything else in this mod only ever reads it: reading a wrong
-	offset gives a wrong answer, writing one corrupts whatever is really there.
-
-	The way in is a detour on the game's own patient selection rather than reaching into its
-	memory. TODO item 14. Until then the medic heals whoever the game picked. */
-	if (redbots_manager_debug.BoolValue)
-		PrintToServer("UpdateMedicPatient: %N would rather heal %N", actor, wanted);
+	return held;
 }
 
 /* The charge and the resistance, whoever is doing the healing
@@ -1020,8 +1016,6 @@ public Action CTFBotMedicHeal_UpdatePost(BehaviorAction action, int actor, float
 	if (PreferredPatient(actor) > 0)
 		return action.SuspendFor(CTFBotDefenderMedicHeal(), "Heal the biggest body");
 	
-	UpdateMedicPatient(action, actor);
-
 	int myWeapon = BaseCombatCharacter_GetActiveWeapon(actor);
 
 	if (myWeapon != -1 && TF2Util_GetWeaponID(myWeapon) == TF_WEAPON_MEDIGUN)
