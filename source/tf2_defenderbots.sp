@@ -338,6 +338,7 @@ public void OnPluginStart()
 	RegAdminCmd("sm_dump_upgrades", Command_DumpUpgrades, ADMFLAG_GENERIC);
 	RegAdminCmd("sm_dump_hats", Command_DumpHats, ADMFLAG_GENERIC);
 	RegAdminCmd("sm_dump_nest", Command_DumpNest, ADMFLAG_GENERIC);
+	RegAdminCmd("sm_dump_medic", Command_DumpMedic, ADMFLAG_GENERIC);
 	
 	AddCommandListener(Listener_TournamentPlayerReadystate, "tournament_player_readystate");
 	
