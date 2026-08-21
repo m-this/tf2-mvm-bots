@@ -11,23 +11,25 @@ set -eu
 
 runs=${1:-3}
 base=${2:-}
+map=${MAP:-mvm_decoy}
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 out=$here/results/batch
 mkdir -p "$out"
 
-# Two engineers to have something to measure, and the classes that live off
-# what they build.
-comp="scout,soldier,demoman,heavyweapons,engineer,medic"
+# The lineup both builds are forced to play, so the run measures the code and
+# not the team. Set COMP to empty to let each build choose for itself, which is
+# how the per-map Composition is measured against whatever the old one did.
+comp=${COMP-scout,soldier,demoman,heavyweapons,engineer,medic}
 
 play() {
 	tree=$1 name=$2 i=$3
 	echo "=== $name run $i"
 	TESTBED_BIND=127.0.0.1 \
-	TESTBED_MAP=mvm_decoy \
+	TESTBED_MAP=$map \
 	TESTBED_BOT_TEAM_COMP="$comp" \
 	TESTBED_BOT_TEAM_SIZE=6 \
 	TESTBED_HOST=1 \
-		sh "$tree/testbed/run.sh" --map mvm_decoy --waves 6 --timeout 1800 \
+		sh "$tree/testbed/run.sh" --map "$map" --waves 6 --timeout 1800 \
 			--out "$out/$name-$i.jsonl" >"$out/$name-$i.log" 2>&1 || true
 
 	# The container is recreated by the next run, and `docker compose logs` goes
