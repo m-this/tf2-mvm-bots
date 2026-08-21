@@ -24,6 +24,12 @@ hat is a robot somebody shoots a moment later than they should. */
 
 #define ATTRIB_ATTACH_PARTICLE	134
 
+//How many times a bot may draw again when what it drew has no model to wear
+#define HAT_DRAW_TRIES			4
+
+//What the schema calls the chest a tournament medal hangs on, and nothing worth looking at
+#define EQUIP_REGION_MEDAL		"medal"
+
 /* The schema's spelling of a class, which is not the mod's
 
 items_game says heavy where the mod says heavyweapons, and the per class model of a hat is filed
@@ -103,10 +109,18 @@ static Action Timer_GiveBotCosmetics(Handle timer, int userid)
 	if (!IsClientInGame(client) || !IsPlayerAlive(client) || !g_bIsDefenderBot[client])
 		return Plugin_Stop;
 	
-	DrawWardrobe(client);
-	
-	if (redbots_manager_bot_hats.BoolValue)
-		WearHat(client);
+	/* Draw again when what the bot drew turns out not to be wearable, up to a few times
+
+	A hat the schema has no model for is dropped from the pool and the bot was left bare until its
+	next respawn, which for a defender that does not die is the rest of the mission. Every failure
+	takes that item out of the pool, so the tries cannot chase the same bad one twice. */
+	for (int attempt = 0; attempt < HAT_DRAW_TRIES; attempt++)
+	{
+		DrawWardrobe(client);
+		
+		if (!redbots_manager_bot_hats.BoolValue || WearHat(client))
+			break;
+	}
 	
 	return Plugin_Stop;
 }
@@ -141,7 +155,7 @@ static void DrawWardrobe(int client)
 
 The game clears a player's wearables every time it gives it its items, which is every respawn, so
 the same hat has to be handed back rather than merely remembered. */
-static void WearHat(int client)
+static bool WearHat(int client)
 {
 	RemoveBotHat(client);
 	
@@ -149,12 +163,12 @@ static void WearHat(int client)
 	int effect = g_wardrobe[client].hatEffect;
 	
 	if (itemDefinition < 1)
-		return;
+		return false;
 	
 	int hat = CreateEntityByName("tf_wearable");
 	
 	if (hat == -1)
-		return;
+		return false;
 	
 	SetEntProp(hat, Prop_Send, "m_iItemDefinitionIndex", itemDefinition);
 	SetEntProp(hat, Prop_Send, "m_bInitialized", 1);
@@ -176,7 +190,7 @@ static void WearHat(int client)
 		g_wardrobe[client].drawn = false;
 		g_iBotHat[client] = INVALID_ENT_REFERENCE;
 		
-		return;
+		return false;
 	}
 	
 	SetEntityModel(hat, model);
@@ -202,6 +216,8 @@ static void WearHat(int client)
 	
 	if (redbots_manager_debug.BoolValue)
 		LogMessage("[WearHat] %N puts item %d back on", client, itemDefinition);
+	
+	return true;
 }
 
 /* Take the hat off the way the game does it
@@ -304,11 +320,62 @@ static ArrayList HatPoolForClass(TFClassType playerClass)
 	return g_adtHats[index];
 }
 
-/* Every misc item this class may wear, asked of the schema once
+/* What every defender bot is actually wearing, entity by entity
+
+A hat that does not show up is one of four things and they look the same from the outside: never
+drawn, drawn and refused a model, worn by an entity the game threw away, or worn by an entity with
+no model index on it. This says which. */
+public Action Command_DumpHats(int client, int args)
+{
+	for (int playerClass = 1; playerClass < sizeof(g_adtHats); playerClass++)
+	{
+		ArrayList pool = HatPoolForClass(view_as<TFClassType>(playerClass));
+
+		ReplyToCommand(client, "class %d: %d hats in the pool", playerClass, pool == null ? -1 : pool.Length);
+	}
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || !g_bIsDefenderBot[i])
+			continue;
+
+		int hat = EntRefToEntIndex(g_iBotHat[i]);
+
+		if (hat == INVALID_ENT_REFERENCE)
+		{
+			ReplyToCommand(client, "%N: class %d, drew item %d, effect %d, wearing nothing",
+				i, g_wardrobe[i].playerClass, g_wardrobe[i].hatItem, g_wardrobe[i].hatEffect);
+
+			continue;
+		}
+
+		char model[PLATFORM_MAX_PATH]; GetEntPropString(hat, Prop_Data, "m_ModelName", model, sizeof(model));
+
+		ReplyToCommand(client, "%N: class %d, item %d, effect %d, entity %d, owner %d, modelindex %d, model %s",
+			i, g_wardrobe[i].playerClass, g_wardrobe[i].hatItem, g_wardrobe[i].hatEffect, hat,
+			GetEntPropEnt(hat, Prop_Send, "m_hOwnerEntity"),
+			GetEntProp(hat, Prop_Send, "m_nModelIndex"), model);
+	}
+
+	return Plugin_Handled;
+}
+
+/* Every cosmetic this class may wear, asked of the schema once
+
+Not the medals. What the bots actually drew, almost every time, was a UGC participation medal or
+an ozfortress season badge: a postage stamp on the chest that reads in game as a bot wearing
+nothing at all, while anything with a particle on it still drew the particle, which is why the
+effects looked like the only part that worked. There are far more tournament medals in the schema
+than there are cosmetics, so drawing uniformly from the slot is drawing a medal.
+
+Filed by equip region rather than by slot, because the slot cannot tell them apart: the head slot
+is the game's old single-hat one and no modern item reports it, so every cosmetic and every medal
+alike comes back as misc. The medals are the ones the schema puts in the "medal" region, which is
+one string off a prefab they all share.
 
 The class filter is the schema's own: an item a class cannot equip has no loadout slot for that
 class. The classname filter keeps out the wearables that are really weapons, the demoman's shield
-and the like, which have a misc slot and are not hats. */
+and the like, which have a cosmetic slot and are not worn on the body. */
 static ArrayList BuildHatPool(TFClassType playerClass)
 {
 	ArrayList pool = new ArrayList();
@@ -324,6 +391,12 @@ static ArrayList BuildHatPool(TFClassType playerClass)
 		int itemDefinition = items.Get(i);
 		
 		if (TF2Econ_GetItemLoadoutSlot(itemDefinition, playerClass) != miscSlot)
+			continue;
+		
+		char equipRegion[64];
+		
+		if (TF2Econ_GetItemDefinitionString(itemDefinition, "equip_region", equipRegion, sizeof(equipRegion))
+			&& StrEqual(equipRegion, EQUIP_REGION_MEDAL))
 			continue;
 		
 		char className[64];
