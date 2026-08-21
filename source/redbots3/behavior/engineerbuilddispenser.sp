@@ -1,5 +1,19 @@
 #define DISPENSER_SPOT_TAKEN_RANGE	150.0
 
+/* How far from the nest a named spot may be and still be this nest's dispenser spot
+
+The pairing was whichever named spot was nearest the nest in a straight line, with no ceiling on
+it, so a map that names three nests and three spots can hand a nest a spot that belongs to another
+one. Coaltown does: the nest above the track at z 496 is 415 units from the spot on the floor at
+z 273, which is nearer than any spot on its own level, and the engineer walked off looking for it,
+failed to place anything for the whole reach deadline and dropped the dispenser where he stood.
+
+The height is a separate test from the distance because two floors are close in plan and a
+staircase apart in fact. Past either, the nest area itself is the better answer: a dispenser beside
+the sentry is the point of the thing. */
+#define DISPENSER_NEST_RANGE	400.0
+#define DISPENSER_NEST_HEIGHT	120.0
+
 /* How long an engineer may spend walking to where the dispenser goes
 
 Reported on Rottenburg: engineers stuck on a rock trying to build one. The action pathed to a
@@ -246,11 +260,18 @@ bool ConfiguredDispenserSpot(int actor, float spot[3])
 	if (spots.Length == 0)
 		return false;
 	
+	float nest[3]; m_aNestArea[actor].GetCenter(nest);
+	
 	ArrayList free = new ArrayList(3);
 	
 	for (int i = 0; i < spots.Length; i++)
 	{
 		float candidate[3]; spots.GetArray(i, candidate);
+		
+		//Somebody else's nest named this one
+		if (GetVectorDistance(nest, candidate) > DISPENSER_NEST_RANGE
+			|| FloatAbs(candidate[2] - nest[2]) > DISPENSER_NEST_HEIGHT)
+			continue;
 		
 		//A spot the engineer cannot walk to is not a spot. Rottenburg has a rock in front of one
 		if (IsDispenserSpotTaken(actor, candidate) || !IsPathToVectorPossible(actor, candidate))
@@ -259,11 +280,17 @@ bool ConfiguredDispenserSpot(int actor, float spot[3])
 		free.PushArray(candidate);
 	}
 	
-	float nest[3]; m_aNestArea[actor].GetCenter(nest);
-	
 	bool found = NearestConfiguredSpot(free, nest, spot);
 	
 	delete free;
+	
+	if (redbots_manager_debug.BoolValue)
+	{
+		if (found)
+			PrintToServer("ConfiguredDispenserSpot: %N takes the named spot %.0f %.0f %.0f", actor, spot[0], spot[1], spot[2]);
+		else
+			PrintToServer("ConfiguredDispenserSpot: %N has no named spot for the nest at %.0f %.0f %.0f", actor, nest[0], nest[1], nest[2]);
+	}
 	
 	return found;
 }
