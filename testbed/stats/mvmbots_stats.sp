@@ -206,7 +206,19 @@ static void Event_MissionComplete(Event event, const char[] name, bool dontBroad
  * that nearly lost it, and a change that clears the same waves faster is a change that worked */
 static void WriteWaveResult(const char[] result)
 {
-	float duration = g_flWaveStart > 0.0 ? GetGameTime() - g_flWaveStart : 0.0;
+	/* A wave nobody played is not a result
+	 *
+	 * The game ends a wave when the round resets, which it does when the server restarts, so a
+	 * restart wrote a row of zeros into the file. run.sh counts rows, so that row was the run: it
+	 * stopped twenty seconds in and reported a wave lost that never began. Only a wave with a
+	 * beginning is written.
+	 */
+	if (g_flWaveStart <= 0.0)
+	{
+		return;
+	}
+
+	float duration = GetGameTime() - g_flWaveStart;
 
 	char line[STATS_LINE_LENGTH];
 	FormatEx(line, sizeof(line),
