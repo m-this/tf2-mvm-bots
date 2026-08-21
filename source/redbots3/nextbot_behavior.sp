@@ -568,11 +568,13 @@ static Action CTFBotMainAction_ShouldAttack(BehaviorAction action, INextBot next
 /* A bot is ready when it has done the thing its seat exists for
 
 An engineer pressed ready the moment a sentry entity existed, which is a level one still being
-hammered together, and the wave started in front of it. A medic pressed ready with no charge,
-which is a medic with no answer to the first giant.
+hammered together, and the wave started in front of it. A level three sentry and a level three
+dispenser are what an engineer's seat is for; the teleporter can be built in his own time.
 
-A level three sentry and a level three dispenser are what an engineer's seat is for; the
-teleporter can be built in his own time. A full charge is what a medic's is for.
+The medic used to be held here too, until his charge was full. It is off again: a charge builds
+into whoever he is beaming, so the wait is however long it takes him to find somebody and stay
+next to them, which was minutes of everybody else standing about, and a medic who wandered off
+looking for a patient held the wave from wherever he ended up. He is ready when he spawns.
 
 Several places set a bot ready and gating each of them would be four chances to miss one, so this
 takes the ready away again while the nest is unfinished, every frame, wherever it came from.
@@ -601,35 +603,11 @@ bool IsEngineerNestFinished(int client)
 		&& IsBuildingFinished(GetObjectOfType(client, TFObject_Dispenser));
 }
 
-/* A medic with no charge is a medic who has nothing to answer the first giant with
-
-The charge only builds into somebody, so a medic alone on the team can never satisfy this and
-would sit out the whole grace before every wave. Anybody alive is enough, at any distance: he
-walks to whoever it is. Nobody alive at all is the case the grace exists for, and he is ready. */
-static bool IsMedicCharged(int client)
-{
-	int medigun = GetPlayerWeaponSlot(client, TFWeaponSlot_Secondary);
-
-	if (medigun == -1 || TF2Util_GetWeaponID(medigun) != TF_WEAPON_MEDIGUN)
-		return true;
-
-	if (GetEntPropFloat(medigun, Prop_Send, "m_flChargeLevel") >= 1.0)
-		return true;
-
-	return GerNearestTeammate(client, 999999.0) == -1;
-}
-
 //Whether this bot has done the thing its seat exists for, before the wave starts
 static bool IsDefenderPrepared(int client)
 {
-	switch (TF2_GetPlayerClass(client))
-	{
-		case TFClass_Engineer:
-			return IsEngineerNestFinished(client);
-
-		case TFClass_Medic:
-			return IsMedicCharged(client);
-	}
+	if (TF2_GetPlayerClass(client) == TFClass_Engineer)
+		return IsEngineerNestFinished(client);
 
 	return true;
 }
