@@ -44,12 +44,15 @@ One line each. The spec has the detail and the reasoning.
 - The medic picks his patient from the whole team rather than from whoever is
   within nine metres, which is what parked him at the engineer's nest for the
   length of a wave. See item 14.
-- The bots wear hats rather than tournament medals: the pool was built from the
-  schema's `misc` slot, which is mostly UGC and ozfortress season badges, and is
-  now built from `head`.
+- The bots wear hats rather than tournament medals. The pool was drawn from the
+  schema's misc slot, which is mostly UGC and ozfortress season badges; it is
+  filed by equip region now, because the head slot is the game's old single-hat
+  one and no modern item reports it.
 - `AddBotsFromChosenTeamComposition` counts who is already on RED. It added the
   whole lineup, which is right only while nothing else fills the team before the
   wave, and tf2-archipelago now does.
+- The loadout file can name a seat of `sm_redbots_manager_team_composition` and
+  not only a class, so seat 1 holds the wrangler and seat 2 need not.
 
 ## 1. The crash. Fixed, and it was the test-bed's own entrypoint
 

@@ -27,9 +27,26 @@ When the file exists it decides every slot: a slot it leaves out keeps the stock
 and the players' own preferences are not consulted */
 static KeyValues m_kvServerLoadout;
 
+/* The seat of sm_redbots_manager_team_composition a bot fills, counted from 1, and 0 for a bot that
+fills none
+
+The composition is an ordered list, so the third name in it is a seat somebody sits in and not just
+another engineer. Looking a loadout up by class alone hands every engineer on the team the same two
+weapons, which is the wrong answer the moment one of them is meant to hold the wrangler and the
+other is not.
+
+tf_bot_add is a console command, so the bot does not exist yet when its seat is decided. The seats
+wait here in the order they were asked for and the next bot of ours to enter takes the one in front,
+which is the order the server creates them in */
+static int m_iBotSeat[MAXPLAYERS + 1];
+static ArrayList m_adtPendingBotSeats;
+
 void Config_LoadServerLoadout()
 {
 	delete m_kvServerLoadout;
+
+	//A map change, so the seats the last map asked for belong to bots that will never enter
+	delete m_adtPendingBotSeats;
 
 	char filePath[PLATFORM_MAX_PATH]; BuildPath(Path_SM, filePath, sizeof(filePath), "configs/defenderbots/loadout.cfg");
 
@@ -42,20 +59,118 @@ void Config_LoadServerLoadout()
 	{
 		LogError("Config_LoadServerLoadout: Could not read %s!", filePath);
 		delete m_kvServerLoadout;
+		return;
 	}
+
+	WarnAboutInvalidLoadoutSeats();
 }
 
-static int GetServerLoadoutWeapon(const char[] class, const char[] slot)
+//A seat number the file could not have meant, so the mod never looks one up either
+static bool IsValidLoadoutSeat(int seat)
+{
+	return seat >= 1 && seat <= MAXPLAYERS;
+}
+
+/* Complain about the seats the file names that no bot can ever fill
+
+A seat out of range is a typo, and nothing else says so: the bot wears the loadout of its class
+instead, which reads as the mod ignoring the file rather than the file asking for seat 0 */
+static void WarnAboutInvalidLoadoutSeats()
 {
 	m_kvServerLoadout.Rewind();
 
-	if (!m_kvServerLoadout.JumpToKey(class))
+	if (!m_kvServerLoadout.JumpToKey("seats") || !m_kvServerLoadout.GotoFirstSubKey())
+	{
+		m_kvServerLoadout.Rewind();
+		return;
+	}
+
+	do
+	{
+		char section[16]; m_kvServerLoadout.GetSectionName(section, sizeof(section));
+
+		if (!IsValidLoadoutSeat(StringToInt(section)))
+			LogError("Config_LoadServerLoadout: seat \"%s\" is not between 1 and %d, ignoring it", section, MAXPLAYERS);
+	}
+	while (m_kvServerLoadout.GotoNextKey());
+
+	m_kvServerLoadout.Rewind();
+}
+
+/* Stand on the block the file writes for one seat, when it writes one this bot may wear
+
+A seat answers only for the class it names. The composition gets retyped between waves, so the seat
+that was an engineer's is now a medic's, and that medic is better off with the medic block than with
+an engineer's wrangler */
+static bool JumpToServerLoadoutSeat(int seat, const char[] class)
+{
+	if (!IsValidLoadoutSeat(seat))
+		return false;
+
+	char section[16]; IntToString(seat, section, sizeof(section));
+
+	if (!m_kvServerLoadout.JumpToKey("seats") || !m_kvServerLoadout.JumpToKey(section))
+	{
+		m_kvServerLoadout.Rewind();
+		return false;
+	}
+
+	char seatClass[TF2_CLASS_MAX_NAME_LENGTH]; m_kvServerLoadout.GetString("class", seatClass, sizeof(seatClass));
+
+	if (StrEqual(seatClass, class, false))
+		return true;
+
+	m_kvServerLoadout.Rewind();
+
+	return false;
+}
+
+/* The seat decides the whole loadout when it names this bot, and the class decides it otherwise
+
+The seat is the more specific of the two, so it answers for every slot the way the file itself does:
+a slot it leaves out is the stock weapon, not the class block's answer. Anything else would mix the
+two and hand a bot a combination nobody wrote down */
+static int GetServerLoadoutWeapon(int seat, const char[] class, const char[] slot)
+{
+	m_kvServerLoadout.Rewind();
+
+	if (!JumpToServerLoadoutSeat(seat, class) && !m_kvServerLoadout.JumpToKey(class))
 		return TF_ITEMDEF_DEFAULT;
 
 	int weaponIndex = m_kvServerLoadout.GetNum(slot, TF_ITEMDEF_DEFAULT);
 	m_kvServerLoadout.Rewind();
 
 	return weaponIndex;
+}
+
+//A seat asked for, waiting for the bot the server has not created yet
+void NoteBotSeatPending(int seat)
+{
+	if (m_adtPendingBotSeats == null)
+		m_adtPendingBotSeats = new ArrayList();
+
+	//Nobody came for the oldest one, so that tf_bot_add was refused: one wrong loadout beats a list that only grows
+	if (m_adtPendingBotSeats.Length >= MAXPLAYERS)
+		m_adtPendingBotSeats.Erase(0);
+
+	m_adtPendingBotSeats.Push(seat);
+}
+
+void TakeBotSeat(int client)
+{
+	m_iBotSeat[client] = 0;
+
+	if (m_adtPendingBotSeats == null || m_adtPendingBotSeats.Length < 1)
+		return;
+
+	m_iBotSeat[client] = m_adtPendingBotSeats.Get(0);
+	m_adtPendingBotSeats.Erase(0);
+}
+
+//Whoever holds this client index next is another bot, and this seat is not theirs
+void ForgetBotSeat(int client)
+{
+	m_iBotSeat[client] = 0;
 }
 
 static Action Timer_SavePrefData(Handle timer)
@@ -167,10 +282,10 @@ int GetWeaponPreference(int client, const char[] class, const char[] slot)
 }
 
 //Return weapon def index
-int GetPreferredWeaponForClass(const char[] class, const char[] slot)
+int GetPreferredWeaponForClass(const char[] class, const char[] slot, int client)
 {
 	if (m_kvServerLoadout != null)
-		return GetServerLoadoutWeapon(class, slot);
+		return GetServerLoadoutWeapon(m_iBotSeat[client], class, slot);
 
 	if (g_iPlayerForcedPref != -1)
 	{
