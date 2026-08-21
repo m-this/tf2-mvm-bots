@@ -707,10 +707,10 @@ public Action Command_DumpNest(int client, int args)
 
 		ReplyToCommand(client, "%N: nest %.0f %.0f %.0f", i, nest[0], nest[1], nest[2]);
 
-		DumpBuilding(client, i, "sentry", GetObjectOfType(i, TFObject_Sentry));
-		DumpBuilding(client, i, "dispenser", GetObjectOfType(i, TFObject_Dispenser));
-		DumpBuilding(client, i, "entrance", GetObjectOfType(i, TFObject_Teleporter, TFObjectMode_Entrance));
-		DumpBuilding(client, i, "exit", GetObjectOfType(i, TFObject_Teleporter, TFObjectMode_Exit));
+		DumpBuilding(client, "sentry", GetObjectOfType(i, TFObject_Sentry));
+		DumpBuilding(client, "dispenser", GetObjectOfType(i, TFObject_Dispenser));
+		DumpBuilding(client, "entrance", GetObjectOfType(i, TFObject_Teleporter, TFObjectMode_Entrance));
+		DumpBuilding(client, "exit", GetObjectOfType(i, TFObject_Teleporter, TFObjectMode_Exit));
 
 		//Asking moves the engineer's pending teleporter target, which the idle action recomputes anyway
 		bool wants = ShouldBuildTeleporter(i);
@@ -737,7 +737,7 @@ public Action Command_DumpNest(int client, int args)
 	return Plugin_Handled;
 }
 
-static void DumpBuilding(int client, int owner, const char[] what, int building)
+static void DumpBuilding(int client, const char[] what, int building)
 {
 	if (building == INVALID_ENT_REFERENCE)
 	{
