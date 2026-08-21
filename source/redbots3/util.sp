@@ -514,16 +514,11 @@ void BuildStandPoint(const float spot[3], const float from[3], int attempt, int 
 	stand[2] = spot[2];
 }
 
-/* The RED spawn and the way out of it, for a map that names no teleporter entrance
+/* The RED spawn nearest the engineer, for a map that names no teleporter entrance
 
 Which is most of them: Decoy names one exit and no entrance, so the engineers never built a
-teleporter at all, on any map, however long the players waited between waves.
-
-Not a spot but a spawn and a direction, because one spot is a guess and the caller wants to walk.
-The way out is the way to the nest, since that is where the engineer went and where the wave is.
-He steps along it until the game accepts the floor under the toolbox, which is the nearest place
-to spawn that will take an entrance and the place a player leaving spawn walks straight into. */
-bool SpawnPathOut(int actor, const float nest[3], float spawn[3], float towards[3])
+teleporter at all, on any map, however long the players waited between waves. */
+bool NearestSpawnPoint(int actor, float spawn[3])
 {
 	int point = -1;
 	int nearest = -1;
@@ -550,11 +545,59 @@ bool SpawnPathOut(int actor, const float nest[3], float spawn[3], float towards[
 	
 	GetEntPropVector(nearest, Prop_Data, "m_vecAbsOrigin", spawn);
 	
-	SubtractVectors(nest, spawn, towards);
+	return true;
+}
+
+/* Every point on the way out of spawn an attempt might use, and where to stand to build on each
+
+The old answer was the spawn point plus the direction to the nest times a distance, and a
+direction is not a route: on a map with a wall between the two, the first attempt is inside the
+wall and every attempt after it is further inside. Nothing was ever placed and nothing could be.
+
+So it reads the nav mesh's own route instead, computed from the engineer to the spawn point and
+measured back from the spawn end. The first point is a little way out of the door, and each one
+after it is a step further along the way a player actually walks.
+
+All of them at once, and not one per attempt, and that is the part that was wrong when this was
+first written. The route is computed from wherever the engineer is standing. Once he has walked
+out to the first point, the route left between him and spawn is shorter than the second point is
+from spawn, so the second ask fails and he gives up having tried exactly one place. Sampling here,
+while he is still at his nest, reads the route from the far end of the whole journey, and the
+world coordinates it hands back stay true however far he walks afterwards.
+
+Returns how many points the route was long enough for, which is none when there is no route at all
+and none when the engineer is already inside the spawn room. */
+int SpawnRoutePoints(int actor, const float spawn[3], float first, float step, float reach,
+	float spots[][3], float stands[][3], int pointsMax)
+{
+	CBaseCombatCharacter(actor).UpdateLastKnownArea();
 	
-	towards[2] = 0.0;
+	PathFollower route = PathFollower(_, Path_FilterIgnoreActors, Path_FilterOnlyActors);
 	
-	return NormalizeVector(towards, towards) > 1.0;
+	int found = 0;
+	
+	if (route.ComputeToPos(CBaseNPC_GetNextBotOfEntity(actor), spawn))
+	{
+		float length = route.GetLength();
+		
+		for (int i = 0; i < pointsMax; i++)
+		{
+			float fromSpawn = first + step * float(i);
+			
+			//The route runs out, and a point past the far end of it is not on the way out of spawn
+			if (length <= fromSpawn + reach)
+				break;
+			
+			route.GetPosition(length - fromSpawn, spots[i]);
+			route.GetPosition(length - fromSpawn - reach, stands[i]);
+			
+			found++;
+		}
+	}
+	
+	route.Destroy();
+	
+	return found;
 }
 
 //The authored spot nearest the centre we already have, when one is close enough to be this nest

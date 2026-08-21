@@ -607,10 +607,26 @@ bool IsEngineerNestFinished(int client)
 //Whether this bot has done the thing its seat exists for, before the wave starts
 static bool IsDefenderPrepared(int client)
 {
-	if (TF2_GetPlayerClass(client) == TFClass_Engineer)
-		return IsEngineerNestFinished(client);
+	if (TF2_GetPlayerClass(client) != TFClass_Engineer)
+		return true;
 
-	return true;
+	if (!IsEngineerNestFinished(client))
+		return false;
+
+	/* The teleporter too, but only while nobody is being made to wait for it
+
+	The nest finishing is what lets the wave start, and the engineer's teleporter window is
+	whatever is left of the between-rounds time after it. On a team of nothing but bots that is
+	nothing at all: the last nest finishes, everybody is ready, the wave starts, and the build
+	action gives up on its first update with "Wave started". No engineer had ever finished one.
+
+	Not with a player on the server. Somebody who has finished shopping should not be held at the
+	ready screen for a building the bots want, and their shopping is already the time the engineer
+	needs. */
+	if (GetRealPlayerCount() > 0)
+		return true;
+
+	return !ShouldBuildTeleporter(client);
 }
 
 static void UpdateDefenderReadiness(int actor)
