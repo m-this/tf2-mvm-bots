@@ -30,8 +30,15 @@ play() {
 		sh "$tree/testbed/run.sh" --map mvm_decoy --waves 6 --timeout 1800 \
 			--out "$out/$name-$i.jsonl" >"$out/$name-$i.log" 2>&1 || true
 
+	# The container is recreated by the next run, and `docker compose logs` goes
+	# with it. A crash whose log is gone is a crash nobody can diagnose, so the
+	# server's own output is kept next to the numbers it produced.
+	docker compose -f "$here/compose.yml" logs --no-color srcds \
+		>"$out/$name-$i.srcds.log" 2>&1 || true
+
 	if grep -qi "has crashed" "$out/$name-$i.log"; then
 		echo "    crashed"
+		grep -iE "WatchDog|Segmentation|Bus error|FATAL" "$out/$name-$i.srcds.log" | tail -3
 	fi
 }
 
