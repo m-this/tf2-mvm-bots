@@ -24,6 +24,15 @@ hat is a robot somebody shoots a moment later than they should. */
 
 #define ATTRIB_ATTACH_PARTICLE	134
 
+/* The schema's spelling of a class, which is not the mod's
+
+items_game says heavy where the mod says heavyweapons, and the per class model of a hat is filed
+under the schema's word. Index 0 is TFClass_Unknown. */
+static const char ITEMS_GAME_CLASS[][] =
+{
+	"", "scout", "sniper", "soldier", "demoman", "medic", "heavy", "pyro", "spy", "engineer"
+};
+
 //One pool per class, because a hat one class can wear another cannot. Index 0 is TFClass_Unknown
 static ArrayList g_adtHats[view_as<int>(TFClass_Engineer) + 1];
 static ArrayList g_adtHatEffects;
@@ -153,6 +162,25 @@ static void WearHat(int client)
 	SetEntProp(hat, Prop_Send, "m_iEntityLevel", 1);
 	SetEntProp(hat, Prop_Send, "m_iTeamNum", GetClientTeam(client));
 	
+	/* The model, which the game does not work out for a wearable made by hand
+	
+	Without it the hat is an entity with no shape: the unusual effect drew, attached to nothing,
+	and the bots wore particles and no hats. A hat with no model in the schema cannot be worn at
+	all, so it goes the same way as one the game refuses. */
+	char model[PLATFORM_MAX_PATH];
+	
+	if (!HatModel(itemDefinition, TF2_GetPlayerClass(client), model, sizeof(model)))
+	{
+		RemoveEntity(hat);
+		DropHatFromPool(g_wardrobe[client].playerClass, itemDefinition);
+		g_wardrobe[client].drawn = false;
+		g_iBotHat[client] = INVALID_ENT_REFERENCE;
+		
+		return;
+	}
+	
+	SetEntityModel(hat, model);
+	
 	DispatchSpawn(hat);
 	
 	if (effect > 0)
@@ -189,6 +217,37 @@ static void RemoveBotHat(int client)
 	
 	if (hat != INVALID_ENT_REFERENCE && IsClientInGame(client))
 		TF2_RemoveWearable(client, hat);
+}
+
+/* The model this class wears this hat with
+
+Per class first, because a hat that fits nine heads is nine models and the wrong one is a Scout
+wearing a Heavy's hat at a Heavy's height. */
+static bool HatModel(int itemDefinition, TFClassType playerClass, char[] model, int maxlength)
+{
+	int index = view_as<int>(playerClass);
+	
+	if (index > 0 && index < sizeof(ITEMS_GAME_CLASS))
+	{
+		char key[64]; Format(key, sizeof(key), "model_player_per_class/%s", ITEMS_GAME_CLASS[index]);
+		
+		if (TF2Econ_GetItemDefinitionString(itemDefinition, key, model, maxlength) && model[0] != '\0')
+			return PrecacheHatModel(model);
+	}
+	
+	if (TF2Econ_GetItemDefinitionString(itemDefinition, "model_player", model, maxlength) && model[0] != '\0')
+		return PrecacheHatModel(model);
+	
+	return false;
+}
+
+//A model the map did not load has to be added to the table before anything can wear it
+static bool PrecacheHatModel(const char[] model)
+{
+	if (!IsModelPrecached(model))
+		PrecacheModel(model);
+	
+	return true;
 }
 
 //An item the game will not attach, gone for the rest of the map so nobody draws it twice
