@@ -60,6 +60,14 @@ static int g_iBotHat[MAXPLAYERS + 1] = {INVALID_ENT_REFERENCE, ...};
 //Whether a bot is already waiting to be dressed, so it is dressed once
 static bool g_bCosmeticsPending[MAXPLAYERS + 1];
 
+/* The item a bot is in the middle of putting on, and nothing the rest of the time
+
+Equipping throws when the game refuses an item, and a thrown native takes the callback with it,
+so there is no line after the call that can notice. What is left behind is this: an item still
+written here on the next spawn is an item the game would not attach, and it comes out of the
+pool rather than being drawn again for the rest of the map. */
+static int g_iEquipping[MAXPLAYERS + 1];
+
 /* Half a second after the bot spawns, not the moment it does
 
 The game gives its own items on spawn, and the custom loadout replaces them a tenth of a second
@@ -112,6 +120,13 @@ nothing is left over from the class before. */
 static void DrawWardrobe(int client)
 {
 	TFClassType playerClass = TF2_GetPlayerClass(client);
+	
+	if (g_iEquipping[client] != 0)
+	{
+		DropHatFromPool(g_wardrobe[client].playerClass, g_iEquipping[client]);
+		g_iEquipping[client] = 0;
+		g_wardrobe[client].drawn = false;
+	}
 	
 	if (g_wardrobe[client].drawn && g_wardrobe[client].playerClass == playerClass)
 		return;
@@ -166,9 +181,17 @@ static void WearHat(int client)
 	
 	//The game throws out a wearable whose item it thinks the wearer does not own, and a bot owns nothing
 	TF2Util_SetWearableAlwaysValid(hat, true);
+	
+	/* Written down before the equip and not after, both of them
+	
+	The entity so that a refused one is taken away on the next spawn rather than standing in the
+	world with nobody wearing it, and the item so that the refusal is noticed at all. */
+	g_iBotHat[client] = EntIndexToEntRef(hat);
+	g_iEquipping[client] = itemDefinition;
+	
 	TF2Util_EquipPlayerWearable(client, hat);
 	
-	g_iBotHat[client] = EntIndexToEntRef(hat);
+	g_iEquipping[client] = 0;
 	
 	if (redbots_manager_debug.BoolValue)
 		LogMessage("[WearHat] %N puts item %d back on", client, itemDefinition);
@@ -189,6 +212,22 @@ static void RemoveBotHat(int client)
 		TF2_RemoveWearable(client, hat);
 }
 
+//An item the game will not attach, gone for the rest of the map so nobody draws it twice
+static void DropHatFromPool(TFClassType playerClass, int itemDefinition)
+{
+	ArrayList pool = HatPoolForClass(playerClass);
+	
+	if (pool == null)
+		return;
+	
+	int at = pool.FindValue(itemDefinition);
+	
+	if (at != -1)
+		pool.Erase(at);
+	
+	LogMessage("Item %d cannot be worn by class %d and has been dropped from the hat pool", itemDefinition, playerClass);
+}
+
 /* A bot that has left takes its hat with it
 
 Nothing to remove, then: the game clears a player's wearables when the player goes, and a
@@ -197,6 +236,7 @@ void ForgetBotCosmetics(int client)
 {
 	g_iBotHat[client] = INVALID_ENT_REFERENCE;
 	g_bCosmeticsPending[client] = false;
+	g_iEquipping[client] = 0;
 	
 	//The next bot in this seat is a different bot, and dresses itself
 	g_wardrobe[client].drawn = false;
