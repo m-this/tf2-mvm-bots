@@ -13,6 +13,7 @@ wave instead of walking into a rock for the rest of it. */
 #define DISPENSER_REACH_TIME	12.0
 
 static float m_ctDispenserReachDeadline[MAXPLAYERS + 1];
+static float m_vDispenserSpot[MAXPLAYERS + 1][3];
 
 BehaviorAction CTFBotMvMEngineerBuildDispenser()
 {
@@ -30,6 +31,15 @@ public Action CTFBotMvMEngineerBuildDispenser_OnStart(BehaviorAction action, int
 	UpdateLookAroundForEnemies(actor, true);
 	
 	m_ctDispenserReachDeadline[actor] = GetGameTime() + DISPENSER_REACH_TIME;
+	
+	//Once, here, because the Update runs every tick and a path computation does not belong there
+	if (!ConfiguredDispenserSpot(actor, m_vDispenserSpot[actor]))
+	{
+		if (m_aNestArea[actor] != NULL_AREA)
+			CNavArea_GetRandomPoint(m_aNestArea[actor], m_vDispenserSpot[actor]);
+		else
+			m_vDispenserSpot[actor] = GetAbsOrigin(actor);
+	}
 	
 	return action.Continue();
 }
@@ -63,10 +73,13 @@ public Action CTFBotMvMEngineerBuildDispenser_Update(BehaviorAction action, int 
 		return action.Done("Need to advance nest");
 	}
 	
-	float areaCenter[3];
-	
-	if (!ConfiguredDispenserSpot(actor, areaCenter))
-		CNavArea_GetRandomPoint(m_aNestArea[actor], areaCenter);
+	/* The spot is chosen once, not every frame
+
+	Choosing it here used to mean a path computation per configured spot per tick per engineer,
+	which is how the server's watchdog came to fire inside NavAreaBuildPath. A spot that was
+	reachable when the action started is reachable a second later, and if it is not, the deadline
+	below is what answers for it. */
+	float areaCenter[3]; areaCenter = m_vDispenserSpot[actor];
 	
 	//The walk ran out of time, so here is where it goes
 	if (m_ctDispenserReachDeadline[actor] > 0.0 && GetGameTime() > m_ctDispenserReachDeadline[actor])
