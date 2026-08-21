@@ -288,7 +288,7 @@ static float m_ctNextSpyGlance[MAXPLAYERS + 1];
 
 static void UpdateSpyGlance(int client)
 {
-	if (!IsInSpyParanoiaRange(client))
+	if (!Feature(FEATURE_SPY_GLANCE) || !IsInSpyParanoiaRange(client))
 	{
 		m_ctNextSpyGlance[client] = 0.0;
 		return;

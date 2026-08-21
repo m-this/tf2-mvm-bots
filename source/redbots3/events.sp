@@ -110,6 +110,13 @@ static void Event_RevivePlayerNotify(Event event, const char[] name, bool dontBr
 
 static void Event_MvmWaveBegin(Event event, const char[] name, bool dontBroadcast)
 {
+	/* Publish here rather than only on a timer after the map loads
+
+	server.cfg runs at its own pace and a late-loaded plugin misses it entirely, so a list
+	published once on map start can be the defaults rather than what the server was asked for.
+	A wave beginning is after everything, every time. */
+	PublishActiveFeatures();
+	
 	//Whatever the queue has left is about a bomb that is about to move
 	EngineerNestRelocation_StopEvaluating();
 	

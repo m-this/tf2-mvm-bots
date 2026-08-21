@@ -36,6 +36,9 @@ Forty is a stack with enough scatter that a bomb landing on a lip or a step does
 whole trap with it. */
 #define STICKY_TRAP_SPREAD	40.0
 
+//What it was before, and what the switch goes back to: a carpet for a crowd
+#define STICKY_TRAP_CARPET	120.0
+
 //What the launcher wants between shots, and what the bot needs to turn between them
 #define STICKY_TRAP_SHOT_GAP_MIN	0.6
 #define STICKY_TRAP_SHOT_GAP_MAX	0.9
@@ -142,8 +145,10 @@ public Action CTFBotStickyTrap_Update(BehaviorAction action, int actor, float in
 	//A fresh point for each bomb, near enough to the last that a giant takes the whole stack
 	if (IsZeroVector(m_vStickyTrapPoint[actor]))
 	{
-		m_vStickyTrapPoint[actor][0] = m_vStickyTrapSpot[actor][0] + GetRandomFloat(-STICKY_TRAP_SPREAD, STICKY_TRAP_SPREAD);
-		m_vStickyTrapPoint[actor][1] = m_vStickyTrapSpot[actor][1] + GetRandomFloat(-STICKY_TRAP_SPREAD, STICKY_TRAP_SPREAD);
+		float spread = Feature(FEATURE_STICKY_STACK) ? STICKY_TRAP_SPREAD : STICKY_TRAP_CARPET;
+		
+		m_vStickyTrapPoint[actor][0] = m_vStickyTrapSpot[actor][0] + GetRandomFloat(-spread, spread);
+		m_vStickyTrapPoint[actor][1] = m_vStickyTrapSpot[actor][1] + GetRandomFloat(-spread, spread);
 		m_vStickyTrapPoint[actor][2] = m_vStickyTrapSpot[actor][2];
 	}
 

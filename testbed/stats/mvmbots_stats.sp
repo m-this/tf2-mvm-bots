@@ -164,9 +164,20 @@ static void Event_WaveBegin(Event event, const char[] name, bool dontBroadcast)
 
 	g_Wave.Reset();
 
+	/* The features that are on go in the file with the numbers they produced
+
+	A results file whose settings are not recorded is a file nobody can compare with anything: two
+	runs of the same mission look identical on disk and were not the same mod. The bots plugin
+	publishes the set, and this only copies it. */
+	char features[512];
+	ConVar cvFeatures = FindConVar("sm_redbots_features_active");
+	
+	if (cvFeatures != null)
+		cvFeatures.GetString(features, sizeof(features));
+	
 	char line[STATS_LINE_LENGTH];
-	FormatEx(line, sizeof(line), "{\"event\":\"wave_begin\",\"map\":\"%s\",\"wave\":%d,\"red\":%d,\"bots\":%d}",
-		g_sMap, g_iWave, CountTeam(TFTeam_Red, false), CountTeam(TFTeam_Red, true));
+	FormatEx(line, sizeof(line), "{\"event\":\"wave_begin\",\"map\":\"%s\",\"wave\":%d,\"red\":%d,\"bots\":%d,\"features\":\"%s\"}",
+		g_sMap, g_iWave, CountTeam(TFTeam_Red, false), CountTeam(TFTeam_Red, true), features);
 
 	WriteLine(line);
 }

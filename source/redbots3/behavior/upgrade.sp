@@ -660,6 +660,19 @@ static int ClassUpgradePriority(TFClassType pclass, int slot, const char[] attri
 	return 0;
 }
 
+/* What a resistance is worth, given whether the wave will actually deal that damage
+
+Below the damage upgrades on purpose. A team that kills the wave faster takes less of everything,
+and the guides all put resistances after the weapon is bought. Above the rest of the tail,
+because the alternative is what this mod did before, which was never buying one. */
+static int ResistancePriority(bool wanted)
+{
+	if (!Feature(FEATURE_WAVE_RESISTANCES))
+		return 35;
+	
+	return wanted ? 210 : 25;
+}
+
 /* Damage first, then what keeps it firing. What a bot buys when nothing above had an opinion */
 static int GeneralUpgradePriority(const char[] attribute)
 {
@@ -690,12 +703,28 @@ static int GeneralUpgradePriority(const char[] attribute)
 	if (StrEqual(attribute, "generate rage on damage")) return 60;
 	if (StrEqual(attribute, "bleeding duration")) return 55;
 	
-	//--- A bot respawns every wave, so staying alive is what it needs least
+	/* --- Not dying, which was ranked here on a premise that is not true
+
+	This block used to open with "a bot respawns every wave, so staying alive is what it needs
+	least". Bots do not respawn every wave, and the test-bed says explosions are between forty
+	five and sixty percent of every defender death on every map measured. A resistance ranked at
+	thirty five is a resistance nobody ever buys.
+
+	What the guides do about it is buy the resistance the coming wave calls for, and the wave bar
+	says what is coming before it starts. So a resistance is worth a middling amount when the
+	robots that deal that damage are in the wave, and very little when they are not: blast
+	resistance against a wave of Scouts is three hundred credits spent on nothing. */
+	if (StrEqual(attribute, "dmg taken from blast reduced"))
+		return ResistancePriority(WaveHasExplosiveRobots());
+	
+	if (StrEqual(attribute, "dmg taken from bullets reduced"))
+		return ResistancePriority(WaveHasBulletRobots());
+	
+	if (StrEqual(attribute, "dmg taken from fire reduced"))
+		return ResistancePriority(WaveHasFireRobots());
+	
 	if (StrEqual(attribute, "move speed bonus")) return 45;
 	if (StrEqual(attribute, "health regen")) return 40;
-	if (StrEqual(attribute, "dmg taken from bullets reduced")) return 35;
-	if (StrEqual(attribute, "dmg taken from blast reduced")) return 35;
-	if (StrEqual(attribute, "dmg taken from fire reduced")) return 30;
 	if (StrEqual(attribute, "dmg taken from crit reduced")) return 30;
 	if (StrEqual(attribute, "damage force reduction")) return 25;
 	if (StrEqual(attribute, "increased jump height")) return 10;
