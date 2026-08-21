@@ -56,10 +56,15 @@ enum
 	BOT_LINEUP_MODE_PREFERENCE_CHOOSE
 }
 
+//A zone name is a short label like "inside": long enough to read, short enough to keep in a config
+#define NEST_ZONE_LENGTH	24
+
 enum struct esMapConfiguration
 {
 	ArrayList adtSniperSpot;
 	ArrayList adtEngineerNestLocation;
+	//One zone name per nest spot, same order. Empty when the map does not name one
+	ArrayList adtEngineerNestZone;
 	ArrayList adtTeleporterEntranceLocation;
 	ArrayList adtTeleporterExitLocation;
 	ArrayList adtDispenserLocation;
@@ -73,6 +78,7 @@ enum struct esMapConfiguration
 	{
 		this.adtSniperSpot = new ArrayList(3);
 		this.adtEngineerNestLocation = new ArrayList(3);
+		this.adtEngineerNestZone = new ArrayList(ByteCountToCells(NEST_ZONE_LENGTH));
 		this.adtTeleporterEntranceLocation = new ArrayList(3);
 		this.adtTeleporterExitLocation = new ArrayList(3);
 		this.adtDispenserLocation = new ArrayList(3);
@@ -83,6 +89,7 @@ enum struct esMapConfiguration
 	{
 		this.adtSniperSpot.Clear();
 		this.adtEngineerNestLocation.Clear();
+		this.adtEngineerNestZone.Clear();
 		this.adtTeleporterEntranceLocation.Clear();
 		this.adtTeleporterExitLocation.Clear();
 		this.adtDispenserLocation.Clear();
@@ -2591,7 +2598,7 @@ void Config_LoadMap()
 	}
 	
 	Config_LoadLocations(kv, "SniperSpot", g_arrMapConfig.adtSniperSpot);
-	Config_LoadLocations(kv, "EngineerNest", g_arrMapConfig.adtEngineerNestLocation);
+	Config_LoadNestSpots(kv, "EngineerNest", g_arrMapConfig.adtEngineerNestLocation, g_arrMapConfig.adtEngineerNestZone);
 	Config_LoadLocations(kv, "TeleporterEntrance", g_arrMapConfig.adtTeleporterEntranceLocation);
 	Config_LoadLocations(kv, "TeleporterExit", g_arrMapConfig.adtTeleporterExitLocation);
 	Config_LoadLocations(kv, "DispenserSpot", g_arrMapConfig.adtDispenserLocation);
@@ -2620,6 +2627,35 @@ void Config_LoadMap()
 A block this map does not have leaves the list empty, which is what every caller falls back on:
 the map configurations are hand written one map at a time, so most of them define some blocks and
 not others */
+/* Nest spots, and the zone each one covers
+
+A map with an inside and an outside wants an engineer on each, and nothing in the score says so:
+two spots that both look good get both engineers, and half the map is unheld. A zone is the
+mapper saying "these are the same piece of ground", so the picker can spread across them.
+
+A spot with no zone belongs to no group and competes normally */
+void Config_LoadNestSpots(KeyValues kv, const char[] key, ArrayList locations, ArrayList zones)
+{
+	if (!kv.JumpToKey(key))
+		return;
+	
+	if (kv.GotoFirstSubKey(false))
+	{
+		do
+		{
+			float vec[3]; kv.GetVector("origin", vec);
+			locations.PushArray(vec);
+			
+			char zone[NEST_ZONE_LENGTH]; kv.GetString("zone", zone, sizeof(zone), "");
+			zones.PushString(zone);
+		} while (kv.GotoNextKey(false));
+		
+		kv.GoBack();
+	}
+	
+	kv.GoBack();
+}
+
 void Config_LoadLocations(KeyValues kv, const char[] key, ArrayList locations)
 {
 	if (!kv.JumpToKey(key))
