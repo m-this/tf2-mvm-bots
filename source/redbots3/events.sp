@@ -22,6 +22,8 @@ static void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast
 	
 	if (g_bIsDefenderBot[client])
 	{
+		GiveBotCosmeticsSoon(client);
+		
 		g_bIsBeingRevived[client] = false;
 		g_iBuyUpgradesNumber[client] = CanBuyUpgradesNow(client) ? GetRandomInt(1, 100) : 0;
 		
@@ -245,6 +247,9 @@ static Action Timer_PlayerSpawn(Handle timer, int data)
 	{
 		g_bIsDefenderBot[data] = true;
 		g_bHasBoughtUpgrades[data] = false;
+		
+		//The spawn that identified this bot ran before the flag above was set, so its cosmetics were skipped
+		GiveBotCosmeticsSoon(data);
 		
 		if (redbots_manager_use_custom_loadouts.BoolValue)
 		{
