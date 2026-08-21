@@ -26,6 +26,20 @@ from the intended spot is worth all of one that never gets built, and the engine
 wave instead of walking into a rock for the rest of it. */
 #define DISPENSER_REACH_TIME	12.0
 
+/* How far from the nest "where he stands" is still somewhere worth putting a dispenser
+
+The deadline above assumes the walk is inside the nest, which it is when the engineer is at his
+nest, and it no longer always is: he goes to the far end of the map for a teleporter entrance now.
+A test-bed run on Coaltown found the dispenser three thousand four hundred units from the nest,
+beside the spawn door, because he lost it while he was out there and the twelve seconds ran out
+before he had walked a quarter of the way back.
+
+A dispenser two metres from the intended spot is worth all of one that never gets built. One at
+the other end of the map is worth nothing at all: it feeds no sentry, it heals nobody who is
+fighting, and it is a hundred metal the nest wanted. Past this he keeps walking, and the build
+time above is what stops him. */
+#define DISPENSER_SETTLE_RANGE	500.0
+
 /* Where he stands to put a dispenser on the spot, which is not the spot
 
 A building goes down in front of the man, never under him. Walking onto the coordinate and
@@ -133,8 +147,13 @@ public Action CTFBotMvMEngineerBuildDispenser_Update(BehaviorAction action, int 
 	float spot[3]; spot = m_vDispenserSpot[actor];
 	float stand[3]; stand = m_vDispenserStand[actor];
 	
-	//The walk ran out of time, so he builds from where he stands and aims at the spot anyway
-	bool outOfTime = m_ctDispenserReachDeadline[actor] > 0.0 && GetGameTime() > m_ctDispenserReachDeadline[actor];
+	/* The walk ran out of time, so he builds from where he stands and aims at the spot anyway
+	
+	Only while he is somewhere near his nest. Settling where he stands is a trade of accuracy for a
+	dispenser that exists, and it stops being a trade at all once he is far enough away that what
+	he settles for feeds nothing. */
+	bool outOfTime = m_ctDispenserReachDeadline[actor] > 0.0 && GetGameTime() > m_ctDispenserReachDeadline[actor]
+		&& GetVectorDistance(GetAbsOrigin(actor), spot) < DISPENSER_SETTLE_RANGE;
 	
 	if (outOfTime)
 		stand = GetAbsOrigin(actor);
