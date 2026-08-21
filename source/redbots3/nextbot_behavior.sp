@@ -952,7 +952,17 @@ static void UpdateMedicPatient(BehaviorAction action, int actor)
 	if (!IsBetterPatient(wanted, patient))
 		return;
 
-	action.SetHandleEntity(ACTION_HEAL_PATIENT_OFFSET, wanted);
+	/* Writing the patient back is off, and the reason is worth keeping
+
+	SetHandleEntity on this offset segfaulted the server on the first Mannhattan run, with no
+	watchdog line, which is a memory fault rather than a slow frame. The offset is a hardcoded
+	field inside a game action and everything else in this mod only ever reads it: reading a wrong
+	offset gives a wrong answer, writing one corrupts whatever is really there.
+
+	The way in is a detour on the game's own patient selection rather than reaching into its
+	memory. TODO item 14. Until then the medic heals whoever the game picked. */
+	if (redbots_manager_debug.BoolValue)
+		PrintToServer("UpdateMedicPatient: %N would rather heal %N", actor, wanted);
 }
 
 public Action CTFBotMedicHeal_UpdatePost(BehaviorAction action, int actor, float interval, ActionResult result)

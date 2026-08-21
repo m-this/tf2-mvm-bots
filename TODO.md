@@ -295,6 +295,25 @@ whatever else is running on this one for the duration. What is not worth doing
 is reading a crash rate measured under paging as a property of the code, which
 is a mistake this file has already recorded once in item 12.
 
+## 14. The medic heals whoever the game picked. Open
+
+`PreferredPatient` in `nextbot_behavior.sp` works out who the medigun should be
+on: the most maximum health in range, which names the Heavy without a class
+table and follows the health upgrades the team buys. Nothing acts on it.
+
+Acting on it meant `action.SetHandleEntity(ACTION_HEAL_PATIENT_OFFSET, ...)`,
+and that segfaulted the server on the first Mannhattan run, with no watchdog
+line, which is a memory fault rather than a slow frame. The offset is a
+hardcoded field inside one of the game's own actions. Everything else in this
+mod only reads it, and the difference matters: reading a wrong offset gives a
+wrong answer, writing one corrupts whatever is really there.
+
+The way in is a detour on `CTFBotMedicHeal`'s own patient selection, so the game
+picks from a list this mod filters, rather than having its choice overwritten
+underneath it. Until then the debug convar prints who the medic would rather be
+healing, which is enough to tell whether the ranking is right before anything is
+risked on it.
+
 ## 11. Not this repository
 
 A cash bundle spent on upgrades leaves the money negative when the wave is
