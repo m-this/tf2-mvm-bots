@@ -37,6 +37,19 @@ One line each. The spec has the detail and the reasoning.
 - `PickBuildArea` skips `BLOCKED` areas. Only `PickBuildAreaPreRound` did.
 - `GetBombInfo` tested `BLUE_SPAWN_ROOM` twice where it meant `RED_SPAWN_ROOM`,
   in two places, so RED spawn counted toward the length of the bomb path.
+- Engineers build teleporters. The entrance comes off the nav mesh's own route
+  out of spawn instead of a straight line through the walls, the exit stands
+  beside the nest instead of on the sentry, and an all-bot team holds the ready
+  long enough for him to do it. See item 5.
+- The medic picks his patient from the whole team rather than from whoever is
+  within nine metres, which is what parked him at the engineer's nest for the
+  length of a wave. See item 14.
+- The bots wear hats rather than tournament medals: the pool was built from the
+  schema's `misc` slot, which is mostly UGC and ozfortress season badges, and is
+  now built from `head`.
+- `AddBotsFromChosenTeamComposition` counts who is already on RED. It added the
+  whole lineup, which is right only while nothing else fills the team before the
+  wave, and tf2-archipelago now does.
 
 ## 1. The crash. Fixed, and it was the test-bed's own entrypoint
 
@@ -131,19 +144,34 @@ with bodies in front of it. A nest nobody passes is an engineer alone. Distance
 to where the team holds belongs in that score, and the reason it is not there
 yet is that nothing in this mod says where the team holds.
 
-## 5. Teleporters: whether to build one at all. Open, and it is a question first
+## 5. Teleporters. Built now, and the order they go up in is still a question
 
-The bots do not build them. Six maps now name a `TeleporterExit`, but none
-names a `TeleporterEntrance`, and the build behaviour refuses without both.
+They are built. What was wrong was three separate things and none of them was
+the map data:
 
-The play-test found the ride is worth less than it looks: the entrance is at
-spawn, so taking one means walking backwards first. `ShouldUseTeleporter` now
-refuses unless the fight is far enough up the path to pay for that walk.
+- The entrance spot was the spawn point plus the direction to the nest times a
+  distance, which is a line drawn through whatever wall is in the way. It reads
+  the nav mesh's route from the engineer to the spawn point now, and samples it
+  backwards from the spawn end, so the attempts walk the way a player walks.
+- The exit spot was the nest centre, which is where the sentry is, so all eight
+  attempts asked the game to put a teleporter inside a sentry gun. It stands off
+  the centre now and he stands between the two.
+- On a team of nothing but bots the wave started the instant the last nest
+  finished, so the build action gave up on its first update with "Wave started".
+  `IsDefenderPrepared` holds the ready for the teleporter, but only when there
+  is no human on the server: a player who has finished shopping should not be
+  held for a building the bots want, and their shopping is already the time the
+  engineer needs.
 
-Answer the question before authoring any map data. If a defender bot should
-rarely ride one, an engineer should rarely spend the metal and the walk on
-building one, and the right fix is to leave it alone rather than to fill in
-twenty-eight config files.
+What is still open is the order. The entrance goes up first, on the reasoning
+that an exit alone moves nobody, and that is also the order that maximises the
+chance of the wave starting while the engineer is at the far end of the map. The
+other order leaves him at his nest when the time runs out, and leaves an exit
+nobody can reach. Neither half is worth anything alone, so this is a question
+about which way to be caught, and it wants a play-test rather than an argument.
+
+No official map names a `TeleporterEntrance` and none needs to: the route out of
+spawn is read from the mesh. The six that name a `TeleporterExit` still use it.
 
 ## 6. The sticky launchers that want playing differently. Open
 
@@ -316,24 +344,32 @@ whatever else is running on this one for the duration. What is not worth doing
 is reading a crash rate measured under paging as a property of the code, which
 is a mistake this file has already recorded once in item 12.
 
-## 14. The medic heals whoever the game picked. Open
+## 14. The medic's patient. Mostly closed
 
 `PreferredPatient` in `nextbot_behavior.sp` works out who the medigun should be
-on: the most maximum health in range, which names the Heavy without a class
-table and follows the health upgrades the team buys. Nothing acts on it.
+on: the most maximum health, which names the Heavy without a class table and
+follows the health upgrades the team buys. `behavior/medicheal.sp` acts on it by
+doing the healing itself rather than by arguing with the game's own action.
 
-Acting on it meant `action.SetHandleEntity(ACTION_HEAL_PATIENT_OFFSET, ...)`,
-and that segfaulted the server on the first Mannhattan run, with no watchdog
-line, which is a memory fault rather than a slow frame. The offset is a
-hardcoded field inside one of the game's own actions. Everything else in this
-mod only reads it, and the difference matters: reading a wrong offset gives a
-wrong answer, writing one corrupts whatever is really there.
+Writing the patient into the game's action is still off, and the reason is worth
+keeping: `action.SetHandleEntity(ACTION_HEAL_PATIENT_OFFSET, ...)` segfaulted the
+server on the first Mannhattan run, with no watchdog line, which is a memory
+fault rather than a slow frame. The offset is a hardcoded field inside one of the
+game's own actions. Everything else in this mod only reads it, and the difference
+matters: reading a wrong offset gives a wrong answer, writing one corrupts
+whatever is really there.
 
-The way in is a detour on `CTFBotMedicHeal`'s own patient selection, so the game
-picks from a list this mod filters, rather than having its choice overwritten
-underneath it. Until then the debug convar prints who the medic would rather be
-healing, which is enough to tell whether the ranking is right before anything is
-risked on it.
+What was reported and is fixed: the medic stood in the house in the middle of
+Coaltown for a whole wave. The candidate list was the team within nine metres, so
+once the Heavy walked out of that the ask came back with the engineer at his nest
+and could never come back with anybody else. The list is the whole team now, a
+healthy engineer is not on it because his own dispenser is doing that job, and
+the answer is held between asks because the gate that decides whether the medic
+heals at all runs every frame and every ask is a path computation per teammate.
+
+What is still open is where he should stand once he has a patient. He follows the
+patient, and nothing in this mod says where the team holds, which is the same gap
+item 3 records for nest scoring.
 
 ## 11. Not this repository
 
