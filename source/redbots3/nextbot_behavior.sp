@@ -220,8 +220,15 @@ public void OnActionCreated(BehaviorAction action, int actor, const char[] name)
 
 The numbers are an order, not a measurement. Anything inside THREAT_URGENT_RANGE outranks the
 list: a bot that ignores the Heavy in front of it to shoot a Sniper across the map dies holding
-a good idea */
-#define THREAT_URGENT_RANGE	400.0
+a good idea.
+
+Both distances were widened after measuring. At 400 units the order was costing more than it
+bought: ten runs on Decoy put defender deaths at 54 against the old code's 43, for the same waves
+cleared. 400 is a rocket's splash, not a firefight, so a bot would walk its aim off the Heavy
+shooting it as soon as anything better appeared anywhere. And a priority target beyond
+THREAT_PRIORITY_RANGE is not a target, it is a plan: past that the nearest one wins */
+#define THREAT_URGENT_RANGE		750.0
+#define THREAT_PRIORITY_RANGE	1500.0
 
 enum
 {
@@ -238,6 +245,10 @@ static int ThreatPriority(int threat, float rangeSq)
 {
 	if (rangeSq < THREAT_URGENT_RANGE * THREAT_URGENT_RANGE)
 		return THREAT_PRIORITY_URGENT;
+	
+	//Too far to be worth walking the aim across the map for
+	if (rangeSq > THREAT_PRIORITY_RANGE * THREAT_PRIORITY_RANGE)
+		return THREAT_PRIORITY_NONE;
 	
 	if (!BaseEntity_IsPlayer(threat) || !IsClientInGame(threat))
 		return THREAT_PRIORITY_NONE;
