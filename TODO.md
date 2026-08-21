@@ -269,6 +269,32 @@ causing it alone. Rates seen so far, all on `mvm_decoy` with six bots:
 Finding the underlying one wants a run under gdb rather than more sampling. The
 note in item 1 says how to attach to a stripped 32-bit server.
 
+## 13. The test-bed needs a machine with memory free. Open
+
+Measurement stopped being possible partway through a session, on both builds at
+once. 1.5.5-tf2ap.10 played six waves cleanly earlier the same day and then
+failed four runs in a row, three of them before a single wave started, with the
+watchdog line from item 12. The code did not change between those runs.
+
+What did change is the machine:
+
+```
+7.8 GB of memory, around 200 MB free
+5.0 GB swapped out
+swap-in bursting to 20 MB/s while a run was playing
+```
+
+A page fault that stalls the server is indistinguishable, to a watchdog that
+measures frame time, from an infinite loop. Running `--no-build` to skip the
+per-run image build did not help, so it is the steady state rather than the
+build spike.
+
+Two ways out, and they are worth knowing before trusting any number this
+test-bed produces: give it a machine with a couple of gigabytes free, or stop
+whatever else is running on this one for the duration. What is not worth doing
+is reading a crash rate measured under paging as a property of the code, which
+is a mistake this file has already recorded once in item 12.
+
 ## 11. Not this repository
 
 A cash bundle spent on upgrades leaves the money negative when the wave is
