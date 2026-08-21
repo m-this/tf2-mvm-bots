@@ -403,13 +403,6 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	return APLRes_Success;
 }
 
-static Action Timer_PublishFeatures(Handle timer)
-{
-	PublishActiveFeatures();
-	
-	return Plugin_Stop;
-}
-
 public void OnMapStart()
 {
 	g_bBotsEnabled = false;
@@ -424,8 +417,7 @@ public void OnMapStart()
 	Config_LoadBotNames();
 	Config_LoadServerLoadout();
 	
-	//After the map config has run, so what it turned off is what gets published
-	CreateTimer(1.0, Timer_PublishFeatures, _, TIMER_FLAG_NO_MAPCHANGE);
+
 	CreateBotPreferenceMenu();
 }
 

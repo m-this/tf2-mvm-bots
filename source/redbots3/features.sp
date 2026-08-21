@@ -9,9 +9,14 @@ A feature is a named switch with a default. It becomes a convar, so a mission ca
 one line of a config, and the set that was on is written into the wave results, so a file of
 numbers says which mod produced it without anybody having to remember.
 
-Adding one is a line in FEATURES and a call to Feature() where the behaviour lives. Removing one
-is deleting both, which is the point: a switch that nobody has turned off in a month is a
-behaviour, and it should stop being a switch. */
+Adding one is a line in LoadFeatures and a call to Feature() where the behaviour lives. Removing
+one is deleting both, which is the point: a switch nobody has turned off in a month is a
+behaviour, and it should stop being a switch.
+
+The names live in one array of fixed strings and nothing copies them about. The first version of
+this kept a description per feature in an enum struct and copied both in with strcopy, which is
+three ways to get a length wrong for no gain: the description is only ever handed straight to
+CreateConVar, so it can be written where it is used. */
 
 enum
 {
@@ -25,50 +30,51 @@ enum
 	FEATURE_COUNT
 }
 
-enum struct FeatureInfo
+//Same order as the enum above, and the compiler checks the count matches
+static const char FEATURE_NAME[FEATURE_COUNT][] =
 {
-	char name[32];
-	bool on;
-	char what[160];
-}
+	"threat_priority",
+	"dispenser_guard",
+	"spy_glance",
+	"sticky_stack",
+	"nest_zones",
+	"ready_when_prepared",
+	"wave_resistances"
+};
 
-static FeatureInfo g_arrFeatures[FEATURE_COUNT];
 static ConVar g_arrFeatureConVars[FEATURE_COUNT];
 static ConVar g_cvFeaturesActive;
 
-static void DefineFeature(int id, const char[] name, bool on, const char[] what)
+static ConVar MakeFeature(int id, const char[] description)
 {
-	strcopy(g_arrFeatures[id].name, sizeof(g_arrFeatures[].name), name);
-	strcopy(g_arrFeatures[id].what, sizeof(g_arrFeatures[].what), what);
-	g_arrFeatures[id].on = on;
+	char name[64]; Format(name, sizeof(name), "sm_redbots_feature_%s", FEATURE_NAME[id]);
+
+	//Every feature ships on. A switch exists to turn something off and measure the difference
+	return CreateConVar(name, "1", description, FCVAR_NOTIFY);
 }
 
 void LoadFeatures()
 {
-	DefineFeature(FEATURE_THREAT_PRIORITY, "threat_priority", true,
+	g_arrFeatureConVars[FEATURE_THREAT_PRIORITY] = MakeFeature(FEATURE_THREAT_PRIORITY,
 		"Shoot the Medic, then the Sniper and Engineer, then giants, rather than whatever is nearest.");
-	DefineFeature(FEATURE_DISPENSER_GUARD, "dispenser_guard", true,
+
+	g_arrFeatureConVars[FEATURE_DISPENSER_GUARD] = MakeFeature(FEATURE_DISPENSER_GUARD,
 		"A hurt or dry bot holds the bomb from a friendly dispenser instead of leaving to find a health pack.");
-	DefineFeature(FEATURE_SPY_GLANCE, "spy_glance", true,
+
+	g_arrFeatureConVars[FEATURE_SPY_GLANCE] = MakeFeature(FEATURE_SPY_GLANCE,
 		"Bots look behind themselves while the team knows a Spy is about.");
-	DefineFeature(FEATURE_STICKY_STACK, "sticky_stack", true,
+
+	g_arrFeatureConVars[FEATURE_STICKY_STACK] = MakeFeature(FEATURE_STICKY_STACK,
 		"Sticky traps stack on one spot for a giant rather than carpeting ground for a crowd.");
-	DefineFeature(FEATURE_NEST_ZONES, "nest_zones", true,
+
+	g_arrFeatureConVars[FEATURE_NEST_ZONES] = MakeFeature(FEATURE_NEST_ZONES,
 		"Engineers spread across the zones a map names, so one holds inside and one holds out.");
-	DefineFeature(FEATURE_READY_WHEN_PREPARED, "ready_when_prepared", true,
+
+	g_arrFeatureConVars[FEATURE_READY_WHEN_PREPARED] = MakeFeature(FEATURE_READY_WHEN_PREPARED,
 		"An engineer readies at a level three nest and a medic at a full charge, not before.");
-	DefineFeature(FEATURE_WAVE_RESISTANCES, "wave_resistances", true,
+
+	g_arrFeatureConVars[FEATURE_WAVE_RESISTANCES] = MakeFeature(FEATURE_WAVE_RESISTANCES,
 		"Buy the resistance the coming wave's robots call for, rather than ranking resistances last.");
-
-	char name[64];
-
-	for (int i = 0; i < FEATURE_COUNT; i++)
-	{
-		Format(name, sizeof(name), "sm_redbots_feature_%s", g_arrFeatures[i].name);
-
-		g_arrFeatureConVars[i] = CreateConVar(name, g_arrFeatures[i].on ? "1" : "0",
-			g_arrFeatures[i].what, FCVAR_NOTIFY);
-	}
 
 	/* What is on, as one string, for whoever reads the results later
 
@@ -76,25 +82,23 @@ void LoadFeatures()
 	put it in the file, because a run whose settings are not recorded is a run that cannot be
 	compared with anything. */
 	g_cvFeaturesActive = CreateConVar("sm_redbots_features_active", "",
-		"The features that are on, comma separated. Set by the mod, not by you.", FCVAR_NOTIFY);
+		"The features that are on, comma separated. Set by the mod, not by you.", FCVAR_NONE);
 }
 
-//A feature nobody switched is its default, so a config that names none of them gets the mod as shipped
+//A feature nobody switched is on, so a config that names none of them gets the mod as shipped
 bool Feature(int id)
 {
-	if (id < 0 || id >= FEATURE_COUNT)
+	if (id < 0 || id >= FEATURE_COUNT || g_arrFeatureConVars[id] == null)
 		return true;
-
-	if (g_arrFeatureConVars[id] == null)
-		return g_arrFeatures[id].on;
 
 	return g_arrFeatureConVars[id].BoolValue;
 }
 
-/* Publish the set that is on, once, when a map has settled
+/* Publish the set that is on
 
-Late because a config file executes after the convars exist, and the answer before it runs is the
-defaults rather than what the server was asked for. */
+Called when a wave begins rather than once at map start: a config file executes at its own pace
+and a late loaded plugin misses it entirely, so the answer earlier than this is the defaults
+rather than what the server was asked for. */
 void PublishActiveFeatures()
 {
 	if (g_cvFeaturesActive == null)
@@ -110,10 +114,8 @@ void PublishActiveFeatures()
 		if (list[0] != '\0')
 			StrCat(list, sizeof(list), ",");
 
-		StrCat(list, sizeof(list), g_arrFeatures[i].name);
+		StrCat(list, sizeof(list), FEATURE_NAME[i]);
 	}
 
 	g_cvFeaturesActive.SetString(list);
-
-	LogMessage("Features on: %s", list[0] == '\0' ? "none" : list);
 }
