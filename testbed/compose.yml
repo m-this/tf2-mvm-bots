@@ -17,9 +17,11 @@ services:
     environment:
       # Read by the base image's entrypoint
       SRCDS_STARTMAP: ${TESTBED_MAP:-mvm_decoy}
-      # Twelve, not thirty-two. Six bots, a host and room to spare: every slot
-      # beyond that is edicts and memory for players who never connect.
-      SRCDS_MAXPLAYERS: 12
+      # Thirty-two, and it is not slack. The invading robots are bot players and
+      # they take player slots, so a wave needs room for twenty-odd of them on top
+      # of the defenders. Cutting this to twelve gives a server that spawns almost
+      # no robots and a run that times out with nothing played.
+      SRCDS_MAXPLAYERS: 32
       SRCDS_PORT: ${TESTBED_PORT:-27025}
       SRCDS_RCONPW: ${TESTBED_RCONPW:-testbed}
       # "0" rather than empty: the image passes this to +sv_setsteamaccount
