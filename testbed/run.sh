@@ -69,9 +69,16 @@ fi
 # volume nobody seeded starts a server that exits 127 on a missing srcds_run.
 sh "$here/install-game.sh"
 
+# Compiling on the host, not in an image. The container mounts what this writes,
+# so a rebuild is a compile and a restart rather than a compile, a copy, a chown
+# and a layer export.
 if [ "$rebuild" = 1 ]; then
 	say "building"
-	$compose build
+	sh "$here/build.sh" >"$here/build/build.log" 2>&1 || {
+		say "the build failed, see testbed/build/build.log"
+		tail -20 "$here/build/build.log"
+		exit 1
+	}
 fi
 
 say "starting the server on $map"
