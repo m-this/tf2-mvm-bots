@@ -52,8 +52,11 @@ play() {
 
 i=1
 while [ "$i" -le "$runs" ]; do
-	play "$here/.." current "$i"
-	[ -n "$base" ] && play "$base" base "$i"
+	# The map goes in the name. Results are kept between batches now, and two
+	# batches on different maps writing "current-1.jsonl" is how a Decoy run ends
+	# up averaged into a Rottenburg one.
+	play "$here/.." "$map-current" "$i"
+	[ -n "$base" ] && play "$base" "$map-base" "$i"
 	i=$((i + 1))
 done
 
