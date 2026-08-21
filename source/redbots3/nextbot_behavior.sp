@@ -565,17 +565,20 @@ static Action CTFBotMainAction_ShouldAttack(BehaviorAction action, INextBot next
 	return Plugin_Changed;
 }
 
-/* An engineer is ready when his nest is, not when he has stopped shopping
+/* A bot is ready when it has done the thing its seat exists for
 
-He used to press ready the moment a sentry entity existed, which is a level one still being
-hammered together, and the wave started in front of it. A level three sentry and a level three
-dispenser are what the seat is for; the teleporter can be built in his own time.
+An engineer pressed ready the moment a sentry entity existed, which is a level one still being
+hammered together, and the wave started in front of it. A medic pressed ready with no charge,
+which is a medic with no answer to the first giant.
+
+A level three sentry and a level three dispenser are what an engineer's seat is for; the
+teleporter can be built in his own time. A full charge is what a medic's is for.
 
 Several places set a bot ready and gating each of them would be four chances to miss one, so this
 takes the ready away again while the nest is unfinished, every frame, wherever it came from.
 
-The grace is the important part. An engineer who cannot finish, because a buster took the sentry
-or he ran out of metal, must not hold the wave forever: past it he is ready whatever he has. */
+The grace is the important part. A bot that cannot finish, because a buster took the sentry or
+the metal ran out, must not hold the wave forever: past it it is ready whatever it has. */
 #define ENGINEER_READY_GRACE	90.0
 #define BUILDING_MAX_LEVEL		3
 
@@ -598,11 +601,34 @@ bool IsEngineerNestFinished(int client)
 		&& IsBuildingFinished(GetObjectOfType(client, TFObject_Dispenser));
 }
 
-static void UpdateEngineerReadiness(int actor)
+//A medic with no charge is a medic who has nothing to answer the first giant with
+static bool IsMedicCharged(int client)
 {
-	if (TF2_GetPlayerClass(actor) != TFClass_Engineer)
-		return;
+	int medigun = GetPlayerWeaponSlot(client, TFWeaponSlot_Secondary);
 
+	if (medigun == -1 || TF2Util_GetWeaponID(medigun) != TF_WEAPON_MEDIGUN)
+		return true;
+
+	return GetEntPropFloat(medigun, Prop_Send, "m_flChargeLevel") >= 1.0;
+}
+
+//Whether this bot has done the thing its seat exists for, before the wave starts
+static bool IsDefenderPrepared(int client)
+{
+	switch (TF2_GetPlayerClass(client))
+	{
+		case TFClass_Engineer:
+			return IsEngineerNestFinished(client);
+
+		case TFClass_Medic:
+			return IsMedicCharged(client);
+	}
+
+	return true;
+}
+
+static void UpdateDefenderReadiness(int actor)
+{
 	if (GameRules_GetRoundState() != RoundState_BetweenRounds)
 	{
 		m_ctEngineerReadyDeadline[actor] = 0.0;
@@ -615,7 +641,7 @@ static void UpdateEngineerReadiness(int actor)
 	if (GetGameTime() > m_ctEngineerReadyDeadline[actor])
 		return;
 
-	if (IsEngineerNestFinished(actor))
+	if (IsDefenderPrepared(actor))
 		return;
 
 	SetPlayerReady(actor, false);
@@ -656,7 +682,7 @@ public Action CTFBotTacticalMonitor_Update(BehaviorAction action, int actor, flo
 		}
 	}
 	
-	UpdateEngineerReadiness(actor);
+	UpdateDefenderReadiness(actor);
 
 	if (GameRules_GetRoundState() == RoundState_RoundRunning)
 	{
@@ -817,6 +843,90 @@ public Action CTFBotScenarioMonitor_Update(BehaviorAction action, int actor, flo
 	return GetDesiredBotAction(actor, action);
 }
 
+/* Who the medic should be attached to
+
+The game picks whoever it likes, which on a defender team means the Scout it happened to be
+standing next to. A medigun is worth what the body in front of it is worth, so it belongs on the
+biggest one: the Heavy, and when there is no Heavy, whoever has the most health to work with.
+
+Maximum health rather than a class list, because that is the same answer without a table to keep
+up to date, and because it follows the health upgrades the team buys. A tie goes to whoever is
+hurt worst, which is the only part of this the game was already right about.
+
+Throttled, and only for a genuinely better patient: a medigun beam that changes target every
+frame heals nobody, and the game re-picks on its own between our checks. */
+#define MEDIC_PATIENT_INTERVAL	2.0
+#define MEDIC_PATIENT_RANGE		900.0
+
+static float m_ctNextPatientCheck[MAXPLAYERS + 1];
+
+static int PreferredPatient(int medic)
+{
+	int best = -1;
+	int bestHealth = 0;
+	float bestFraction = 1.0;
+
+	float myOrigin[3]; GetClientAbsOrigin(medic, myOrigin);
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (i == medic || !IsClientInGame(i) || !IsPlayerAlive(i))
+			continue;
+
+		if (GetClientTeam(i) != GetClientTeam(medic))
+			continue;
+
+		//A medic healing a medic is two classes doing nothing
+		if (TF2_GetPlayerClass(i) == TFClass_Medic)
+			continue;
+
+		float theirOrigin[3]; GetClientAbsOrigin(i, theirOrigin);
+
+		if (GetVectorDistance(myOrigin, theirOrigin) > MEDIC_PATIENT_RANGE)
+			continue;
+
+		if (!IsPathToVectorPossible(medic, theirOrigin))
+			continue;
+
+		int maxHealth = TF2Util_GetEntityMaxHealth(i);
+		float fraction = float(GetClientHealth(i)) / float(maxHealth);
+
+		if (maxHealth > bestHealth || (maxHealth == bestHealth && fraction < bestFraction))
+		{
+			best = i;
+			bestHealth = maxHealth;
+			bestFraction = fraction;
+		}
+	}
+
+	return best;
+}
+
+static void UpdateMedicPatient(BehaviorAction action, int actor)
+{
+	if (m_ctNextPatientCheck[actor] > GetGameTime())
+		return;
+
+	m_ctNextPatientCheck[actor] = GetGameTime() + MEDIC_PATIENT_INTERVAL;
+
+	int wanted = PreferredPatient(actor);
+
+	if (wanted == -1)
+		return;
+
+	int patient = action.GetHandleEntity(ACTION_HEAL_PATIENT_OFFSET);
+
+	if (patient == wanted)
+		return;
+
+	//Only for more body to heal than the one already on the beam
+	if (patient > 0 && IsClientInGame(patient)
+		&& TF2Util_GetEntityMaxHealth(patient) >= TF2Util_GetEntityMaxHealth(wanted))
+		return;
+
+	action.SetHandleEntity(ACTION_HEAL_PATIENT_OFFSET, wanted);
+}
+
 public Action CTFBotMedicHeal_UpdatePost(BehaviorAction action, int actor, float interval, ActionResult result)
 {
 	if (g_bIsDefenderBot[actor] == false)
@@ -845,6 +955,8 @@ public Action CTFBotMedicHeal_UpdatePost(BehaviorAction action, int actor, float
 	if (CTFBotMedicRevive_IsPossible(actor))
 		return action.SuspendFor(CTFBotMedicRevive(), "Revive teammate");
 	
+	UpdateMedicPatient(action, actor);
+
 	int myWeapon = BaseCombatCharacter_GetActiveWeapon(actor);
 
 	if (myWeapon != -1 && TF2Util_GetWeaponID(myWeapon) == TF_WEAPON_MEDIGUN)
