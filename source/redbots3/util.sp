@@ -1986,6 +1986,71 @@ CNavArea BestNestArea(int client, ArrayList areas, const float target[3], float 
 	return best;
 }
 
+/* The authored nests worth offering this engineer
+
+A zone is a piece of ground the map names, and the point of naming it is that somebody should be
+on each. So the spots in a zone another engineer already holds are left out, which sends the
+second engineer inside when the first one took the courtyard. When every zone is spoken for, or
+the map names none, the whole list comes back and the score decides as before */
+static void CollectZonedNestAreas(int client, ArrayList out)
+{
+	ArrayList spots = g_arrMapConfig.adtEngineerNestLocation;
+	ArrayList zones = g_arrMapConfig.adtEngineerNestZone;
+	
+	if (spots.Length == 0)
+		return;
+	
+	ArrayList free = new ArrayList(3);
+	
+	for (int i = 0; i < spots.Length; i++)
+	{
+		char zone[NEST_ZONE_LENGTH];
+		
+		if (i < zones.Length)
+			zones.GetString(i, zone, sizeof(zone));
+		
+		if (zone[0] != '\0' && IsNestZoneTaken(client, zone))
+			continue;
+		
+		float spot[3]; spots.GetArray(i, spot);
+		free.PushArray(spot);
+	}
+	
+	CollectConfiguredNestAreas(free.Length > 0 ? free : spots, out);
+	
+	delete free;
+}
+
+//Is another engineer's nest one of the spots this zone names?
+static bool IsNestZoneTaken(int client, const char[] zone)
+{
+	ArrayList spots = g_arrMapConfig.adtEngineerNestLocation;
+	ArrayList zones = g_arrMapConfig.adtEngineerNestZone;
+	
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (i == client || !IsClientInGame(i) || m_aNestArea[i] == NULL_AREA)
+			continue;
+		
+		float held[3]; m_aNestArea[i].GetCenter(held);
+		
+		for (int s = 0; s < spots.Length && s < zones.Length; s++)
+		{
+			char other[NEST_ZONE_LENGTH]; zones.GetString(s, other, sizeof(other));
+			
+			if (!StrEqual(other, zone))
+				continue;
+			
+			float spot[3]; spots.GetArray(s, spot);
+			
+			if (GetVectorDistance(held, spot) < NEST_SPOT_MATCH_RANGE)
+				return true;
+		}
+	}
+	
+	return false;
+}
+
 /* The nest the map configuration asks for, or NULL_AREA when it asks for nothing
 
 A hand placed nest is there because somebody stood on that ground and decided it was the spot, so
@@ -1996,7 +2061,7 @@ CNavArea PickConfiguredNestArea(int client, const float target[3], float SentryR
 {
 	ArrayList areas = new ArrayList();
 	
-	CollectConfiguredNestAreas(g_arrMapConfig.adtEngineerNestLocation, areas);
+	CollectZonedNestAreas(client, areas);
 	
 	/* Rottenburg has a spot that only works when a tank is rolling and one that must be left
 	empty when it is: a sentry parked on the tank's path is a sentry the tank drives through.
