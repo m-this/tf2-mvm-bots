@@ -12,8 +12,36 @@ from the intended spot is worth all of one that never gets built, and the engine
 wave instead of walking into a rock for the rest of it. */
 #define DISPENSER_REACH_TIME	12.0
 
+/* Where he stands to put a dispenser on the spot, which is not the spot
+
+A building goes down in front of the man, never under him. Walking onto the coordinate and
+pressing fire aims the dispenser at whatever is a build's reach beyond it, which on Coaltown is
+the wall on the right: the placement never comes up green, and the engineer stands on the spot
+holding the toolbox until the wave starts without him.
+
+So he stops a reach short of the spot and looks at it. The old code turned him on the spot
+instead, a tenth of a second of IN_RIGHT at a time, which cannot help: the direction he faces is
+the direction the dispenser goes, so turning moves the problem rather than solving it.
+
+When the game still says no, he walks to the next point around the spot and looks at it from
+there. Eight of them, which is a look from every side at forty five degrees. */
+#define DISPENSER_BUILD_REACH	90.0
+#define DISPENSER_TRY_POINTS	8
+#define DISPENSER_TRY_TIME		2.0
+
+/* How long he may spend on the whole business before he goes back to the wave
+
+The readiness gate holds a wave until the engineer's nest is finished, and a nest is not finished
+without a dispenser. An engineer who can never place one is an engineer holding every wave for
+the length of that grace, which is what a spot with no room around it costs. */
+#define DISPENSER_BUILD_TIME	25.0
+
 static float m_ctDispenserReachDeadline[MAXPLAYERS + 1];
+static float m_ctDispenserGiveUpTime[MAXPLAYERS + 1];
+static float m_ctDispenserTryDeadline[MAXPLAYERS + 1];
+static int m_iDispenserTry[MAXPLAYERS + 1];
 static float m_vDispenserSpot[MAXPLAYERS + 1][3];
+static float m_vDispenserStand[MAXPLAYERS + 1][3];
 
 BehaviorAction CTFBotMvMEngineerBuildDispenser()
 {
@@ -31,6 +59,9 @@ public Action CTFBotMvMEngineerBuildDispenser_OnStart(BehaviorAction action, int
 	UpdateLookAroundForEnemies(actor, true);
 	
 	m_ctDispenserReachDeadline[actor] = GetGameTime() + DISPENSER_REACH_TIME;
+	m_ctDispenserGiveUpTime[actor] = GetGameTime() + DISPENSER_BUILD_TIME;
+	m_ctDispenserTryDeadline[actor] = GetGameTime() + DISPENSER_TRY_TIME;
+	m_iDispenserTry[actor] = 0;
 	
 	//Once, here, because the Update runs every tick and a path computation does not belong there
 	if (!ConfiguredDispenserSpot(actor, m_vDispenserSpot[actor]))
@@ -40,6 +71,8 @@ public Action CTFBotMvMEngineerBuildDispenser_OnStart(BehaviorAction action, int
 		else
 			m_vDispenserSpot[actor] = GetAbsOrigin(actor);
 	}
+	
+	DispenserStandPoint(actor, m_iDispenserTry[actor], m_vDispenserStand[actor]);
 	
 	return action.Continue();
 }
@@ -79,62 +112,122 @@ public Action CTFBotMvMEngineerBuildDispenser_Update(BehaviorAction action, int 
 	which is how the server's watchdog came to fire inside NavAreaBuildPath. A spot that was
 	reachable when the action started is reachable a second later, and if it is not, the deadline
 	below is what answers for it. */
-	float areaCenter[3]; areaCenter = m_vDispenserSpot[actor];
+	//Every side of the spot refused him, and a wave held for one dispenser is the worse trade
+	if (GetGameTime() > m_ctDispenserGiveUpTime[actor])
+		return action.Done("Nowhere to put a dispenser");
 	
-	//The walk ran out of time, so here is where it goes
-	if (m_ctDispenserReachDeadline[actor] > 0.0 && GetGameTime() > m_ctDispenserReachDeadline[actor])
-		areaCenter = GetAbsOrigin(actor);
+	float spot[3]; spot = m_vDispenserSpot[actor];
+	float stand[3]; stand = m_vDispenserStand[actor];
 	
-	float range_to_hint = GetVectorDistance(GetAbsOrigin(actor), areaCenter);
+	//The walk ran out of time, so he builds from where he stands and aims at the spot anyway
+	bool outOfTime = m_ctDispenserReachDeadline[actor] > 0.0 && GetGameTime() > m_ctDispenserReachDeadline[actor];
 	
-	if (range_to_hint < 200.0) 
+	if (outOfTime)
+		stand = GetAbsOrigin(actor);
+	
+	float range_to_stand = GetVectorDistance(GetAbsOrigin(actor), stand);
+	
+	INextBot myNextbot = CBaseNPC_GetNextBotOfEntity(actor);
+	IBody myBody = myNextbot.GetBodyInterface();
+	
+	if (range_to_stand < 200.0) 
 	{
 		//Start building a dispenser
 		if (!IsWeapon(actor, TF_WEAPON_BUILDER))
 			FakeClientCommandThrottled(actor, "build 0");
 		
-		//Look in "random" directions in an attempt to find a place to fit a dispenser.
-		g_arrExtraButtons[actor].PressButtons(IN_RIGHT, 0.1);
-		g_arrExtraButtons[actor].flKeySpeed = 5.0;
+		//It goes where he looks, so he looks at the spot. Turning on the spot only turns the problem
+		AimHeadTowards(myBody, spot, MANDATORY, 0.1, _, "Placing dispenser");
 		
-	//	if(g_flNextLookTime[actor] > GetGameTime())
-	//		return false;
-		
-	//	g_flNextLookTime[actor] = GetGameTime() + GetRandomFloat(0.3, 1.0);
-		
-		//NOTE: we do not look around for incoming enemies cause all we care about is finding somewhere to place this dispenser
-		
-		//BotAim(actor).AimHeadTowards(areaCenter, OVERRIDE_ALL, 0.1, "Placing sentry");
+		//NOTE: we do not look around for incoming enemies cause all we care about is placing this dispenser
 	}
 	
-	if (range_to_hint > 70.0)
+	if (range_to_stand > 70.0)
 	{
-		//PrintToServer("%f %f %f", areaCenter[0], areaCenter[1], areaCenter[2]);
-		
-		g_arrPluginBot[actor].SetPathGoalVector(areaCenter);
+		g_arrPluginBot[actor].SetPathGoalVector(stand);
 		g_arrPluginBot[actor].bPathing = true;
-		
-		//if(range_to_hint > 300.0)
-		//{
-			//Fuck em up.
-			//EquipWeaponSlot(actor, TFWeaponSlot_Melee);
-		//}
 		
 		return action.Continue();
 	}
 	
 	g_arrPluginBot[actor].bPathing = false;
 	
+	int myWeapon = BaseCombatCharacter_GetActiveWeapon(actor);
+	
+	if (myWeapon != -1 && TF2Util_GetWeaponID(myWeapon) == TF_WEAPON_BUILDER)
+	{
+		int objBeingBuilt = GetEntPropEnt(myWeapon, Prop_Send, "m_hObjectBeingBuilt");
+		
+		//The toolbox is out but the game has not decided yet
+		if (objBeingBuilt == -1)
+			return action.Continue();
+		
+		/* The game says no from here, so try looking at it from the next side
+		
+		Only once he is actually looking at the spot: the answer while his head is still coming
+		round is the answer for wherever it was pointing, which is not this spot. */
+		if (!IsPlacementOK(objBeingBuilt) && !outOfTime
+			&& myBody.IsHeadAimingOnTarget() && GetGameTime() > m_ctDispenserTryDeadline[actor])
+		{
+			NextDispenserStandPoint(actor);
+			
+			return action.Continue();
+		}
+	}
+	
 	VS_PressFireButton(actor);
 	
-	int sentry = GetObjectOfType(actor, TFObject_Dispenser);
+	int dispenser = GetObjectOfType(actor, TFObject_Dispenser);
 	
-	if (sentry == INVALID_ENT_REFERENCE)
+	if (dispenser == INVALID_ENT_REFERENCE)
 		return action.Continue();
 	
 	SetPlayerReady(actor, true);
 	
 	return action.Done("Built a dispenser");
+}
+
+/* One build's reach short of the spot, on the side the try asks for
+
+Try zero is the side he is walking in from, so the first look costs him no walking at all. Each
+one after it is forty five degrees round from there. */
+static void DispenserStandPoint(int actor, int attempt, float stand[3])
+{
+	float spot[3]; spot = m_vDispenserSpot[actor];
+	float fromSpot[3]; SubtractVectors(GetAbsOrigin(actor), spot, fromSpot);
+	
+	fromSpot[2] = 0.0;
+	
+	//Standing on it himself, so any side will do to start from
+	if (NormalizeVector(fromSpot, fromSpot) < 1.0)
+	{
+		fromSpot[0] = 1.0;
+		fromSpot[1] = 0.0;
+	}
+	
+	float yaw = ArcTangent2(fromSpot[1], fromSpot[0]) + DegToRad(360.0 / DISPENSER_TRY_POINTS * attempt);
+	
+	stand[0] = spot[0] + Cosine(yaw) * DISPENSER_BUILD_REACH;
+	stand[1] = spot[1] + Sine(yaw) * DISPENSER_BUILD_REACH;
+	stand[2] = spot[2];
+}
+
+//The next side of the spot, or the end of them, which is when he takes whatever he can get
+static void NextDispenserStandPoint(int actor)
+{
+	m_iDispenserTry[actor]++;
+	
+	if (m_iDispenserTry[actor] >= DISPENSER_TRY_POINTS)
+	{
+		//A dispenser two metres from the spot beats an engineer who never builds one
+		m_ctDispenserReachDeadline[actor] = GetGameTime();
+		
+		return;
+	}
+	
+	DispenserStandPoint(actor, m_iDispenserTry[actor], m_vDispenserStand[actor]);
+	
+	m_ctDispenserTryDeadline[actor] = GetGameTime() + DISPENSER_TRY_TIME;
 }
 
 public void CTFBotMvMEngineerBuildDispenser_OnEnd(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
