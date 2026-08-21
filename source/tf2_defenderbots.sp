@@ -325,6 +325,7 @@ public void OnPluginStart()
 	//Not RegAdminCmd: it prints where the caller is standing and changes nothing, and needing
 	//an admin entry to write down a nest spot is a gate in front of the only way to author one
 	RegConsoleCmd("sm_dump_spot", Command_DumpSpot);
+	RegAdminCmd("sm_dump_upgrades", Command_DumpUpgrades, ADMFLAG_GENERIC);
 	
 	AddCommandListener(Listener_TournamentPlayerReadystate, "tournament_player_readystate");
 	
@@ -1219,6 +1220,57 @@ public Action Command_StopManagingBots(int client, int args)
 {
 	ManageDefenderBots(false);
 	ReplyToCommand(client, "Stopped manaing bots.");
+	
+	return Plugin_Handled;
+}
+
+/* Every upgrade the game holds, by the index it holds it at
+
+tf2-archipelago names an upgrade by counting "attribute" lines in
+scripts/items/mvm_upgrades.txt and taking the Nth one, which assumes the game numbers them in
+file order and skips nothing. That assumption has never been checked against the game.
+
+This prints what the game itself says, so the two can be compared. If they disagree, every
+purchase that mod reports is named after the wrong upgrade, and the fix is there rather than here.
+
+An upgrade with no attribute is printed as well rather than skipped: a gap in the numbering is
+exactly the thing that would break counting lines, so hiding it would hide the answer. */
+//A list far longer than this is the manager not being what we think it is, not a big mission
+#define DUMP_UPGRADES_MAX	1024
+
+public Action Command_DumpUpgrades(int client, int args)
+{
+	CMannVsMachineUpgradeManager manager = CMannVsMachineUpgradeManager();
+	
+	if (manager.Address == Address_Null)
+	{
+		ReplyToCommand(client, "[SM] The upgrade manager is not up yet. Load an MvM map first.");
+		return Plugin_Handled;
+	}
+	
+	int count = manager.Count();
+	
+	if (count < 1 || count > DUMP_UPGRADES_MAX)
+	{
+		ReplyToCommand(client, "[SM] The manager says it holds %d upgrades, which is not believable.", count);
+		return Plugin_Handled;
+	}
+	
+	ReplyToCommand(client, "[SM] %d upgrades, by the index the game uses:", count);
+	LogMessage("sm_dump_upgrades: %d upgrades", count);
+	
+	for (int i = 0; i < count; i++)
+	{
+		CMannVsMachineUpgrades upgrade = manager.GetUpgradeByIndex(i);
+		
+		char attribute[MAX_ATTRIBUTE_DESCRIPTION_LENGTH];
+		
+		if (upgrade.Address != Address_Null)
+			attribute = upgrade.m_szAttribute();
+		
+		ReplyToCommand(client, "%d %s", i, attribute[0] == '\0' ? "(none)" : attribute);
+		LogMessage("%d %s", i, attribute[0] == '\0' ? "(none)" : attribute);
+	}
 	
 	return Plugin_Handled;
 }
