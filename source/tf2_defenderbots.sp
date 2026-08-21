@@ -191,6 +191,9 @@ ConVar redbots_manager_engineer_nest_depth;
 ConVar redbots_manager_engineer_nest_relocate;
 ConVar redbots_manager_engineer_nest_relocate_score_gain_min;
 ConVar redbots_manager_bot_use_upgrades;
+ConVar redbots_manager_bot_hats;
+ConVar redbots_manager_bot_hat_effects;
+ConVar redbots_manager_bot_weapon_skins;
 ConVar redbots_manager_bot_buyback_chance;
 ConVar redbots_manager_bot_buy_upgrades_chance;
 ConVar redbots_manager_bot_max_tank_attackers;
@@ -230,6 +233,7 @@ Address g_pMannVsMachineUpgrades;
 #include "redbots3/offsets.sp"
 #include "redbots3/sdkcalls.sp"
 #include "redbots3/loadouts.sp"
+#include "redbots3/cosmetics.sp"
 #include "redbots3/dhooks.sp"
 #include "redbots3/events.sp"
 #include "redbots3/player_pref.sp"
@@ -275,6 +279,9 @@ public void OnPluginStart()
 	redbots_manager_engineer_nest_relocate = CreateConVar("sm_redbots_manager_engineer_nest_relocate", "0", "Let engineers move their nest between waves when a better spot opens up. Crashes the server, see TODO item 10.", FCVAR_NOTIFY);
 	redbots_manager_engineer_nest_relocate_score_gain_min = CreateConVar("sm_redbots_manager_engineer_nest_relocate_score_gain_min", "40.0", "How much better a nest spot has to score than the one an engineer holds before he moves to it between waves. 0 makes him move for any improvement at all.", FCVAR_NOTIFY, true, 0.0, true, 200.0);
 	redbots_manager_bot_use_upgrades = CreateConVar("sm_redbots_manager_bot_use_upgrades", "1", "Enable bots to buy upgrades.", FCVAR_NOTIFY);
+	redbots_manager_bot_hats = CreateConVar("sm_redbots_manager_bot_hats", "1", "Give every defender bot a random hat its class can wear. Looks only.", FCVAR_NOTIFY);
+	redbots_manager_bot_hat_effects = CreateConVar("sm_redbots_manager_bot_hat_effects", "0", "Put a random unusual effect on that hat. Needs the hats above.", FCVAR_NOTIFY);
+	redbots_manager_bot_weapon_skins = CreateConVar("sm_redbots_manager_bot_weapon_skins", "0", "Give every defender bot a random war paint on the three weapons it carries. Looks only.", FCVAR_NOTIFY);
 	redbots_manager_bot_buyback_chance = CreateConVar("sm_redbots_manager_bot_buyback_chance", "5", "Chance for bots to buyback into the game.", FCVAR_NOTIFY);
 	redbots_manager_bot_buy_upgrades_chance = CreateConVar("sm_redbots_manager_bot_buy_upgrades_chance", "50", "Chance for bots to buy upgrades in the middle of a game.", FCVAR_NOTIFY);
 	redbots_manager_bot_max_tank_attackers = CreateConVar("sm_redbots_manager_bot_max_tank_attackers", "3", _, FCVAR_NOTIFY);
@@ -440,6 +447,7 @@ public void OnClientDisconnect(int client)
 	g_bChoosingBotClasses[client] = false;
 	
 	ResetLoadouts(client);
+	ForgetBotCosmetics(client);
 }
 
 public void OnClientPutInServer(int client)
