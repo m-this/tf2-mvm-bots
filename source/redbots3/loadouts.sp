@@ -260,58 +260,58 @@ void PrepareCustomLoadout(int client)
 	{
 		case TFClass_Scout:
 		{
-			m_iWeaponPrimary[client] = GetPreferredWeaponForClass("scout", "primary");
-			m_iWeaponSecondary[client] = GetPreferredWeaponForClass("scout", "secondary");
-			m_iWeaponMelee[client] = GetPreferredWeaponForClass("scout", "melee");
+			m_iWeaponPrimary[client] = GetPreferredWeaponForClass("scout", "primary", client);
+			m_iWeaponSecondary[client] = GetPreferredWeaponForClass("scout", "secondary", client);
+			m_iWeaponMelee[client] = GetPreferredWeaponForClass("scout", "melee", client);
 		}
 		case TFClass_Soldier:
 		{
-			m_iWeaponPrimary[client] = GetPreferredWeaponForClass("soldier", "primary");
-			m_iWeaponSecondary[client] = GetPreferredWeaponForClass("soldier", "secondary");
-			m_iWeaponMelee[client] = GetPreferredWeaponForClass("soldier", "melee");
+			m_iWeaponPrimary[client] = GetPreferredWeaponForClass("soldier", "primary", client);
+			m_iWeaponSecondary[client] = GetPreferredWeaponForClass("soldier", "secondary", client);
+			m_iWeaponMelee[client] = GetPreferredWeaponForClass("soldier", "melee", client);
 		}
 		case TFClass_Pyro:
 		{
-			m_iWeaponPrimary[client] = GetPreferredWeaponForClass("pyro", "primary");
-			m_iWeaponSecondary[client] = GetPreferredWeaponForClass("pyro", "secondary");
-			m_iWeaponMelee[client] = GetPreferredWeaponForClass("pyro", "melee");
+			m_iWeaponPrimary[client] = GetPreferredWeaponForClass("pyro", "primary", client);
+			m_iWeaponSecondary[client] = GetPreferredWeaponForClass("pyro", "secondary", client);
+			m_iWeaponMelee[client] = GetPreferredWeaponForClass("pyro", "melee", client);
 		}
 		case TFClass_DemoMan:
 		{
-			m_iWeaponPrimary[client] = GetPreferredWeaponForClass("demoman", "primary");
-			m_iWeaponSecondary[client] = GetPreferredWeaponForClass("demoman", "secondary");
-			m_iWeaponMelee[client] = GetPreferredWeaponForClass("demoman", "melee");
+			m_iWeaponPrimary[client] = GetPreferredWeaponForClass("demoman", "primary", client);
+			m_iWeaponSecondary[client] = GetPreferredWeaponForClass("demoman", "secondary", client);
+			m_iWeaponMelee[client] = GetPreferredWeaponForClass("demoman", "melee", client);
 		}
 		case TFClass_Heavy:
 		{
-			m_iWeaponPrimary[client] = GetPreferredWeaponForClass("heavyweapons", "primary");
-			m_iWeaponSecondary[client] = GetPreferredWeaponForClass("heavyweapons", "secondary");
-			m_iWeaponMelee[client] = GetPreferredWeaponForClass("heavyweapons", "melee");
+			m_iWeaponPrimary[client] = GetPreferredWeaponForClass("heavyweapons", "primary", client);
+			m_iWeaponSecondary[client] = GetPreferredWeaponForClass("heavyweapons", "secondary", client);
+			m_iWeaponMelee[client] = GetPreferredWeaponForClass("heavyweapons", "melee", client);
 		}
 		case TFClass_Engineer:
 		{
-			m_iWeaponPrimary[client] = GetPreferredWeaponForClass("engineer", "primary");
-			m_iWeaponSecondary[client] = GetPreferredWeaponForClass("engineer", "secondary");
-			m_iWeaponMelee[client] = GetPreferredWeaponForClass("engineer", "melee");
+			m_iWeaponPrimary[client] = GetPreferredWeaponForClass("engineer", "primary", client);
+			m_iWeaponSecondary[client] = GetPreferredWeaponForClass("engineer", "secondary", client);
+			m_iWeaponMelee[client] = GetPreferredWeaponForClass("engineer", "melee", client);
 		}
 		case TFClass_Medic:
 		{
-			m_iWeaponPrimary[client] = GetPreferredWeaponForClass("medic", "primary");
-			m_iWeaponSecondary[client] = GetPreferredWeaponForClass("medic", "secondary");
-			m_iWeaponMelee[client] = GetPreferredWeaponForClass("medic", "melee");
+			m_iWeaponPrimary[client] = GetPreferredWeaponForClass("medic", "primary", client);
+			m_iWeaponSecondary[client] = GetPreferredWeaponForClass("medic", "secondary", client);
+			m_iWeaponMelee[client] = GetPreferredWeaponForClass("medic", "melee", client);
 		}
 		case TFClass_Sniper:
 		{
-			m_iWeaponPrimary[client] = GetPreferredWeaponForClass("sniper", "primary");
-			m_iWeaponSecondary[client] = GetPreferredWeaponForClass("sniper", "secondary");
-			m_iWeaponMelee[client] = GetPreferredWeaponForClass("sniper", "melee");
+			m_iWeaponPrimary[client] = GetPreferredWeaponForClass("sniper", "primary", client);
+			m_iWeaponSecondary[client] = GetPreferredWeaponForClass("sniper", "secondary", client);
+			m_iWeaponMelee[client] = GetPreferredWeaponForClass("sniper", "melee", client);
 		}
 		case TFClass_Spy:
 		{
-			m_iWeaponPrimary[client] = GetPreferredWeaponForClass("spy", "primary");
-			m_iWeaponSecondary[client] = GetPreferredWeaponForClass("spy", "secondary");
-			m_iWeaponMelee[client] = GetPreferredWeaponForClass("spy", "melee");
-			m_iWeaponPDA2[client] = GetPreferredWeaponForClass("spy", "pda2");
+			m_iWeaponPrimary[client] = GetPreferredWeaponForClass("spy", "primary", client);
+			m_iWeaponSecondary[client] = GetPreferredWeaponForClass("spy", "secondary", client);
+			m_iWeaponMelee[client] = GetPreferredWeaponForClass("spy", "melee", client);
+			m_iWeaponPDA2[client] = GetPreferredWeaponForClass("spy", "pda2", client);
 		}
 	}
 	
