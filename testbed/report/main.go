@@ -47,10 +47,15 @@ type wave struct {
 	KillsBy    map[string]int `json:"-"`
 	GiantsBy   map[string]int `json:"-"`
 	KilledByBy map[string]int `json:"-"`
+	CauseBy    map[string]int `json:"-"`
 }
 
 var classes = []string{"scout", "soldier", "pyro", "demoman", "heavy",
 	"engineer", "medic", "sniper", "spy"}
+
+// How a defender died, as opposed to who killed him
+var causes = []string{"bullet", "explosion", "fire", "melee", "backstab",
+	"headshot", "fall", "other"}
 
 // The per-class fields are flat keys rather than nested objects, because the
 // plugin writes them with one format string and no allocation.
@@ -69,6 +74,12 @@ func (w *wave) unpackClasses(raw map[string]int) {
 
 	w.KilledByBy["sentry"] = raw["killedby_sentry"]
 	w.KilledByBy["tank"] = raw["killedby_tank"]
+
+	w.CauseBy = map[string]int{}
+
+	for _, c := range causes {
+		w.CauseBy[c] = raw["cause_"+c]
+	}
 }
 
 func load(path string) ([]wave, error) {
@@ -118,12 +129,14 @@ type summary struct {
 	damage, tankDamage, sentryDamage      int
 	healing, ubers                        int
 	damageBy, killsBy, giantsBy, killedBy map[string]int
+	causeBy                               map[string]int
 }
 
 func summarise(waves []wave) summary {
 	s := summary{
 		damageBy: map[string]int{}, killsBy: map[string]int{},
 		giantsBy: map[string]int{}, killedBy: map[string]int{},
+		causeBy: map[string]int{},
 	}
 
 	for _, w := range waves {
@@ -155,6 +168,9 @@ func summarise(waves []wave) summary {
 		}
 		for k, v := range w.KilledByBy {
 			s.killedBy[k] += v
+		}
+		for k, v := range w.CauseBy {
+			s.causeBy[k] += v
 		}
 	}
 
@@ -222,6 +238,7 @@ func print(name string, s summary) {
 	fmt.Printf("  kills by class    %s\n", ranked(s.killsBy))
 	fmt.Printf("  giants by class   %s\n", ranked(s.giantsBy))
 	fmt.Printf("  killed us         %s\n", ranked(s.killedBy))
+	fmt.Printf("  died to           %s\n", ranked(s.causeBy))
 }
 
 func compare(now, then summary) {
@@ -232,6 +249,7 @@ func compare(now, then summary) {
 	fmt.Printf("  sentry damage     %d -> %d\n", then.sentryDamage, now.sentryDamage)
 	fmt.Printf("  healing done      %d -> %d\n", then.healing, now.healing)
 	fmt.Printf("  sentries lost     %d -> %d\n", then.sentriesLost, now.sentriesLost)
+	fmt.Printf("  backstabbed       %d -> %d\n", then.causeBy["backstab"], now.causeBy["backstab"])
 }
 
 func main() {
