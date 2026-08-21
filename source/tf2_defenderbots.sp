@@ -193,7 +193,6 @@ ConVar redbots_manager_engineer_nest_relocate_score_gain_min;
 ConVar redbots_manager_bot_use_upgrades;
 ConVar redbots_manager_bot_hats;
 ConVar redbots_manager_bot_hat_effects;
-ConVar redbots_manager_bot_weapon_skins;
 ConVar redbots_manager_bot_buyback_chance;
 ConVar redbots_manager_bot_buy_upgrades_chance;
 ConVar redbots_manager_bot_max_tank_attackers;
@@ -281,7 +280,6 @@ public void OnPluginStart()
 	redbots_manager_bot_use_upgrades = CreateConVar("sm_redbots_manager_bot_use_upgrades", "1", "Enable bots to buy upgrades.", FCVAR_NOTIFY);
 	redbots_manager_bot_hats = CreateConVar("sm_redbots_manager_bot_hats", "1", "Give every defender bot a random hat its class can wear. Looks only.", FCVAR_NOTIFY);
 	redbots_manager_bot_hat_effects = CreateConVar("sm_redbots_manager_bot_hat_effects", "0", "Put a random unusual effect on that hat. Needs the hats above.", FCVAR_NOTIFY);
-	redbots_manager_bot_weapon_skins = CreateConVar("sm_redbots_manager_bot_weapon_skins", "0", "Give every defender bot a random war paint on the three weapons it carries. Looks only.", FCVAR_NOTIFY);
 	redbots_manager_bot_buyback_chance = CreateConVar("sm_redbots_manager_bot_buyback_chance", "5", "Chance for bots to buyback into the game.", FCVAR_NOTIFY);
 	redbots_manager_bot_buy_upgrades_chance = CreateConVar("sm_redbots_manager_bot_buy_upgrades_chance", "50", "Chance for bots to buy upgrades in the middle of a game.", FCVAR_NOTIFY);
 	redbots_manager_bot_max_tank_attackers = CreateConVar("sm_redbots_manager_bot_max_tank_attackers", "3", _, FCVAR_NOTIFY);

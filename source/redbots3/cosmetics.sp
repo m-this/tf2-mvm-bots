@@ -1,37 +1,32 @@
-/* Hats, unusual effects and weapon skins on the defender bots, for the look of the thing
+/* Hats and unusual effects on the defender bots, for the look of the thing
 
 None of this changes how a bot plays. What the team looks like now is six bare-headed mercenaries
 with the same three weapons, and a run built out of a randomiser is more fun to watch when they
 look like six strangers who met on the way in.
 
-The three pools come from the game's own item schema through tf_econ_data, never from a table of
+Both pools come from the game's own item schema through tf_econ_data, never from a table of
 numbers in this file. A table of item definition indexes is a guess that goes stale on the next
 update, and the schema is what the client renders from anyway. Each pool costs one walk of the
 schema, once, and is then kept.
 
-The attribute numbers are the schema's own: 134 attaches a particle, 834 names a war paint and
-725 says how worn it is. Read out of scripts/items/items_game.txt rather than copied from a
-forum post.
+Attribute 134 attaches the particle, read out of scripts/items/items_game.txt rather than copied
+from a forum post.
+
+War paints on the weapons were here too and are gone: they are attributes on the entity the
+upgrade station rewrites all wave, and they were not worth one more thing to blame a crash on.
 
 Defender bots only, and never the invading robots: a wave is read by silhouette, and a robot in a
 hat is a robot somebody shoots a moment later than they should. */
 
-//The quality a client expects on an item before it will draw either of these
+//The quality a client expects on an item before it will draw an effect on it
 #define TF_QUALITY_UNIQUE		6
 #define TF_QUALITY_UNUSUAL		5
-#define TF_QUALITY_DECORATED	15
 
 #define ATTRIB_ATTACH_PARTICLE	134
-#define ATTRIB_PAINTKIT			834
-#define ATTRIB_TEXTURE_WEAR		725
-
-//Factory New to Battle Scarred, which is the whole of what a war paint can look like
-static const float WEAR_LEVELS[] = {0.2, 0.4, 0.6, 0.8, 1.0};
 
 //One pool per class, because a hat one class can wear another cannot. Index 0 is TFClass_Unknown
 static ArrayList g_adtHats[view_as<int>(TFClass_Engineer) + 1];
 static ArrayList g_adtHatEffects;
-static ArrayList g_adtPaintKits;
 
 /* What one bot wears, drawn once and worn for the rest of the mission
 
@@ -40,16 +35,13 @@ of six that comes back from the respawn room in six new hats is a team nobody ca
 following them is most of what there is to do while they play.
 
 The class is part of it: a bot that changes class between waves cannot wear what it drew, so it
-draws again. The weapon slots are here for the same reason, since the weapons change with the
-class. */
+draws again. */
 enum struct Wardrobe
 {
 	bool drawn;
 	TFClassType playerClass;
 	int hatItem;
 	int hatEffect;
-	int paintKit[3];
-	float paintWear[3];
 }
 
 static Wardrobe g_wardrobe[MAXPLAYERS + 1];
@@ -71,7 +63,7 @@ static int g_iEquipping[MAXPLAYERS + 1];
 /* Half a second after the bot spawns, not the moment it does
 
 The game gives its own items on spawn, and the custom loadout replaces them a tenth of a second
-later. Painting a weapon that is about to be thrown away paints nothing.
+later, and a hat handed to a bot in the middle of that is a hat the game throws away.
 
 Once per spawn, however many times it is asked. A bot's first spawn asks twice: the spawn that
 identifies it as ours, and the respawn that applies its loadout, which is close enough behind to
@@ -79,7 +71,7 @@ be the same moment. Without the flag that is a hat created, worn and taken off a
 bot at the start of every wave. */
 void GiveBotCosmeticsSoon(int client)
 {
-	if (!redbots_manager_bot_hats.BoolValue && !redbots_manager_bot_weapon_skins.BoolValue)
+	if (!redbots_manager_bot_hats.BoolValue)
 		return;
 	
 	if (g_bCosmeticsPending[client])
@@ -107,16 +99,10 @@ static Action Timer_GiveBotCosmetics(Handle timer, int userid)
 	if (redbots_manager_bot_hats.BoolValue)
 		WearHat(client);
 	
-	if (redbots_manager_bot_weapon_skins.BoolValue)
-		PaintCarriedWeapons(client);
-	
 	return Plugin_Stop;
 }
 
-/* What this bot is going to wear for the rest of the mission, drawn once
-
-Everything is drawn together, hat and weapons, so that one class change redraws the lot and
-nothing is left over from the class before. */
+//What this bot is going to wear for the rest of the mission, drawn once
 static void DrawWardrobe(int client)
 {
 	TFClassType playerClass = TF2_GetPlayerClass(client);
@@ -132,18 +118,11 @@ static void DrawWardrobe(int client)
 		return;
 	
 	ArrayList hats = HatPoolForClass(playerClass);
-	ArrayList paintKits = PaintKitPool();
 	
 	g_wardrobe[client].drawn = true;
 	g_wardrobe[client].playerClass = playerClass;
 	g_wardrobe[client].hatItem = hats != null && hats.Length > 0 ? hats.Get(GetRandomInt(0, hats.Length - 1)) : 0;
 	g_wardrobe[client].hatEffect = redbots_manager_bot_hat_effects.BoolValue ? RandomHatEffect() : 0;
-	
-	for (int slot = 0; slot < sizeof(g_wardrobe[].paintKit); slot++)
-	{
-		g_wardrobe[client].paintKit[slot] = paintKits != null && paintKits.Length > 0 ? paintKits.Get(GetRandomInt(0, paintKits.Length - 1)) : 0;
-		g_wardrobe[client].paintWear[slot] = WEAR_LEVELS[GetRandomInt(0, sizeof(WEAR_LEVELS) - 1)];
-	}
 	
 	if (redbots_manager_debug.BoolValue)
 		LogMessage("[DrawWardrobe] %N drew item %d with effect %d", client, g_wardrobe[client].hatItem, g_wardrobe[client].hatEffect);
@@ -242,22 +221,6 @@ void ForgetBotCosmetics(int client)
 	g_wardrobe[client].drawn = false;
 }
 
-//The three the player sees in a teammate's hands. The rest are pdas and buildings nobody paints
-static void PaintCarriedWeapons(int client)
-{
-	for (int slot = TFWeaponSlot_Primary; slot <= TFWeaponSlot_Melee; slot++)
-	{
-		int weapon = GetPlayerWeaponSlot(client, slot);
-		
-		if (weapon == -1 || g_wardrobe[client].paintKit[slot] < 1)
-			continue;
-		
-		TF2Attrib_SetByDefIndex(weapon, ATTRIB_PAINTKIT, float(g_wardrobe[client].paintKit[slot]));
-		TF2Attrib_SetByDefIndex(weapon, ATTRIB_TEXTURE_WEAR, g_wardrobe[client].paintWear[slot]);
-		SetEntProp(weapon, Prop_Send, "m_iEntityQuality", TF_QUALITY_DECORATED);
-	}
-}
-
 static int RandomHatEffect()
 {
 	if (g_adtHatEffects == null)
@@ -267,14 +230,6 @@ static int RandomHatEffect()
 		return 0;
 	
 	return g_adtHatEffects.Get(GetRandomInt(0, g_adtHatEffects.Length - 1));
-}
-
-static ArrayList PaintKitPool()
-{
-	if (g_adtPaintKits == null)
-		g_adtPaintKits = TF2Econ_GetPaintKitDefinitionList();
-	
-	return g_adtPaintKits;
 }
 
 static ArrayList HatPoolForClass(TFClassType playerClass)
