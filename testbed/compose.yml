@@ -17,12 +17,18 @@ services:
     environment:
       # Read by the base image's entrypoint
       SRCDS_STARTMAP: ${TESTBED_MAP:-mvm_decoy}
-      SRCDS_MAXPLAYERS: 32
+      # Twelve, not thirty-two. Six bots, a host and room to spare: every slot
+      # beyond that is edicts and memory for players who never connect.
+      SRCDS_MAXPLAYERS: 12
       SRCDS_PORT: ${TESTBED_PORT:-27025}
       SRCDS_RCONPW: ${TESTBED_RCONPW:-testbed}
       # "0" rather than empty: the image passes this to +sv_setsteamaccount
       SRCDS_TOKEN: "0"
-      SRCDS_FPSMAX: 0
+      # Capped, not uncapped. fps_max 0 makes srcds spin a whole core rendering
+      # nothing, which on a machine that is already paging is how a frame gets
+      # slow enough for the watchdog to call it an infinite loop. The tickrate is
+      # 66, so anything above that is work nobody reads.
+      SRCDS_FPSMAX: 120
       # Read by our entrypoint, and written into server.cfg
       BOT_TEAM_SIZE: ${TESTBED_BOT_TEAM_SIZE:-6}
       BOT_TEAM_COMP: ${TESTBED_BOT_TEAM_COMP:-}
