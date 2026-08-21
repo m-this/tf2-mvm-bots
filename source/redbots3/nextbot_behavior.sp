@@ -565,6 +565,62 @@ static Action CTFBotMainAction_ShouldAttack(BehaviorAction action, INextBot next
 	return Plugin_Changed;
 }
 
+/* An engineer is ready when his nest is, not when he has stopped shopping
+
+He used to press ready the moment a sentry entity existed, which is a level one still being
+hammered together, and the wave started in front of it. A level three sentry and a level three
+dispenser are what the seat is for; the teleporter can be built in his own time.
+
+Several places set a bot ready and gating each of them would be four chances to miss one, so this
+takes the ready away again while the nest is unfinished, every frame, wherever it came from.
+
+The grace is the important part. An engineer who cannot finish, because a buster took the sentry
+or he ran out of metal, must not hold the wave forever: past it he is ready whatever he has. */
+#define ENGINEER_READY_GRACE	90.0
+#define BUILDING_MAX_LEVEL		3
+
+static float m_ctEngineerReadyDeadline[MAXPLAYERS + 1];
+
+static bool IsBuildingFinished(int building)
+{
+	if (building == INVALID_ENT_REFERENCE)
+		return false;
+
+	if (TF2_IsBuilding(building))
+		return false;
+
+	return GetEntProp(building, Prop_Send, "m_iUpgradeLevel") >= BUILDING_MAX_LEVEL;
+}
+
+bool IsEngineerNestFinished(int client)
+{
+	return IsBuildingFinished(GetObjectOfType(client, TFObject_Sentry))
+		&& IsBuildingFinished(GetObjectOfType(client, TFObject_Dispenser));
+}
+
+static void UpdateEngineerReadiness(int actor)
+{
+	if (TF2_GetPlayerClass(actor) != TFClass_Engineer)
+		return;
+
+	if (GameRules_GetRoundState() != RoundState_BetweenRounds)
+	{
+		m_ctEngineerReadyDeadline[actor] = 0.0;
+		return;
+	}
+
+	if (m_ctEngineerReadyDeadline[actor] <= 0.0)
+		m_ctEngineerReadyDeadline[actor] = GetGameTime() + ENGINEER_READY_GRACE;
+
+	if (GetGameTime() > m_ctEngineerReadyDeadline[actor])
+		return;
+
+	if (IsEngineerNestFinished(actor))
+		return;
+
+	SetPlayerReady(actor, false);
+}
+
 public Action CTFBotTacticalMonitor_Update(BehaviorAction action, int actor, float interval, ActionResult result)
 {
 	if (g_bIsDefenderBot[actor] == false)
@@ -600,6 +656,8 @@ public Action CTFBotTacticalMonitor_Update(BehaviorAction action, int actor, flo
 		}
 	}
 	
+	UpdateEngineerReadiness(actor);
+
 	if (GameRules_GetRoundState() == RoundState_RoundRunning)
 	{
 		/* Nothing else matters while a buster is on top of the bot

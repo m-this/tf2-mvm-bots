@@ -298,6 +298,6 @@ is a mistake this file has already recorded once in item 12.
 ## 11. Not this repository
 
 A cash bundle spent on upgrades leaves the money negative when the wave is
-lost. It is `tf2-archipelago`'s to fix, item 12 in its TODO: the plugin writes
+lost. It is `tf2-archipelago`'s to fix, item 1 in its TODO: the plugin writes
 `m_nCurrency` directly, so the game's wave-loss restore never knew the money
 existed.
