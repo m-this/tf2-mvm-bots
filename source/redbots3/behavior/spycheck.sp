@@ -47,10 +47,10 @@ still gets his stab. */
 #define SPY_CHECK_LOOK_INTERVAL	0.1
 
 //Knife range, and a little more, for the Spy who is simply standing behind the bot
-#define SPY_BEHIND_RANGE	250.0
+#define SPY_BEHIND_RANGE	400.0
 
 //How long he has to be back there. Instant would be a bot that cannot be flanked at all
-#define SPY_BEHIND_TIME		0.4
+#define SPY_BEHIND_TIME		0.2
 
 /* Where and when this team last saw a Spy
 
@@ -270,8 +270,56 @@ Spy standing at the bot's back.
 
 The last one is not RCBot2's and it is not paranoia. A player who has somebody at knife distance
 behind him for half a second turns around, whatever he believes about who it is */
+/* Looking behind you, which is the whole of Spy defence a bot never did
+
+A player on a Spy wave turns round. The bot did not: it noticed a Spy only once one had stood
+within SPY_BEHIND_RANGE of its back for SPY_BEHIND_TIME, which on a wave of a hundred Spies is
+a description of being stabbed rather than a defence against it.
+
+So while the team is worried about Spies, a bot turns and looks. The glance is short and on a
+loose interval: a bot that spins constantly never shoots anything, and one that spins on a fixed
+beat is a bot a Spy walks in behind between beats. */
+#define SPY_GLANCE_INTERVAL_MIN	1.6
+#define SPY_GLANCE_INTERVAL_MAX	3.2
+#define SPY_GLANCE_TIME			0.35
+#define SPY_GLANCE_RANGE		220.0
+
+static float m_ctNextSpyGlance[MAXPLAYERS + 1];
+
+static void UpdateSpyGlance(int client)
+{
+	if (!IsInSpyParanoiaRange(client))
+	{
+		m_ctNextSpyGlance[client] = 0.0;
+		return;
+	}
+
+	INextBot myBot = CBaseNPC_GetNextBotOfEntity(client);
+
+	//Something in front is a better use of the eyes than something that might be behind
+	if (myBot.GetVisionInterface().GetPrimaryKnownThreat(true) != NULL_KNOWN_ENTITY)
+		return;
+
+	if (m_ctNextSpyGlance[client] > GetGameTime())
+		return;
+
+	m_ctNextSpyGlance[client] = GetGameTime() + GetRandomFloat(SPY_GLANCE_INTERVAL_MIN, SPY_GLANCE_INTERVAL_MAX);
+
+	float myAngles[3]; GetClientEyeAngles(client, myAngles);
+	float myForward[3]; GetAngleVectors(myAngles, myForward, NULL_VECTOR, NULL_VECTOR);
+
+	float behind[3]; behind = GetEyePosition(client);
+	behind[0] -= myForward[0] * SPY_GLANCE_RANGE;
+	behind[1] -= myForward[1] * SPY_GLANCE_RANGE;
+	behind[2] -= myForward[2] * SPY_GLANCE_RANGE;
+
+	AimHeadTowards(myBot.GetBodyInterface(), behind, IMPORTANT, SPY_GLANCE_TIME, _, "Checking behind me");
+}
+
 void UpdateSpyIntel(int client)
 {
+	UpdateSpyGlance(client);
+
 	IVision myVision = CBaseNPC_GetNextBotOfEntity(client).GetVisionInterface();
 	TFTeam enemyTeam = GetPlayerEnemyTeam(client);
 
