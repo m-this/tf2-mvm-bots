@@ -78,6 +78,27 @@ fi
 # volume nobody seeded starts a server that exits 127 on a missing srcds_run.
 sh "$here/install-game.sh"
 
+# Whether there was a server here before this run, which decides whether the
+# build below has to be carried in by a restart.
+running=$($compose ps --status running -q srcds 2>/dev/null || true)
+
+# Nothing may write the staged tree while a server is reading it.
+#
+# The entrypoint copies that tree into the volume every thirty seconds and cp
+# truncates each file before writing it. Truncating one the running game has
+# mapped is a SIGBUS in whatever it executes out of that page next, or a SIGSEGV
+# later once a half written one is executing. The entrypoint says so above its
+# cp, and says it cost a day.
+#
+# Restarting afterwards is not enough: the copy only has to happen once in the
+# seconds between the compiler writing a file and the restart, and it runs every
+# thirty. So the server goes down first and comes back up onto the finished
+# tree.
+if [ "$rebuild" = 1 ] && [ -n "$running" ]; then
+	say "stopping the server while the mod is rebuilt"
+	$compose stop
+fi
+
 # Compiling on the host, not in an image. The container mounts what this writes,
 # so a rebuild is a compile and a restart rather than a compile, a copy, a chown
 # and a layer export.
@@ -95,23 +116,8 @@ if [ "$rebuild" = 1 ]; then
 	fi
 fi
 
-# Whether there was a server here before this run, which decides whether the
-# build below has to be carried in by a restart.
-running=$($compose ps --status running -q srcds 2>/dev/null || true)
-
 say "starting the server on $map"
 $compose up -d
-
-# A rebuild reaches a live server through a restart and never through the copy
-# the entrypoint runs every thirty seconds. That copy truncates each file before
-# writing it, and truncating one the running game has mapped is a SIGBUS in
-# whatever it executes out of that page next: the entrypoint says as much above
-# its cp, and says it cost a day. A container that has just come up already has
-# the new build, so only one that was already running needs this.
-if [ "$rebuild" = 1 ] && [ -n "$running" ]; then
-	say "restarting the server onto the new build"
-	$compose restart
-fi
 
 # The first start downloads the game, which is tens of gigabytes, and then
 # SourceMod, and only then does the supervisor in the entrypoint have somewhere
