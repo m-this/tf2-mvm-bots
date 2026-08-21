@@ -40,6 +40,24 @@ char g_sMap[PLATFORM_MAX_PATH];
 int g_iWave;
 float g_flWaveStart;
 
+/* How a defender died, which is not the same question as who killed him
+
+"Killed by a Spy" and "killed by a knife in the back" are different failures: the first is a bot
+that lost a fight, the second is a bot that never had one. Counting the causes is what tells a
+hundred-Spy wave apart from a hundred-Heavy wave in the numbers */
+enum
+{
+	DEATH_CAUSE_BULLET = 0,
+	DEATH_CAUSE_EXPLOSION,
+	DEATH_CAUSE_FIRE,
+	DEATH_CAUSE_MELEE,
+	DEATH_CAUSE_BACKSTAB,
+	DEATH_CAUSE_HEADSHOT,
+	DEATH_CAUSE_FALL,
+	DEATH_CAUSE_OTHER,
+	DEATH_CAUSE_COUNT
+}
+
 //Everything counted for the wave in progress. Reset when one begins, written when one ends
 enum struct WaveCounters
 {
@@ -73,6 +91,8 @@ enum struct WaveCounters
 	int deathsToClass[view_as<int>(TFClass_Engineer) + 1];
 	int deathsToSentry;
 	int deathsToTank;
+	//How it happened, which is a different question from who did it
+	int deathsByCause[DEATH_CAUSE_COUNT];
 
 	void Reset()
 	{
@@ -93,6 +113,9 @@ enum struct WaveCounters
 		
 		this.deathsToSentry = 0;
 		this.deathsToTank = 0;
+		
+		for (int i = 0; i < DEATH_CAUSE_COUNT; i++)
+			this.deathsByCause[i] = 0;
 		
 		for (int i = 0; i < sizeof(this.damageByClass); i++)
 		{
@@ -194,7 +217,10 @@ static void WriteWaveResult(const char[] result)
 		... "\"killedby_scout\":%d,\"killedby_soldier\":%d,\"killedby_pyro\":%d,"
 		... "\"killedby_demoman\":%d,\"killedby_heavy\":%d,\"killedby_engineer\":%d,"
 		... "\"killedby_medic\":%d,\"killedby_sniper\":%d,\"killedby_spy\":%d,"
-		... "\"killedby_sentry\":%d,\"killedby_tank\":%d}",
+		... "\"killedby_sentry\":%d,\"killedby_tank\":%d,"
+		... "\"cause_bullet\":%d,\"cause_explosion\":%d,\"cause_fire\":%d,"
+		... "\"cause_melee\":%d,\"cause_backstab\":%d,\"cause_headshot\":%d,"
+		... "\"cause_fall\":%d,\"cause_other\":%d}",
 		g_sMap, g_iWave, result, duration,
 		g_Wave.robotKills, g_Wave.giantKills, g_Wave.tankKills, g_Wave.sentryKills,
 		g_Wave.defenderDeaths, g_Wave.backstabs, g_Wave.busterDetonations,
@@ -238,7 +264,15 @@ static void WriteWaveResult(const char[] result)
 		g_Wave.deathsToClass[view_as<int>(TFClass_Sniper)],
 		g_Wave.deathsToClass[view_as<int>(TFClass_Spy)],
 		g_Wave.deathsToSentry,
-		g_Wave.deathsToTank);
+		g_Wave.deathsToTank,
+		g_Wave.deathsByCause[DEATH_CAUSE_BULLET],
+		g_Wave.deathsByCause[DEATH_CAUSE_EXPLOSION],
+		g_Wave.deathsByCause[DEATH_CAUSE_FIRE],
+		g_Wave.deathsByCause[DEATH_CAUSE_MELEE],
+		g_Wave.deathsByCause[DEATH_CAUSE_BACKSTAB],
+		g_Wave.deathsByCause[DEATH_CAUSE_HEADSHOT],
+		g_Wave.deathsByCause[DEATH_CAUSE_FALL],
+		g_Wave.deathsByCause[DEATH_CAUSE_OTHER]);
 
 	WriteLine(line);
 
@@ -323,6 +357,8 @@ static void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 
 	if (customKill == TF_CUSTOM_BACKSTAB || StrContains(weapon, "knife", false) != -1)
 		g_Wave.backstabs++;
+
+	g_Wave.deathsByCause[DeathCause(customKill, event.GetInt("damagebits"))]++;
 }
 
 
@@ -390,6 +426,42 @@ static void CountDefenderDamage(int attacker, int inflictor, float damage, bool 
 		if (StrEqual(classname, "obj_sentrygun"))
 			g_Wave.sentryDamage += amount;
 	}
+}
+
+/* The custom kill says the special cases, the damage bits say the ordinary ones
+
+Order matters: a backstab is also a melee hit and a headshot is also a bullet, so the specific
+answer has to be asked for first or every stab is filed as "melee" */
+static int DeathCause(int customKill, int damageBits)
+{
+	switch (customKill)
+	{
+		case TF_CUSTOM_BACKSTAB:
+			return DEATH_CAUSE_BACKSTAB;
+		
+		case TF_CUSTOM_HEADSHOT, TF_CUSTOM_HEADSHOT_DECAPITATION:
+			return DEATH_CAUSE_HEADSHOT;
+		
+		case TF_CUSTOM_BURNING, TF_CUSTOM_BURNING_FLARE:
+			return DEATH_CAUSE_FIRE;
+	}
+	
+	if (damageBits & DMG_BURN)
+		return DEATH_CAUSE_FIRE;
+	
+	if (damageBits & DMG_BLAST)
+		return DEATH_CAUSE_EXPLOSION;
+	
+	if (damageBits & DMG_CLUB)
+		return DEATH_CAUSE_MELEE;
+	
+	if (damageBits & DMG_BULLET)
+		return DEATH_CAUSE_BULLET;
+	
+	if (damageBits & DMG_FALL)
+		return DEATH_CAUSE_FALL;
+	
+	return DEATH_CAUSE_OTHER;
 }
 
 static void Event_PlayerHealed(Event event, const char[] name, bool dontBroadcast)
