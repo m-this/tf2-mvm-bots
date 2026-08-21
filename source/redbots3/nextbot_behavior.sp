@@ -601,7 +601,11 @@ bool IsEngineerNestFinished(int client)
 		&& IsBuildingFinished(GetObjectOfType(client, TFObject_Dispenser));
 }
 
-//A medic with no charge is a medic who has nothing to answer the first giant with
+/* A medic with no charge is a medic who has nothing to answer the first giant with
+
+The charge only builds into somebody, so a medic alone on the team can never satisfy this and
+would sit out the whole grace before every wave. Anybody alive is enough, at any distance: he
+walks to whoever it is. Nobody alive at all is the case the grace exists for, and he is ready. */
 static bool IsMedicCharged(int client)
 {
 	int medigun = GetPlayerWeaponSlot(client, TFWeaponSlot_Secondary);
@@ -609,7 +613,10 @@ static bool IsMedicCharged(int client)
 	if (medigun == -1 || TF2Util_GetWeaponID(medigun) != TF_WEAPON_MEDIGUN)
 		return true;
 
-	return GetEntPropFloat(medigun, Prop_Send, "m_flChargeLevel") >= 1.0;
+	if (GetEntPropFloat(medigun, Prop_Send, "m_flChargeLevel") >= 1.0)
+		return true;
+
+	return GerNearestTeammate(client, 999999.0) == -1;
 }
 
 //Whether this bot has done the thing its seat exists for, before the wave starts
@@ -858,13 +865,42 @@ frame heals nobody, and the game re-picks on its own between our checks. */
 #define MEDIC_PATIENT_INTERVAL	2.0
 #define MEDIC_PATIENT_RANGE		900.0
 
+/* How much worse off a tied patient has to be before the beam moves to him
+
+Two Soldiers stood together are the same body, so the choice between them is how hurt they are,
+and that number crosses back and forth while both are being shot at. Without a margin the beam
+follows the crossings and heals neither. */
+#define MEDIC_PATIENT_MARGIN	0.15
+
 static float m_ctNextPatientCheck[MAXPLAYERS + 1];
+
+static float HealthFraction(int client)
+{
+	return float(GetClientHealth(client)) / float(TF2Util_GetEntityMaxHealth(client));
+}
+
+/* The ranking, written once
+
+It decides both which patient is picked and whether the beam moves off the one it already has.
+Two orderings would eventually disagree, and the way they disagree is a beam that swaps target
+every check, or a tie-break that can never be reached. */
+static bool IsBetterPatient(int candidate, int incumbent)
+{
+	if (incumbent <= 0 || !IsClientInGame(incumbent) || !IsPlayerAlive(incumbent))
+		return true;
+
+	int candidateHealth = TF2Util_GetEntityMaxHealth(candidate);
+	int incumbentHealth = TF2Util_GetEntityMaxHealth(incumbent);
+
+	if (candidateHealth != incumbentHealth)
+		return candidateHealth > incumbentHealth;
+
+	return HealthFraction(candidate) < HealthFraction(incumbent) - MEDIC_PATIENT_MARGIN;
+}
 
 static int PreferredPatient(int medic)
 {
 	int best = -1;
-	int bestHealth = 0;
-	float bestFraction = 1.0;
 
 	float myOrigin[3]; GetClientAbsOrigin(medic, myOrigin);
 
@@ -888,15 +924,8 @@ static int PreferredPatient(int medic)
 		if (!IsPathToVectorPossible(medic, theirOrigin))
 			continue;
 
-		int maxHealth = TF2Util_GetEntityMaxHealth(i);
-		float fraction = float(GetClientHealth(i)) / float(maxHealth);
-
-		if (maxHealth > bestHealth || (maxHealth == bestHealth && fraction < bestFraction))
-		{
+		if (IsBetterPatient(i, best))
 			best = i;
-			bestHealth = maxHealth;
-			bestFraction = fraction;
-		}
 	}
 
 	return best;
@@ -919,9 +948,8 @@ static void UpdateMedicPatient(BehaviorAction action, int actor)
 	if (patient == wanted)
 		return;
 
-	//Only for more body to heal than the one already on the beam
-	if (patient > 0 && IsClientInGame(patient)
-		&& TF2Util_GetEntityMaxHealth(patient) >= TF2Util_GetEntityMaxHealth(wanted))
+	//Only for a better patient than the beam already has, by the same ranking that picked him
+	if (!IsBetterPatient(wanted, patient))
 		return;
 
 	action.SetHandleEntity(ACTION_HEAL_PATIENT_OFFSET, wanted);

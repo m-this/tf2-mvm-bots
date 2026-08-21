@@ -166,7 +166,7 @@ does not say whether the bots look right, and somebody still has to watch them.
 | `report/`               | turns a results file into a table, and compares two    |
 | `build.sh`              | stages the mod and its dependencies from this tree     |
 | `seed-volume.sh`        | copies an existing game install into the test-bed's    |
-| `Dockerfile`            | the server image                                       |
+| `build.sh`              | compiles the mod on the host, into `build/package`     |
 | `compose.yml`           | one service, loopback only                             |
 | `entrypoint.sh`         | installs into the game volume, writes `server.cfg`     |
 | `stats/mvmbots_stats.sp`| the plugin that counts                                 |

@@ -11,9 +11,17 @@ name: mvmbots-testbed
 
 services:
   srcds:
-    build:
-      context: ..
-      dockerfile: testbed/Dockerfile
+    # The stock image, with no build of our own.
+    #
+    # There used to be a Dockerfile that compiled the plugins inside the image,
+    # so every run paid for a spcomp run, a chown -R over the staged tree and a
+    # layer export before the server even started. Minutes per run, to produce
+    # files the host had already built.
+    #
+    # The staged tree is bind mounted instead. Rebuilding the mod is now
+    # `sh testbed/build.sh` on the host and a container restart.
+    image: cm2network/tf2:sourcemod
+    command: ["bash", "/usr/local/bin/entrypoint.sh"]
     environment:
       # Read by the base image's entrypoint
       SRCDS_STARTMAP: ${TESTBED_MAP:-mvm_decoy}
@@ -56,6 +64,10 @@ services:
       - "127.0.0.1:${TESTBED_PORT:-27025}:${TESTBED_PORT:-27025}/tcp"
     volumes:
       - tf2game:/home/steam/tf-dedicated
+      # Read only: the entrypoint copies out of here, and a server that can
+      # write back into the build output is a server that can corrupt it.
+      - ../testbed/build/package/addons:/opt/mvmbots/addons:ro
+      - ../testbed/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
 
 volumes:
   tf2game:
