@@ -416,6 +416,38 @@ adds one, would otherwise give every upgrade the same number: the sort would the
 than sensible, and every bot would buy the same wrong thing in the same order forever. Ranking the
 unknown at random degrades to the old behaviour one upgrade at a time instead, and leaves the ones
 this table does know still ahead of the resistances */
+/* Upgrades that do nothing for the weapons this bot is actually holding
+
+Reported on 1.8: Pyros buying Explode on Ignite with no Gas Passer, and airblast pushback while
+carrying a Phlogistinator, which has no airblast at all. Both are the upgrade menu offering
+everything the class can theoretically use rather than what this loadout can.
+
+The menu is right to offer them. Deciding is this mod's job. */
+static bool IsUpgradeWasted(int client, const char[] attribute)
+{
+	//Explode on Ignite is the Gas Passer's, and nothing else can be ignited into exploding
+	if (StrContains(attribute, "explode_on_ignite", false) != -1
+		|| StrContains(attribute, "explode on ignite", false) != -1)
+	{
+		int secondary = GetPlayerWeaponSlot(client, TFWeaponSlot_Secondary);
+
+		return secondary == -1 || TF2Util_GetWeaponID(secondary) != TF_WEAPON_JAR_GAS;
+	}
+
+	if (StrContains(attribute, "airblast", false) != -1)
+	{
+		int primary = GetPlayerWeaponSlot(client, TFWeaponSlot_Primary);
+
+		if (primary == -1 || TF2Util_GetWeaponID(primary) != TF_WEAPON_FLAMETHROWER)
+			return true;
+
+		//A flamethrower that cannot airblast, which is the Phlogistinator and anything like it
+		return TF2Attrib_GetByName(primary, "airblast disabled") != Address_Null;
+	}
+
+	return false;
+}
+
 int GetUpgradePriority(int client, JSONObject info)
 {
 	int slot = info.GetInt("slot");
@@ -434,6 +466,10 @@ int GetUpgradePriority(int client, JSONObject info)
 	
 	if (attribute[0] == '\0')
 		return UnrankedUpgradePriority();
+	
+	//An upgrade to something the bot is not carrying is credits set on fire
+	if (IsUpgradeWasted(client, attribute))
+		return -10;
 	
 	int priority = LoadoutUpgradePriority(client, slot, attribute);
 	
@@ -831,6 +867,18 @@ JSONObject CTFBotPurchaseUpgrades_ChooseUpgrade(int actor)
 			continue;
 		}
 	
+		/* A negative priority is a refusal, not a low bid
+
+		It used to be only a bid, so once everything worth having was maxed or unaffordable the
+		bot worked down the list and bought whatever was left. Reported as Pyros buying Airblast
+		Pushback Scale, which is in the canteen slot and was ranked at minus ten for exactly that
+		reason. Ranking it last is not the same as never buying it. */
+		if (GetUpgradePriority(actor, info) < 0)
+		{
+			delete info;
+			continue;
+		}
+		
 		int tier = GetUpgradeTier(info.GetInt("index"));
 		if (tier != 0) 
 		{
