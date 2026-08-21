@@ -230,6 +230,30 @@ nest for the whole mission. It now asks the convar too, so with the feature off
 `CTFBotUpgrade_OnEnd` detonates after every shopping trip exactly as it did
 before, and nothing else in the release depends on this being fixed.
 
+## 12. The Gas Passer crashes the server. Open, and it is out of the loadout
+
+A Pyro carrying a Gas Passer trips the watchdog at a wave transition:
+
+```
+WatchDog! Server took too long to process (probably infinite loop).
+FATAL ERROR: Host_Error: WatchdogHandler called - server exiting.
+```
+
+Four runs in six on `mvm_decoy`, and clean six waves running with a shotgun in
+that slot instead. It was four in six rather than every run because the forced
+lineup has no Pyro in it: `sm_redbots_manager_extra_bots` adds one beyond the
+composition and sometimes rolls Pyro.
+
+The fault is here, not in the weapon. `EquipBestWeaponForThreat` says to throw
+gas whenever `HasAmmo(secondary)` is true, and `HasAmmo` on a weapon that fires
+off a charge meter rather than a clip is always true. So the Pyro equips a jar
+it cannot throw, every tick, and never picks the flamethrower back up.
+
+The fix is a charge test rather than an ammo test before the bot commits to the
+jar, and the same question applies to every meter weapon in that switch: Jarate,
+Mad Milk and the banners all go through `HasAmmo` in the same way. Until then
+the loadout gives the Pyro a shotgun.
+
 ## 11. Not this repository
 
 A cash bundle spent on upgrades leaves the money negative when the wave is
