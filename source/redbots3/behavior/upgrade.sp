@@ -510,6 +510,13 @@ static int LoadoutUpgradePriority(int client, int slot, const char[] attribute)
 			if (StrEqual(attribute, "metal regen")) return 300;
 			if (StrEqual(attribute, "maxammo metal increased")) return 290;
 		}
+		case 730: //Beggar's Bazooka: it fires as fast as the button is pressed, so buying that twice is buying nothing
+		{
+			if (StrEqual(attribute, "fire rate bonus")) return 20;
+			//The clip is the burst, and the burst is the whole weapon
+			if (StrEqual(attribute, "clip size upgrade atomic")) return 280;
+			if (StrEqual(attribute, "clip size bonus upgrade")) return 280;
+		}
 		case 527: //Widowmaker: the shot is paid for in metal and paid back in damage dealt
 		{
 			if (StrEqual(attribute, "damage bonus")) return 300;
@@ -612,7 +619,28 @@ static int ClassUpgradePriority(TFClassType pclass, int slot, const char[] attri
 		}
 		case TFClass_Soldier:
 		{
-			if (StrEqual(attribute, "rocket specialist")) return 240;
+			/* Reload first, and everybody who writes about this class says so
+
+			A Soldier's damage is four rockets and then a wait, so the wait is what the credits
+			buy. Rocket Specialist next and exactly one tick of it, capped in
+			CTFBotPurchaseUpgrades_PurchaseUpgrade: the first removes the falloff, the rest widen
+			a blast radius nobody needed. Then damage, then the rest of the general table */
+			if (StrEqual(attribute, "faster reload rate")) return 310;
+			if (StrEqual(attribute, "rocket specialist")) return 290;
+		}
+		case TFClass_DemoMan:
+		{
+			/* Reload, then fire rate, then everything else
+
+			Same shape as the Soldier and for the same reason: the launcher is a burst and a
+			reload, so the reload is the damage. Fire rate second because a sticky trap is
+			however many bombs he got down before the robots arrived.
+
+			Projectile speed is on the list because it is cheap and it is what makes a pipe land
+			on something that is walking, which is the shot a bot is worst at leading */
+			if (StrEqual(attribute, "faster reload rate")) return 310;
+			if (StrEqual(attribute, "fire rate bonus")) return 290;
+			if (StrEqual(attribute, "Projectile speed increased")) return 200;
 		}
 		case TFClass_Heavy:
 		{
@@ -806,6 +834,22 @@ would have bought anyway. The bot just finishes sooner and says so once */
 //No stock upgrade has more steps than this, and asking for steps that do not exist buys nothing
 #define UPGRADE_TIERS_MAX	4
 
+/* Upgrades where the steps after the first buy nothing worth having
+
+Rocket Specialist is the one everybody names: the first tick removes the damage falloff and slows
+what it hits, and the three after it are three hundred credits each for a bigger blast radius
+nobody asked for. Buying all four is the single most expensive mistake a Soldier can make here,
+and the batching above would buy all four in one go.
+
+A cap of one, not a ban: the tick itself is worth having, which is why it ranks high */
+static int UpgradeTierCap(const char[] attribute)
+{
+	if (StrEqual(attribute, "rocket specialist"))
+		return 1;
+
+	return UPGRADE_TIERS_MAX;
+}
+
 bool CTFBotPurchaseUpgrades_PurchaseUpgrade(int actor, JSONObject info)
 {
 	int slot = info.GetInt("slot");
@@ -817,10 +861,20 @@ bool CTFBotPurchaseUpgrades_PurchaseUpgrade(int actor, JSONObject info)
 
 	if (cost > 0)
 	{
+		CMannVsMachineUpgrades upgrade = CMannVsMachineUpgradeManager().GetUpgradeByIndex(index);
+
+		int tiers = UPGRADE_TIERS_MAX;
+
+		if (upgrade.Address != Address_Null)
+		{
+			char attribute[MAX_ATTRIBUTE_DESCRIPTION_LENGTH]; attribute = upgrade.m_szAttribute();
+			tiers = UpgradeTierCap(attribute);
+		}
+
 		count = currencyBefore / cost;
 
-		if (count > UPGRADE_TIERS_MAX)
-			count = UPGRADE_TIERS_MAX;
+		if (count > tiers)
+			count = tiers;
 
 		if (count < 1)
 			count = 1;
