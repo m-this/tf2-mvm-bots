@@ -5,6 +5,7 @@
 #   testbed/run.sh --mission mvm_decoy_advanced     a named popfile
 #   testbed/run.sh --waves 12 --timeout 3600        stop after twelve results
 #   testbed/run.sh --out results/after.jsonl        somewhere to compare against
+#   testbed/run.sh --docker                         compile in the image instead
 #
 # It brings the server up, waits for the game to finish downloading itself the
 # first time, sends the mission, and then watches the statistics file until it
@@ -23,6 +24,10 @@ timeout=2400
 out=""
 down=0
 rebuild=1
+# Where the mod is compiled. The host is the fast way and needs spcomp and the
+# fetched sources; the image needs nothing but Docker and pays for a compile and
+# a layer export on every rebuild.
+in_docker=0
 
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -33,6 +38,7 @@ while [ $# -gt 0 ]; do
 	--out) out=$2; shift 2 ;;
 	--down) down=1; shift ;;
 	--no-build) rebuild=0; shift ;;
+	--docker) in_docker=1; shift ;;
 	-h | --help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
 	*) echo "unknown option: $1" >&2; exit 2 ;;
 	esac
@@ -43,7 +49,10 @@ done
 stats_file=${TESTBED_STATS_FILE:-mvmbots_stats.jsonl}
 export TESTBED_MAP=$map TESTBED_RCONPW TESTBED_PORT TESTBED_STATS_FILE=$stats_file
 
-compose="docker compose -f $here/compose.yml"
+compose_file=$here/compose.yml
+[ "$in_docker" = 1 ] && compose_file=$here/compose.docker.yml
+
+compose="docker compose -f $compose_file"
 # rcon.py reads the password and the port from the environment, and takes the
 # commands as arguments
 rcon="SRCDS_RCONPW=$TESTBED_RCONPW SRCDS_PORT=$TESTBED_PORT python3 $here/rcon.py"
@@ -74,11 +83,16 @@ sh "$here/install-game.sh"
 # and a layer export.
 if [ "$rebuild" = 1 ]; then
 	say "building"
-	sh "$here/build.sh" >"$here/build/build.log" 2>&1 || {
-		say "the build failed, see testbed/build/build.log"
-		tail -20 "$here/build/build.log"
-		exit 1
-	}
+
+	if [ "$in_docker" = 1 ]; then
+		$compose build
+	else
+		sh "$here/build.sh" >"$here/build/build.log" 2>&1 || {
+			say "the build failed, see testbed/build/build.log"
+			tail -20 "$here/build/build.log"
+			exit 1
+		}
+	fi
 fi
 
 say "starting the server on $map"
