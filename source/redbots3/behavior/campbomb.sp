@@ -72,7 +72,7 @@ public Action CTFBotCampBomb_Update(BehaviorAction action, int actor, float inte
 	float guardPosition[3];
 	guardPosition = bombPosition;
 	
-	if (WantsDispenser(actor))
+	if (Feature(FEATURE_DISPENSER_GUARD) && WantsDispenser(actor))
 	{
 		int dispenser = FindFriendlyDispenserNear(actor, bombPosition);
 		

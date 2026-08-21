@@ -2,6 +2,7 @@
 # Play the same mission N times on each of two builds, one run at a time.
 #
 #   testbed/batch.sh 3 /tmp/bots-base
+#   FEATURES=spy_glance=0 testbed/batch.sh 3      the same mod with one thing off
 #
 # Sequential on purpose. The watchdog this mod trips measures how long a frame
 # took, and running two servers on four cores makes frames take longer, so
@@ -35,6 +36,7 @@ play() {
 	TESTBED_BOT_TEAM_COMP="$comp" \
 	TESTBED_BOT_TEAM_SIZE=6 \
 	TESTBED_HOST=1 \
+	TESTBED_BOT_FEATURES="${FEATURES-}" \
 		sh "$tree/testbed/run.sh" --map "$map" --waves 6 --timeout 1800 \
 			--out "$out/$name-$i.jsonl" >"$out/$name-$i.log" 2>&1 || true
 

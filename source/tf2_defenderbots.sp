@@ -222,6 +222,7 @@ ConVar tf_bot_health_search_near_range;
 Address g_pMannVsMachineUpgrades;
 #endif
 
+#include "redbots3/features.sp"
 #include "redbots3/util.sp"
 #include "redbots3/weapon_tuning.sp"
 #include "redbots3/medic_uber.sp"
@@ -373,6 +374,7 @@ public void OnPluginStart()
 		g_iPopulationManager = FindEntityByClassname(MaxClients + 1, "info_populator");
 	}
 	
+	LoadFeatures();
 	LoadLoadoutFunctions();
 	LoadPreferencesData();
 	
@@ -401,6 +403,13 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	return APLRes_Success;
 }
 
+static Action Timer_PublishFeatures(Handle timer)
+{
+	PublishActiveFeatures();
+	
+	return Plugin_Stop;
+}
+
 public void OnMapStart()
 {
 	g_bBotsEnabled = false;
@@ -414,6 +423,9 @@ public void OnMapStart()
 	Config_LoadMap();
 	Config_LoadBotNames();
 	Config_LoadServerLoadout();
+	
+	//After the map config has run, so what it turned off is what gets published
+	CreateTimer(1.0, Timer_PublishFeatures, _, TIMER_FLAG_NO_MAPCHANGE);
 	CreateBotPreferenceMenu();
 }
 

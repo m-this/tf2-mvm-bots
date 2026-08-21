@@ -102,6 +102,20 @@ install_server_cfg() {
 	target="$GAME/cfg/server.cfg"
 	[ -d "$(dirname "$target")" ] || return 1
 
+	# One convar line per name=value in BOT_FEATURES, so a run can turn a
+	# behaviour off without a rebuild and the results say which was on.
+	BOT_FEATURE_LINES=""
+
+	for pair in $(echo "${BOT_FEATURES:-}" | tr ',' ' '); do
+		name=${pair%%=*}
+		value=${pair#*=}
+
+		[ -n "$name" ] || continue
+
+		BOT_FEATURE_LINES="${BOT_FEATURE_LINES}sm_redbots_feature_${name} ${value}
+	"
+	done
+
 	cat >"$target" <<-CFG
 	// Managed by the mvm-bots test-bed. Edits here are replaced on restart.
 	hostname "MvM defender bots test-bed"
@@ -154,6 +168,10 @@ install_server_cfg() {
 	sm_redbots_manager_bot_use_upgrades ${BOT_USE_UPGRADES:-1}
 	sm_redbots_manager_engineer_nest_relocate ${BOT_NEST_RELOCATE:-0}
 	sm_redbots_manager_use_custom_loadouts ${BOT_USE_LOADOUTS:-1}
+
+	// Feature switches, for running the same mission twice with one thing
+	// different. BOT_FEATURES is a list like "spy_glance=0,sticky_stack=0"
+	${BOT_FEATURE_LINES}
 	sm_redbots_manager_class_blacklist "${BOT_CLASS_BLACKLIST:-}"
 	sm_redbots_manager_team_composition "${BOT_TEAM_COMP:-}"
 

@@ -46,6 +46,9 @@ services:
       BOT_USE_UPGRADES: ${TESTBED_BOT_USE_UPGRADES:-1}
       BOT_NEST_RELOCATE: ${TESTBED_BOT_NEST_RELOCATE:-0}
       BOT_USE_LOADOUTS: ${TESTBED_BOT_USE_LOADOUTS:-1}
+      # A list like "spy_glance=0,sticky_stack=0". Anything not named keeps its
+      # default, so an empty value is the mod as shipped.
+      BOT_FEATURES: ${TESTBED_BOT_FEATURES:-}
       STATS_FILE: ${TESTBED_STATS_FILE:-mvmbots_stats.jsonl}
       TESTBED_HOST: ${TESTBED_HOST:-1}
       # Comma-separated SteamIDs that get root, for walking a map by hand

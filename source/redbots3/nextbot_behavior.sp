@@ -359,7 +359,7 @@ public Action CTFBotMainAction_SelectMoreDangerousThreat(BehaviorAction action, 
 	int priority1 = ThreatPriority(iThreat1, rangeSq1);
 	int priority2 = ThreatPriority(iThreat2, rangeSq2);
 	
-	if (priority1 != priority2)
+	if (Feature(FEATURE_THREAT_PRIORITY) && priority1 != priority2)
 	{
 		knownEntity = priority1 > priority2 ? threat1 : threat2;
 	}
@@ -636,6 +636,9 @@ static bool IsDefenderPrepared(int client)
 
 static void UpdateDefenderReadiness(int actor)
 {
+	if (!Feature(FEATURE_READY_WHEN_PREPARED))
+		return;
+	
 	if (GameRules_GetRoundState() != RoundState_BetweenRounds)
 	{
 		m_ctEngineerReadyDeadline[actor] = 0.0;

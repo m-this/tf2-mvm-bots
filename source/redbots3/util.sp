@@ -2013,7 +2013,7 @@ static void CollectZonedNestAreas(int client, ArrayList out)
 		if (i < zones.Length)
 			zones.GetString(i, zone, sizeof(zone));
 		
-		if (zone[0] != '\0' && IsNestZoneTaken(client, zone))
+		if (Feature(FEATURE_NEST_ZONES) && zone[0] != '\0' && IsNestZoneTaken(client, zone))
 			continue;
 		
 		float spot[3]; spots.GetArray(i, spot);
@@ -2111,7 +2111,13 @@ in before the wave starts, and a wave with a tank in it carries the "tank" icon 
 #define MVM_WAVE_CLASS_ICONS_MAX	12
 #define MVM_TANK_CLASS_ICON			"tank"
 
-bool IsTankWave()
+/* Does the coming wave carry robots of this kind?
+
+The icon names are the wave bar's, so they are the mission's own answer and they are filled in
+before the wave starts. Matched as a substring because the variants are all suffixed: a wave with
+demoknights and burst demos carries "demoknight" and "demo_burst", and both of them throw
+explosives at the team */
+bool WaveHasClassIcon(const char[] needle)
 {
 	int rsrc = FindEntityByClassname(MaxClients + 1, "tf_objective_resource");
 	
@@ -2122,11 +2128,32 @@ bool IsTankWave()
 	{
 		char icon[64]; TF2_GetMannVsMachineWaveClassName(rsrc, i, icon, sizeof(icon));
 		
-		if (StrEqual(icon, MVM_TANK_CLASS_ICON, false))
+		if (icon[0] != '\0' && StrContains(icon, needle, false) != -1)
 			return true;
 	}
 	
 	return false;
+}
+
+bool IsTankWave()
+{
+	return WaveHasClassIcon(MVM_TANK_CLASS_ICON);
+}
+
+//What the coming wave will actually kill the team with
+bool WaveHasExplosiveRobots()
+{
+	return WaveHasClassIcon("demo") || WaveHasClassIcon("soldier") || IsTankWave();
+}
+
+bool WaveHasBulletRobots()
+{
+	return WaveHasClassIcon("heavy") || WaveHasClassIcon("scout") || WaveHasClassIcon("sniper");
+}
+
+bool WaveHasFireRobots()
+{
+	return WaveHasClassIcon("pyro");
 }
 
 /* The nest spots the map itself carries, and where they come from
