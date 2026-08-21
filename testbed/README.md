@@ -27,7 +27,7 @@ testbed/run.sh --out testbed/results/after.jsonl # somewhere to compare against
 Then compare two runs:
 
 ```sh
-testbed/report.py testbed/results/after.jsonl --baseline testbed/results/before.jsonl
+go run ./testbed/report testbed/results/after.jsonl testbed/results/before.jsonl
 ```
 
 Needs Docker and Python 3.
@@ -163,7 +163,7 @@ does not say whether the bots look right, and somebody still has to watch them.
 | file                    | what it is                                            |
 | ----------------------- | ----------------------------------------------------- |
 | `run.sh`                | brings the server up, runs the mission, reads results  |
-| `report.py`             | turns a results file into a table, and compares two    |
+| `report/`               | turns a results file into a table, and compares two    |
 | `build.sh`              | stages the mod and its dependencies from this tree     |
 | `seed-volume.sh`        | copies an existing game install into the test-bed's    |
 | `Dockerfile`            | the server image                                       |

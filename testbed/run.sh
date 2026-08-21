@@ -153,4 +153,4 @@ if [ "$down" = 1 ]; then
 	$compose down
 fi
 
-python3 "$here/report.py" "$out"
+go run "$here/report" "$out"

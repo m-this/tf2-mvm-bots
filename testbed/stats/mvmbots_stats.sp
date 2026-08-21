@@ -14,6 +14,7 @@
 
 #include <sourcemod>
 #include <tf2_stocks>
+#include <sdkhooks>
 
 #pragma semicolon 1
 #pragma newdecls required
@@ -21,7 +22,7 @@
 #define PLUGIN_VERSION "1.0.0"
 
 //A wave is hundreds of deaths and a line is written per wave, so the file is small on purpose
-#define STATS_LINE_LENGTH	1024
+#define STATS_LINE_LENGTH	2048
 
 public Plugin myinfo =
 {
@@ -51,6 +52,27 @@ enum struct WaveCounters
 	int busterDetonations;
 	int sentriesLost;
 	int dispensersLost;
+	/* Contribution, not just body count
+
+	Waves cleared says whether the team held. It does not say who held it, and two builds that
+	both clear five waves can be doing completely different work to get there. Damage, healing
+	and what the sentry did are the numbers that separate them */
+	int damageDealt;
+	int damageToTanks;
+	int sentryDamage;
+	int healingDone;
+	int ubersDeployed;
+	int damageByClass[view_as<int>(TFClass_Engineer) + 1];
+	/* Who killed what, on both sides
+
+	"Five waves cleared" hides everything worth knowing. Which defender class does the killing
+	says which one is worth its seat, and what kills the defenders says what the team has no
+	answer to */
+	int killsByClass[view_as<int>(TFClass_Engineer) + 1];
+	int giantKillsByClass[view_as<int>(TFClass_Engineer) + 1];
+	int deathsToClass[view_as<int>(TFClass_Engineer) + 1];
+	int deathsToSentry;
+	int deathsToTank;
 
 	void Reset()
 	{
@@ -63,6 +85,22 @@ enum struct WaveCounters
 		this.busterDetonations = 0;
 		this.sentriesLost = 0;
 		this.dispensersLost = 0;
+		this.damageDealt = 0;
+		this.damageToTanks = 0;
+		this.sentryDamage = 0;
+		this.healingDone = 0;
+		this.ubersDeployed = 0;
+		
+		this.deathsToSentry = 0;
+		this.deathsToTank = 0;
+		
+		for (int i = 0; i < sizeof(this.damageByClass); i++)
+		{
+			this.damageByClass[i] = 0;
+			this.killsByClass[i] = 0;
+			this.giantKillsByClass[i] = 0;
+			this.deathsToClass[i] = 0;
+		}
 	}
 }
 
@@ -79,6 +117,9 @@ public void OnPluginStart()
 	HookEvent("mvm_mission_complete", Event_MissionComplete);
 	HookEvent("player_death", Event_PlayerDeath);
 	HookEvent("object_destroyed", Event_ObjectDestroyed);
+	HookEvent("player_healed", Event_PlayerHealed);
+	HookEvent("player_chargedeployed", Event_ChargeDeployed);
+	HookEvent("player_spawn", Event_PlayerSpawn);
 
 	g_Wave.Reset();
 }
@@ -138,11 +179,66 @@ static void WriteWaveResult(const char[] result)
 		"{\"event\":\"wave_end\",\"map\":\"%s\",\"wave\":%d,\"result\":\"%s\",\"duration\":%.1f,"
 		... "\"robot_kills\":%d,\"giant_kills\":%d,\"tank_kills\":%d,\"sentry_kills\":%d,"
 		... "\"defender_deaths\":%d,\"backstabs\":%d,\"buster_detonations\":%d,"
-		... "\"sentries_lost\":%d,\"dispensers_lost\":%d}",
+		... "\"sentries_lost\":%d,\"dispensers_lost\":%d,"
+		... "\"damage\":%d,\"tank_damage\":%d,\"sentry_damage\":%d,"
+		... "\"healing\":%d,\"ubers\":%d,"
+		... "\"damage_scout\":%d,\"damage_sniper\":%d,\"damage_soldier\":%d,"
+		... "\"damage_demoman\":%d,\"damage_medic\":%d,\"damage_heavy\":%d,"
+		... "\"damage_pyro\":%d,\"damage_spy\":%d,\"damage_engineer\":%d,"
+		... "\"kills_scout\":%d,\"kills_soldier\":%d,\"kills_pyro\":%d,"
+		... "\"kills_demoman\":%d,\"kills_heavy\":%d,\"kills_engineer\":%d,"
+		... "\"kills_medic\":%d,\"kills_sniper\":%d,\"kills_spy\":%d,"
+		... "\"giantkills_scout\":%d,\"giantkills_soldier\":%d,\"giantkills_pyro\":%d,"
+		... "\"giantkills_demoman\":%d,\"giantkills_heavy\":%d,\"giantkills_engineer\":%d,"
+		... "\"giantkills_medic\":%d,\"giantkills_sniper\":%d,\"giantkills_spy\":%d,"
+		... "\"killedby_scout\":%d,\"killedby_soldier\":%d,\"killedby_pyro\":%d,"
+		... "\"killedby_demoman\":%d,\"killedby_heavy\":%d,\"killedby_engineer\":%d,"
+		... "\"killedby_medic\":%d,\"killedby_sniper\":%d,\"killedby_spy\":%d,"
+		... "\"killedby_sentry\":%d,\"killedby_tank\":%d}",
 		g_sMap, g_iWave, result, duration,
 		g_Wave.robotKills, g_Wave.giantKills, g_Wave.tankKills, g_Wave.sentryKills,
 		g_Wave.defenderDeaths, g_Wave.backstabs, g_Wave.busterDetonations,
-		g_Wave.sentriesLost, g_Wave.dispensersLost);
+		g_Wave.sentriesLost, g_Wave.dispensersLost,
+		g_Wave.damageDealt, g_Wave.damageToTanks, g_Wave.sentryDamage,
+		g_Wave.healingDone, g_Wave.ubersDeployed,
+		g_Wave.damageByClass[view_as<int>(TFClass_Scout)],
+		g_Wave.damageByClass[view_as<int>(TFClass_Sniper)],
+		g_Wave.damageByClass[view_as<int>(TFClass_Soldier)],
+		g_Wave.damageByClass[view_as<int>(TFClass_DemoMan)],
+		g_Wave.damageByClass[view_as<int>(TFClass_Medic)],
+		g_Wave.damageByClass[view_as<int>(TFClass_Heavy)],
+		g_Wave.damageByClass[view_as<int>(TFClass_Pyro)],
+		g_Wave.damageByClass[view_as<int>(TFClass_Spy)],
+		g_Wave.damageByClass[view_as<int>(TFClass_Engineer)],
+		g_Wave.killsByClass[view_as<int>(TFClass_Scout)],
+		g_Wave.killsByClass[view_as<int>(TFClass_Soldier)],
+		g_Wave.killsByClass[view_as<int>(TFClass_Pyro)],
+		g_Wave.killsByClass[view_as<int>(TFClass_DemoMan)],
+		g_Wave.killsByClass[view_as<int>(TFClass_Heavy)],
+		g_Wave.killsByClass[view_as<int>(TFClass_Engineer)],
+		g_Wave.killsByClass[view_as<int>(TFClass_Medic)],
+		g_Wave.killsByClass[view_as<int>(TFClass_Sniper)],
+		g_Wave.killsByClass[view_as<int>(TFClass_Spy)],
+		g_Wave.giantKillsByClass[view_as<int>(TFClass_Scout)],
+		g_Wave.giantKillsByClass[view_as<int>(TFClass_Soldier)],
+		g_Wave.giantKillsByClass[view_as<int>(TFClass_Pyro)],
+		g_Wave.giantKillsByClass[view_as<int>(TFClass_DemoMan)],
+		g_Wave.giantKillsByClass[view_as<int>(TFClass_Heavy)],
+		g_Wave.giantKillsByClass[view_as<int>(TFClass_Engineer)],
+		g_Wave.giantKillsByClass[view_as<int>(TFClass_Medic)],
+		g_Wave.giantKillsByClass[view_as<int>(TFClass_Sniper)],
+		g_Wave.giantKillsByClass[view_as<int>(TFClass_Spy)],
+		g_Wave.deathsToClass[view_as<int>(TFClass_Scout)],
+		g_Wave.deathsToClass[view_as<int>(TFClass_Soldier)],
+		g_Wave.deathsToClass[view_as<int>(TFClass_Pyro)],
+		g_Wave.deathsToClass[view_as<int>(TFClass_DemoMan)],
+		g_Wave.deathsToClass[view_as<int>(TFClass_Heavy)],
+		g_Wave.deathsToClass[view_as<int>(TFClass_Engineer)],
+		g_Wave.deathsToClass[view_as<int>(TFClass_Medic)],
+		g_Wave.deathsToClass[view_as<int>(TFClass_Sniper)],
+		g_Wave.deathsToClass[view_as<int>(TFClass_Spy)],
+		g_Wave.deathsToSentry,
+		g_Wave.deathsToTank);
 
 	WriteLine(line);
 
@@ -158,12 +254,30 @@ static void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 
 	char weapon[64]; event.GetString("weapon", weapon, sizeof(weapon));
 
+	int attacker = GetClientOfUserId(event.GetInt("attacker"));
+
 	if (TF2_GetClientTeam(victim) == TFTeam_Blue)
 	{
 		g_Wave.robotKills++;
 
-		if (HasEntProp(victim, Prop_Send, "m_bIsMiniBoss") && GetEntProp(victim, Prop_Send, "m_bIsMiniBoss"))
+		bool giant = HasEntProp(victim, Prop_Send, "m_bIsMiniBoss") && GetEntProp(victim, Prop_Send, "m_bIsMiniBoss");
+
+		if (giant)
 			g_Wave.giantKills++;
+
+		//Which defender did it. A robot that killed itself leaves no attacker, and belongs to nobody
+		if (attacker > 0 && IsClientInGame(attacker) && TF2_GetClientTeam(attacker) == TFTeam_Red)
+		{
+			int class = view_as<int>(TF2_GetPlayerClass(attacker));
+
+			if (class >= 0 && class < sizeof(g_Wave.killsByClass))
+			{
+				g_Wave.killsByClass[class]++;
+
+				if (giant)
+					g_Wave.giantKillsByClass[class]++;
+			}
+		}
 
 		/* A sentry buster kills itself, so the death has no attacker and the weapon is its own
 		explosion. Counting them says whether the engineers are losing nests to something the
@@ -182,11 +296,118 @@ static void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 
 	g_Wave.defenderDeaths++;
 
+	/* What killed the defender
+
+	The robot's class is the answer most of the time. A sentry is not a class and neither is a
+	tank, and both kill defenders, so they get counted on their own: a team losing people to a
+	robot Engineer's sentry has a different problem from one losing them to giant Heavies */
+	if (StrContains(weapon, "obj_sentrygun", false) != -1 || StrContains(weapon, "sentry", false) != -1)
+	{
+		g_Wave.deathsToSentry++;
+	}
+	else if (attacker < 1 || !IsClientInGame(attacker))
+	{
+		//Tanks are not players, so a tank kill arrives with nobody holding the gun
+		g_Wave.deathsToTank++;
+	}
+	else
+	{
+		int class = view_as<int>(TF2_GetPlayerClass(attacker));
+
+		if (class >= 0 && class < sizeof(g_Wave.deathsToClass))
+			g_Wave.deathsToClass[class]++;
+	}
+
 	//A defender who died to a knife in the back is a defender who never saw the Spy
 	int customKill = event.GetInt("customkill");
 
 	if (customKill == TF_CUSTOM_BACKSTAB || StrContains(weapon, "knife", false) != -1)
 		g_Wave.backstabs++;
+}
+
+
+/* Damage is counted where it lands, not where it was fired
+
+A player_hurt event cannot tell an engineer's shotgun from his sentry: both name him as the
+attacker. The damage hook can, because it carries the inflictor, and the sentry is the whole
+reason an engineer is on the team */
+public void OnEntityCreated(int entity, const char[] classname)
+{
+	//Tanks are not players, so nothing else here would ever see damage done to one
+	if (StrEqual(classname, "tank_boss"))
+		SDKHook(entity, SDKHook_OnTakeDamagePost, OnTankDamagePost);
+}
+
+static void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
+{
+	int client = GetClientOfUserId(event.GetInt("userid"));
+	
+	if (client < 1 || !IsClientInGame(client))
+		return;
+	
+	//Only the robots need hooking: what we are counting is damage the defenders put into them
+	if (TF2_GetClientTeam(client) != TFTeam_Blue)
+		return;
+	
+	SDKUnhook(client, SDKHook_OnTakeDamagePost, OnRobotDamagePost);
+	SDKHook(client, SDKHook_OnTakeDamagePost, OnRobotDamagePost);
+}
+
+static void OnRobotDamagePost(int victim, int attacker, int inflictor, float damage, int damagetype)
+{
+	CountDefenderDamage(attacker, inflictor, damage, false);
+}
+
+static void OnTankDamagePost(int victim, int attacker, int inflictor, float damage, int damagetype)
+{
+	CountDefenderDamage(attacker, inflictor, damage, true);
+}
+
+static void CountDefenderDamage(int attacker, int inflictor, float damage, bool tank)
+{
+	if (attacker < 1 || attacker > MaxClients || !IsClientInGame(attacker))
+		return;
+	
+	if (TF2_GetClientTeam(attacker) != TFTeam_Red)
+		return;
+	
+	int amount = RoundToNearest(damage);
+	
+	g_Wave.damageDealt += amount;
+	
+	if (tank)
+		g_Wave.damageToTanks += amount;
+	
+	int class = view_as<int>(TF2_GetPlayerClass(attacker));
+	
+	if (class >= 0 && class < sizeof(g_Wave.damageByClass))
+		g_Wave.damageByClass[class] += amount;
+	
+	if (inflictor > MaxClients && IsValidEntity(inflictor))
+	{
+		char classname[32]; GetEntityClassname(inflictor, classname, sizeof(classname));
+		
+		if (StrEqual(classname, "obj_sentrygun"))
+			g_Wave.sentryDamage += amount;
+	}
+}
+
+static void Event_PlayerHealed(Event event, const char[] name, bool dontBroadcast)
+{
+	int healer = GetClientOfUserId(event.GetInt("healer"));
+	
+	if (healer < 1 || !IsClientInGame(healer) || TF2_GetClientTeam(healer) != TFTeam_Red)
+		return;
+	
+	g_Wave.healingDone += event.GetInt("amount");
+}
+
+static void Event_ChargeDeployed(Event event, const char[] name, bool dontBroadcast)
+{
+	int client = GetClientOfUserId(event.GetInt("userid"));
+	
+	if (client > 0 && IsClientInGame(client) && TF2_GetClientTeam(client) == TFTeam_Red)
+		g_Wave.ubersDeployed++;
 }
 
 static void Event_ObjectDestroyed(Event event, const char[] name, bool dontBroadcast)
