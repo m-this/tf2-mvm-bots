@@ -18,7 +18,7 @@ public Action CTFBotMvMEngineerBuildSentrygun_OnStart(BehaviorAction action, int
 		if (m_aNestArea[actor])
 		{
 			//Teleport ourselves to the nest area for a faster setup
-			float vNestPosition[3]; m_aNestArea[actor].GetCenter(vNestPosition);
+			float vNestPosition[3]; NestBuildPosition(m_aNestArea[actor], vNestPosition);
 			vNestPosition[2] += TFBOT_STEP_HEIGHT;
 			CBaseEntity(actor).SetAbsOrigin(vNestPosition);
 		}
@@ -42,7 +42,7 @@ public Action CTFBotMvMEngineerBuildSentrygun_Update(BehaviorAction action, int 
 	}
 	
 	float areaCenter[3];
-	m_aNestArea[actor].GetCenter(areaCenter);
+	NestBuildPosition(m_aNestArea[actor], areaCenter);
 	
 	float range_to_hint = GetVectorDistance(GetAbsOrigin(actor), areaCenter);
 	int myWeapon = BaseCombatCharacter_GetActiveWeapon(actor);

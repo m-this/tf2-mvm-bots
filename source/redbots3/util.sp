@@ -456,6 +456,50 @@ nothing in the game promises that: the loop reads them all and keeps the closest
 
 Busters still in the spawn room are skipped. One walks the whole length of the map to reach a
 sentry, and a team that starts running when it leaves the door spends the wave running */
+/* Where to actually build inside a nest area
+
+The area centre is not the spot. A nav area on a ledge runs back from the edge,
+so its centre is a couple of metres behind the drop and a sentry there cannot see
+what is underneath it. Reported on Decoy and Mannhattan: engineers building too
+far back from the high ground.
+
+When the nest came out of a map config, the authored origin is the answer,
+because somebody stood on it. Anything else falls back to the centre */
+#define NEST_SPOT_MATCH_RANGE	400.0
+
+void NestBuildPosition(CNavArea area, float out[3])
+{
+	area.GetCenter(out);
+
+	if (area == NULL_AREA)
+		return;
+
+	float best = NEST_SPOT_MATCH_RANGE;
+
+	NestSpotFromList(g_arrMapConfig.adtEngineerNestLocation, out, best);
+	NestSpotFromList(g_arrMapConfig.adtNestTankOnlyLocation, out, best);
+	NestSpotFromList(g_arrMapConfig.adtNestNoTankLocation, out, best);
+}
+
+//The authored spot nearest the centre we already have, when one is close enough to be this nest
+static void NestSpotFromList(ArrayList spots, float inout[3], float &best)
+{
+	float centre[3]; centre = inout;
+
+	for (int i = 0; i < spots.Length; i++)
+	{
+		float spot[3]; spots.GetArray(i, spot);
+
+		float distance = GetVectorDistance(centre, spot);
+
+		if (distance < best)
+		{
+			best = distance;
+			inout = spot;
+		}
+	}
+}
+
 /* Somebody for the medic to point the medigun at
 
 The beam already attached is the plain answer, and it is what the game itself tracks. Without one,

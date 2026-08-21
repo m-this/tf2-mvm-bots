@@ -281,7 +281,7 @@ public Action CTFBotMainAction_SelectMoreDangerousThreat(BehaviorAction action, 
 	if (myWeapon != -1 && (TF2Util_GetWeaponID(myWeapon) == TF_WEAPON_FLAMETHROWER || IsMeleeWeapon(myWeapon)))
 	{
 		//Always target the closest one to us with these weapons
-		knownEntity = SelectCloserThreat(nextbot, threat1, threat2);
+		knownEntity = HealerOrThreat(nextbot, SelectCloserThreat(nextbot, threat1, threat2));
 		return Plugin_Changed;
 	}
 	
@@ -293,13 +293,13 @@ public Action CTFBotMainAction_SelectMoreDangerousThreat(BehaviorAction action, 
 	
 	if (oneVisible == iThreat1)
 	{
-		knownEntity = threat1;
+		knownEntity = HealerOrThreat(nextbot, threat1);
 		return Plugin_Changed;
 	}
 	
 	if (oneVisible == iThreat2)
 	{
-		knownEntity = threat2;
+		knownEntity = HealerOrThreat(nextbot, threat2);
 		return Plugin_Changed;
 	}
 	
@@ -362,11 +362,8 @@ public Action CTFBotMainAction_SelectMoreDangerousThreat(BehaviorAction action, 
 		knownEntity = threat2;
 	}
 	
-	if (BaseEntity_IsPlayer(knownEntity.GetEntity()))
-	{
-		//Target the healer
-		knownEntity = GetHealerOfThreat(nextbot, knownEntity);
-	}
+	//Target the healer
+	knownEntity = HealerOrThreat(nextbot, knownEntity);
 	
 	// PrintToChatAll("CTFBotMainAction_SelectMoreDangerousThreat");
 	
@@ -1691,6 +1688,20 @@ void EquipBestWeaponForThreat(int client, const CKnownEntity threat)
 
 /* Get the medic healing this threat only if we know about him and he's in our FOV
 otherwise return the original threat if there is no known healer right now */
+/* The Medic behind whatever we just picked, when there is one
+
+Shooting the patient of a Quick-Fix Medic is shooting through the heal rate, which is the whole
+problem with that pair. Every path out of the threat selection goes through here now: it used to
+sit on the last one only, so a bot that could see the giant and not the Medic locked onto the
+giant and stayed there. Reported on Bavarian Botbash */
+static CKnownEntity HealerOrThreat(INextBot bot, const CKnownEntity threat)
+{
+	if (!threat || !BaseEntity_IsPlayer(threat.GetEntity()))
+		return threat;
+	
+	return GetHealerOfThreat(bot, threat);
+}
+
 CKnownEntity GetHealerOfThreat(INextBot bot, const CKnownEntity threat)
 {
 	if (!threat)
