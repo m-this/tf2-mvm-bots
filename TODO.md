@@ -254,6 +254,21 @@ jar, and the same question applies to every meter weapon in that switch: Jarate,
 Mad Milk and the banners all go through `HasAmmo` in the same way. Until then
 the loadout gives the Pyro a shotgun.
 
+The Gas Passer is not the whole story. 1.5.5-tf2ap.10, which has no loadout file
+at all, crashed twice in three runs of the same mission afterwards, with the same
+watchdog line. So there is an intermittent watchdog crash in this mod that
+predates all of the above, and the Gas Passer made it far more likely rather than
+causing it alone. Rates seen so far, all on `mvm_decoy` with six bots:
+
+| build | crashes |
+| --- | --- |
+| tf2ap.10 | 2 in 9 |
+| this branch, Gas Passer | 4 in 6 |
+| this branch, shotgun | 0 in 5 |
+
+Finding the underlying one wants a run under gdb rather than more sampling. The
+note in item 1 says how to attach to a stripped 32-bit server.
+
 ## 11. Not this repository
 
 A cash bundle spent on upgrades leaves the money negative when the wave is
