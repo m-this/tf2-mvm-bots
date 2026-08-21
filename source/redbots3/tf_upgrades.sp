@@ -1,7 +1,18 @@
 #if defined METHOD_MVM_UPGRADES
 
-//Amount of upgrades parsed in mvm_upgrades.txt
-#define MAX_UPGRADES	62
+/* A ceiling on the number of upgrades, not the number of them
+
+The count comes from the game, through UpgradeCount below. This is only the point past which the
+manager is not what we think it is and walking further would read memory that is not a list of
+upgrades. */
+#define MAX_UPGRADES	128
+
+/* What the game held when this was last measured, for when it will not say
+
+sm_dump_upgrades walked CMannVsMachineUpgradeManager and printed sixty three. The constant here
+used to be sixty two and was used as the loop bound, so the last upgrade the game holds was one
+no loop in this mod ever reached. */
+#define UPGRADE_COUNT_MEASURED	63
 
 //Size of attribute string
 #define MAX_ATTRIBUTE_DESCRIPTION_LENGTH	128
@@ -118,6 +129,17 @@ methodmap CMannVsMachineUpgradeManager < CMannVsMachineUpgrades
 		
 		return view_as<CMannVsMachineUpgrades>(pUpgrades + view_as<Address>(index * CMannVsMachineUpgrades_Size));
 	}
+}
+
+//How many upgrades the game holds, asked of the game rather than counted in a text file
+int UpgradeCount()
+{
+	int count = CMannVsMachineUpgradeManager().Count();
+	
+	if (count < 1 || count > MAX_UPGRADES)
+		return UPGRADE_COUNT_MEASURED;
+	
+	return count;
 }
 
 void InitMvMUpgrades(GameData hGamedata)
