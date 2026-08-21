@@ -122,6 +122,9 @@ static void Event_MvmWaveBegin(Event event, const char[] name, bool dontBroadcas
 	//Whatever the queue has left is about a bomb that is about to move
 	EngineerNestRelocation_StopEvaluating();
 	
+	//A new wave is a new chance at a spot that refused him last time
+	EngineerTeleporter_ForgetGivingUp();
+	
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (IsClientInGame(i) && g_bIsDefenderBot[i] && IsPlayerAlive(i))

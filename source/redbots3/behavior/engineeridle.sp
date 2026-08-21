@@ -691,6 +691,69 @@ static void CTFBotMvMEngineerIdle_ResetProperties(int actor)
 	g_arrPluginBot[actor].bPathing = true;
 }
 
+/* What each engineer has actually got standing, and where
+
+An engineer who never finishes a building looks the same from outside as one who never started,
+and a teleporter half of a pair looks the same as none. This says which, and where each piece
+ended up, so a spot that refuses everything can be walked to with sm_dump_spot. */
+public Action Command_DumpNest(int client, int args)
+{
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || TF2_GetPlayerClass(i) != TFClass_Engineer)
+			continue;
+
+		float nest[3]; NestBuildPosition(m_aNestArea[i], nest);
+
+		ReplyToCommand(client, "%N: nest %.0f %.0f %.0f", i, nest[0], nest[1], nest[2]);
+
+		DumpBuilding(client, i, "sentry", GetObjectOfType(i, TFObject_Sentry));
+		DumpBuilding(client, i, "dispenser", GetObjectOfType(i, TFObject_Dispenser));
+		DumpBuilding(client, i, "entrance", GetObjectOfType(i, TFObject_Teleporter, TFObjectMode_Entrance));
+		DumpBuilding(client, i, "exit", GetObjectOfType(i, TFObject_Teleporter, TFObjectMode_Exit));
+
+		//Asking moves the engineer's pending teleporter target, which the idle action recomputes anyway
+		bool wants = ShouldBuildTeleporter(i);
+
+		char lastResult[64]; EngineerTeleporter_LastResult(i, lastResult, sizeof(lastResult));
+
+		ReplyToCommand(client, "  teleporter: round %d, sentry safe %s, gave up %s, wants %s%s, last \"%s\"",
+			GameRules_GetRoundState(),
+			m_ctSentrySafe[i] > GetGameTime() ? "yes" : "no",
+			EngineerTeleporter_HasGivenUp(i) ? "yes" : "no",
+			wants ? "yes" : "no",
+			ActionsManager.LookupEntityActionByName(i, "DefenderBuildTeleporter") != INVALID_ACTION ? ", building one now" : "",
+			lastResult);
+
+		if (wants)
+		{
+			float spot[3]; EngineerTeleporter_Spot(i, spot);
+
+			ReplyToCommand(client, "  teleporter target: mode %d at %.0f %.0f %.0f",
+				EngineerTeleporter_Mode(i), spot[0], spot[1], spot[2]);
+		}
+	}
+
+	return Plugin_Handled;
+}
+
+static void DumpBuilding(int client, int owner, const char[] what, int building)
+{
+	if (building == INVALID_ENT_REFERENCE)
+	{
+		ReplyToCommand(client, "  %s: none", what);
+
+		return;
+	}
+
+	float origin[3]; origin = GetAbsOrigin(building);
+
+	ReplyToCommand(client, "  %s: level %d, %d of %d health, at %.0f %.0f %.0f%s",
+		what, TF2_GetUpgradeLevel(building), BaseEntity_GetHealth(building),
+		TF2Util_GetEntityMaxHealth(building), origin[0], origin[1], origin[2],
+		TF2_IsBuilding(building) ? ", still going up" : "");
+}
+
 bool CTFBotMvMEngineerIdle_ShouldAdvanceNestSpot(int actor)
 {
 	if (m_aNestArea[actor] == NULL_AREA)
