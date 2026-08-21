@@ -88,6 +88,44 @@ public Action CTFBotDefenderMedicHeal_Update(BehaviorAction action, int actor, f
 	return action.Continue();
 }
 
+/* Where each medic is, who he is beaming and how far that is from the bomb
+
+The complaint this answers is that he stands somewhere the wave is not, and where a bot stands is
+not something an opinion should decide. The bomb is the fight: a medic a little behind his patient
+is a medic doing his job, and one much further from the bomb than the man he is healing has
+stopped following anybody. */
+public Action Command_DumpMedic(int client, int args)
+{
+	BombInfo_t bomb;
+	bool haveBomb = GetBombInfo(bomb);
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || !IsPlayerAlive(i) || TF2_GetPlayerClass(i) != TFClass_Medic)
+			continue;
+
+		float mine[3]; mine = GetAbsOrigin(i);
+		float fromBomb = haveBomb ? GetVectorDistance(mine, bomb.vPosition) : -1.0;
+
+		int patient = PreferredPatient(i);
+
+		if (patient <= 0)
+		{
+			ReplyToCommand(client, "%N: nobody to heal, %.0f from the bomb", i, fromBomb);
+
+			continue;
+		}
+
+		float theirs[3]; theirs = GetAbsOrigin(patient);
+
+		ReplyToCommand(client, "%N: healing %N, %.0f behind him, %.0f from the bomb, he is %.0f from it",
+			i, patient, GetVectorDistance(mine, theirs), fromBomb,
+			haveBomb ? GetVectorDistance(theirs, bomb.vPosition) : -1.0);
+	}
+
+	return Plugin_Handled;
+}
+
 public void CTFBotDefenderMedicHeal_OnEnd(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
 {
 	g_arrPluginBot[actor].bPathing = false;
