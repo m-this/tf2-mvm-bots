@@ -485,6 +485,78 @@ void NestBuildPosition(CNavArea area, float out[3])
 	NestSpotFromList(g_arrMapConfig.adtNestNoTankLocation, out, best);
 }
 
+/* Where a man stands to put a building on a spot, on the side the attempt asks for
+
+A building goes down in front of him and never under him, so the place to stand is a build's
+reach short of the spot with the spot in front of him. Attempt zero is the side he is coming
+from, which costs him no walking at all; each one after it is a step round the spot, so a spot
+with a wall on one side is reached from another.
+
+Shared because both the dispenser and the teleporter need it, and the sentry will when somebody
+gives it the same treatment. */
+void BuildStandPoint(const float spot[3], const float from[3], int attempt, int attempts, float reach, float stand[3])
+{
+	float away[3]; SubtractVectors(from, spot, away);
+	
+	away[2] = 0.0;
+	
+	//He is standing on it, so any side will do to start from
+	if (NormalizeVector(away, away) < 1.0)
+	{
+		away[0] = 1.0;
+		away[1] = 0.0;
+	}
+	
+	float yaw = ArcTangent2(away[1], away[0]) + DegToRad(360.0 / float(attempts) * float(attempt));
+	
+	stand[0] = spot[0] + Cosine(yaw) * reach;
+	stand[1] = spot[1] + Sine(yaw) * reach;
+	stand[2] = spot[2];
+}
+
+/* The RED spawn and the way out of it, for a map that names no teleporter entrance
+
+Which is most of them: Decoy names one exit and no entrance, so the engineers never built a
+teleporter at all, on any map, however long the players waited between waves.
+
+Not a spot but a spawn and a direction, because one spot is a guess and the caller wants to walk.
+The way out is the way to the nest, since that is where the engineer went and where the wave is.
+He steps along it until the game accepts the floor under the toolbox, which is the nearest place
+to spawn that will take an entrance and the place a player leaving spawn walks straight into. */
+bool SpawnPathOut(int actor, const float nest[3], float spawn[3], float towards[3])
+{
+	int point = -1;
+	int nearest = -1;
+	float nearestRange = -1.0;
+	
+	while ((point = FindEntityByClassname(point, "info_player_teamspawn")) != -1)
+	{
+		if (GetEntProp(point, Prop_Data, "m_iTeamNum") != view_as<int>(TFTeam_Red))
+			continue;
+		
+		float origin[3]; GetEntPropVector(point, Prop_Data, "m_vecAbsOrigin", origin);
+		
+		float range = GetVectorDistance(GetAbsOrigin(actor), origin);
+		
+		if (nearestRange < 0.0 || range < nearestRange)
+		{
+			nearestRange = range;
+			nearest = point;
+		}
+	}
+	
+	if (nearest == -1)
+		return false;
+	
+	GetEntPropVector(nearest, Prop_Data, "m_vecAbsOrigin", spawn);
+	
+	SubtractVectors(nest, spawn, towards);
+	
+	towards[2] = 0.0;
+	
+	return NormalizeVector(towards, towards) > 1.0;
+}
+
 //The authored spot nearest the centre we already have, when one is close enough to be this nest
 static void NestSpotFromList(ArrayList spots, float inout[3], float &best)
 {
@@ -1944,19 +2016,49 @@ float ScoreNestArea(int client, CTFNavArea area, const float target[3], float Se
 	
 	score += NestSightScore(area, approach);
 	
-	//Somebody is already holding this ground
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (i == client || !IsClientInGame(i) || m_aNestArea[i] == NULL_AREA || m_aNestArea[i] == view_as<CNavArea>(area))
-			continue;
-		
-		float other[3]; m_aNestArea[i].GetCenter(other);
-		
-		if (GetVectorDistance(center, other) < NEST_SPACING)
-			score -= 50.0;
-	}
+	score += NestCrowdingPenalty(client, area, center);
 	
 	return score;
+}
+
+/* What this ground is worth less for somebody else already being on it
+
+The old rule skipped the one case that matters. An engineer whose nest area was this very area
+was passed over with a continue, so two engineers who scored the same area best both walked to it
+and stood there placing a sentry on top of a sentry, while an area merely near a held one was
+penalised. The same ground is the strongest reason to pick different ground, not a free pass.
+
+A sentry that is already standing there counts as well, whoever built it: a bot who has not
+chosen a nest yet, and a human engineer, are both invisible to a rule that only reads other
+bots' intentions. */
+static float NestCrowdingPenalty(int client, CTFNavArea area, const float center[3])
+{
+	float penalty = 0.0;
+	
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (i == client || !IsClientInGame(i))
+			continue;
+		
+		if (m_aNestArea[i] == view_as<CNavArea>(area))
+		{
+			penalty -= 100.0;
+		}
+		else if (m_aNestArea[i] != NULL_AREA)
+		{
+			float other[3]; m_aNestArea[i].GetCenter(other);
+			
+			if (GetVectorDistance(center, other) < NEST_SPACING)
+				penalty -= 50.0;
+		}
+		
+		int sentry = GetObjectOfType(i, TFObject_Sentry);
+		
+		if (sentry != INVALID_ENT_REFERENCE && GetVectorDistance(center, GetAbsOrigin(sentry)) < NEST_SPACING)
+			penalty -= 100.0;
+	}
+	
+	return penalty;
 }
 
 /* The best scoring area in the list, or NULL_AREA for an empty one

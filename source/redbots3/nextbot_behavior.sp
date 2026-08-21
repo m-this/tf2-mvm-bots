@@ -648,8 +648,19 @@ static void UpdateDefenderReadiness(int actor)
 	if (m_ctEngineerReadyDeadline[actor] <= 0.0)
 		m_ctEngineerReadyDeadline[actor] = GetGameTime() + ENGINEER_READY_GRACE;
 
+	/* Past the grace he says he is ready, rather than merely stopping being made unready
+	
+	Nothing else says it for him. A bot readies when it leaves the upgrade station or moves to the
+	front, and an engineer whose nest will not finish does neither: he is still trying to build.
+	Letting go of the ready was not the same as pressing it, so the wave waited for him for as
+	long as he kept trying, which is the whole round. */
 	if (GetGameTime() > m_ctEngineerReadyDeadline[actor])
+	{
+		if (!IsPlayerReady(actor))
+			SetPlayerReady(actor, true);
+		
 		return;
+	}
 
 	if (IsDefenderPrepared(actor))
 		return;
