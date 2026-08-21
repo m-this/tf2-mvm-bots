@@ -3,13 +3,13 @@
 The state machine is Cheeseh's, from RCBot2's CBotTF2::deployStickies, and it is worth copying
 because it is the small honest version of a thing that invites a large dishonest one. A bot does
 not need to know where the robots will walk. It needs a piece of ground, a handful of bombs
-scattered across it rather than stacked on one point, a gap between shots so the launcher keeps
-up, and somebody to decide when the ground is worth it.
+stacked on it, a gap between shots so the launcher keeps up, and somebody to decide when the
+ground is worth it.
 
   the ground     for a defender, where the bomb is. Robots escort it, so it is the one place on
                  the map they are all walking to, and it is where the carrier will stand
-  the scatter    a random point inside a spread for each bomb, so eight bombs cover an area
-                 instead of eight bombs covering one dinner plate
+  the stack      a small scatter around one point, so a giant standing on it takes all eight
+                 bombs rather than the two it walked near
   the gap        a second or so between shots, which is what the launcher wants and what stops
                  the bot emptying a clip into a wall while it turns
   the deadline   because a Demoman standing in the open aiming at the floor is a Demoman not
@@ -21,8 +21,20 @@ better than trusting where they were aimed. */
 //The launcher holds eight, and eight is the trap
 #define STICKY_TRAP_BOMBS	8
 
-//How wide to scatter them. Roughly a blast across, so the cluster covers ground without gaps
-#define STICKY_TRAP_SPREAD	120.0
+/* How wide to scatter them, and why it is this narrow
+
+It was 120, roughly a blast across, on the reasoning that a spread covers ground without gaps.
+That is the right trap for a crowd and the wrong one for what actually walks into it here.
+
+Every guide written about this class says the same thing: stack the bombs on one spot for a
+giant, and carpet only for a group or a line of Medics. A giant is what a trap is for, because a
+giant is what the team cannot kill any other way, and a giant standing on eight stacked bombs
+takes all eight. The same giant walking over a carpet takes the two or three it happens to be
+near, which is a giant that lives.
+
+Forty is a stack with enough scatter that a bomb landing on a lip or a step does not take the
+whole trap with it. */
+#define STICKY_TRAP_SPREAD	40.0
 
 //What the launcher wants between shots, and what the bot needs to turn between them
 #define STICKY_TRAP_SHOT_GAP_MIN	0.6
@@ -127,7 +139,7 @@ public Action CTFBotStickyTrap_Update(BehaviorAction action, int actor, float in
 
 	TF2Util_SetPlayerActiveWeapon(actor, launcher);
 
-	//A fresh scattered point for each bomb, so the cluster covers ground rather than a dinner plate
+	//A fresh point for each bomb, near enough to the last that a giant takes the whole stack
 	if (IsZeroVector(m_vStickyTrapPoint[actor]))
 	{
 		m_vStickyTrapPoint[actor][0] = m_vStickyTrapSpot[actor][0] + GetRandomFloat(-STICKY_TRAP_SPREAD, STICKY_TRAP_SPREAD);
