@@ -117,7 +117,10 @@ both builds, so the mission does not tell two builds apart.
 
 An earlier version of this note said none of the four nests was inside and that the
 map needed an interior one. That was wrong: it was read off the coordinates by
-somebody who has not seen the building, and there are interior nests among them.
-What is still not written down is which ones, and that is worth recording next time
-somebody walks it, because "this nest covers the inside" is the fact the picker
-would need.
+somebody who has not seen the building.
+
+The interior spots are the ones walked last: the nest at `1014 885 256`, the
+dispenser at `999 551 256` next to it, and the teleporter exit at `417 663 384` on
+the upper floor. The earlier spots are the open ground to the north. So the map data
+already covers the inside, and the reason the mission does not tell two builds apart
+is something else.
