@@ -45,6 +45,17 @@ it is the shape of the bug the reach deadline used to cause, so the distance goe
 rather than a verdict about it. */
 #define ENGINEER_LINE_LENGTH	512
 
+/* How often the engineers are looked at while a wave runs
+
+What each one had when the wave began says what the between-rounds time bought. It says nothing
+about the eight minutes of a Bigrock wave he spent with no sentry at all, which is the shape most
+"the engineer misbehaves on this map" reports actually have: not a nest he never built, but one he
+could not keep.
+
+Five seconds is a hundred and some samples in a long wave and a handful in a short one, which is
+enough to tell "lost it once and rebuilt" from "never had one". */
+#define ENGINEER_SAMPLE_INTERVAL	5.0
+
 public Plugin myinfo =
 {
 	name = "MvM Defender Bots: wave statistics",
@@ -186,6 +197,59 @@ fifteen milliseconds through a stall as happily as through an idle frame. The ga
 frame starting and the next one starting is what actually elapsed. */
 static float g_flLastFrame;
 
+/* How much of the wave each engineer spent with something standing
+
+Counted in samples rather than seconds because the sample is what is actually observed, and a
+fraction of samples is a fraction of the wave whatever the interval is set to. */
+static int g_iEngineerSamples[MAXPLAYERS + 1];
+static int g_iSamplesWithSentry[MAXPLAYERS + 1];
+static int g_iSamplesWithLevel3[MAXPLAYERS + 1];
+static int g_iSamplesWithDispenser[MAXPLAYERS + 1];
+
+static void ResetEngineerSamples()
+{
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		g_iEngineerSamples[i] = 0;
+		g_iSamplesWithSentry[i] = 0;
+		g_iSamplesWithLevel3[i] = 0;
+		g_iSamplesWithDispenser[i] = 0;
+	}
+}
+
+public Action Timer_SampleEngineers(Handle timer)
+{
+	//Only while a wave is being played: between rounds he is building, and that is not uptime
+	if (g_flWaveStart <= 0.0 || GameRules_GetRoundState() != RoundState_RoundRunning)
+		return Plugin_Continue;
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || TF2_GetClientTeam(i) != TFTeam_Red)
+			continue;
+
+		if (TF2_GetPlayerClass(i) != TFClass_Engineer)
+			continue;
+
+		g_iEngineerSamples[i]++;
+
+		int sentry = FindOwnedObject(i, TFObject_Sentry);
+
+		if (sentry != -1)
+		{
+			g_iSamplesWithSentry[i]++;
+
+			if (GetEntProp(sentry, Prop_Send, "m_iUpgradeLevel") >= 3)
+				g_iSamplesWithLevel3[i]++;
+		}
+
+		if (FindOwnedObject(i, TFObject_Dispenser) != -1)
+			g_iSamplesWithDispenser[i]++;
+	}
+
+	return Plugin_Continue;
+}
+
 public void OnGameFrame()
 {
 	float now = GetEngineTime();
@@ -225,6 +289,8 @@ static void Event_WaveBegin(Event event, const char[] name, bool dontBroadcast)
 	g_flWaveStart = GetGameTime();
 
 	g_Wave.Reset();
+
+	ResetEngineerSamples();
 
 	/* The features that are on go in the file with the numbers they produced
 
@@ -290,12 +356,14 @@ static void WriteEngineers(const char[] when)
 		FormatEx(line, sizeof(line),
 			"{\"event\":\"engineer\",\"map\":\"%s\",\"wave\":%d,\"when\":\"%s\",\"who\":\"%s\","
 			... "\"sentry\":%d,\"dispenser\":%d,\"entrance\":%d,\"exit\":%d,"
-			... "\"dispenser_from_sentry\":%.0f,\"exit_from_sentry\":%.0f,\"alive\":%d}",
+			... "\"dispenser_from_sentry\":%.0f,\"exit_from_sentry\":%.0f,\"alive\":%d,"
+			... "\"samples\":%d,\"with_sentry\":%d,\"with_level3\":%d,\"with_dispenser\":%d}",
 			g_sMap, g_iWave, when, name,
 			BuildingLevel(sentry), BuildingLevel(dispenser), BuildingLevel(entrance), BuildingLevel(teleExit),
 			haveSentry ? RangeToBuilding(sentryAt, dispenser) : -1.0,
 			haveSentry ? RangeToBuilding(sentryAt, teleExit) : -1.0,
-			IsPlayerAlive(i) ? 1 : 0);
+			IsPlayerAlive(i) ? 1 : 0,
+			g_iEngineerSamples[i], g_iSamplesWithSentry[i], g_iSamplesWithLevel3[i], g_iSamplesWithDispenser[i]);
 
 		WriteLine(line);
 	}
