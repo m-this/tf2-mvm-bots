@@ -530,10 +530,6 @@ static bool IsUpgradeWasted(int client, const char[] attribute)
 	if (StrEqual(attribute, "weapon burn dmg increased") || StrEqual(attribute, "weapon burn time increased"))
 		return true;
 
-	//A second sentry is only worth its metal where the first one has to move: see the Engineer table
-	if (StrEqual(attribute, "engy disposable sentries"))
-		return !g_arrMapConfig.bMovingNests;
-
 	return false;
 }
 
@@ -702,13 +698,15 @@ static int ClassUpgradePriority(TFClassType pclass, int slot, const char[] attri
 			so, not because a page did. */
 			if (StrEqual(attribute, "engy dispenser radius increased")) return 330;
 			if (StrEqual(attribute, "engy sentry fire rate increased")) return 320;
-			/* A second sentry is worth buying only where the first one has to move
+			/* A second gun, now that something puts it somewhere on purpose
 
-			Every guide says never, and every guide is describing an engineer who picks one spot
-			and holds it. On a map whose front moves the sentry spends part of each wave in a
-			toolbox, and a disposable one covers the ground while it does. Refusing it everywhere
-			else is IsUpgradeWasted's job, because a negative returned from here is thrown away:
-			the caller only keeps a positive. */
+			Every guide says never, and every guide is describing a person who drops one and
+			forgets it. It was refused here for a while for a better reason than that: nothing in
+			this mod placed it, so the game put it wherever the engineer happened to be facing,
+			and what that produced was minis pointing at walls.
+
+			behavior/engineerbuilddisposable.sp stands it beside the real one now, on ground that
+			can see what the real one sees, so the upgrade buys what it is supposed to buy. */
 			if (StrEqual(attribute, "engy disposable sentries")) return 310;
 			
 			if (StrEqual(attribute, "engy building health bonus")) return 260;

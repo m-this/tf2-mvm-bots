@@ -100,6 +100,7 @@ esPluginBot g_arrPluginBot[MAXPLAYERS + 1];
 #include "behavior/engineerbuildsentrygun.sp"
 #include "behavior/engineerbuilddispenser.sp"
 #include "behavior/engineerbuildteleporter.sp"
+#include "behavior/engineerbuilddisposable.sp"
 #include "behavior/spycheck.sp"
 #include "behavior/stickytrap.sp"
 #include "behavior/spylurk.sp"
