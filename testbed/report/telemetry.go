@@ -160,20 +160,53 @@ func buildingKind(s buildingSample) string {
 	return s.Type
 }
 
-// The action actually running, which is the first name the plugin wrote. The
-// rest of the stack is the same three monitors on every line.
+// The scaffolding every bot is inside no matter what it is doing. Two of these
+// are the game's, two are ours, and none of them is an answer to "what was he
+// doing".
+var scaffolding = map[string]bool{
+	"MainAction": true, "TacticalMonitor": true,
+	"ScenarioMonitor": true, "Heal": true, "": true,
+}
+
+// The most specific thing the bot was doing.
+//
+// Not simply the first or last name: ActionsManager.Iterator does not hand them
+// back in a dependable stack order, and both ends were tried. A run reported
+// every bot as "MainAction 100%" and then as "ScenarioMonitor 100%", which are
+// columns of numbers that say nothing while looking like they say something.
+//
+// The mod's own actions all begin "Defender", so the deepest of those is the
+// answer whenever there is one. Failing that, anything that is not scaffolding.
+// Failing that, the scaffolding itself, which does mean idle.
 func innermost(stack string) string {
 	if stack == "" {
 		return "none"
 	}
 
-	for i := 0; i+2 < len(stack); i++ {
-		if stack[i] == ' ' && stack[i+1] == '<' && stack[i+2] == ' ' {
-			return stack[:i]
+	parts := strings.Split(stack, " < ")
+	answer := ""
+
+	for _, p := range parts {
+		if strings.HasPrefix(p, "Defender") {
+			answer = p
 		}
 	}
 
-	return stack
+	if answer != "" {
+		return answer
+	}
+
+	for _, p := range parts {
+		if !scaffolding[p] {
+			answer = p
+		}
+	}
+
+	if answer != "" {
+		return answer
+	}
+
+	return parts[len(parts)-1]
 }
 
 func pct(part, whole int) int {

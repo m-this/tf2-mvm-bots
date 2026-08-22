@@ -124,10 +124,17 @@ public Action Command_DumpMedic(int client, int args)
 
 		float theirs[3]; theirs = GetAbsOrigin(patient);
 
-		ReplyToCommand(client, "%N: healing %N, %.0f behind him, %.0f from the bomb, he is %.0f from it, %s, %s",
+		/* The path itself, because "he is not moving" and "he has nowhere to walk" look the same
+		
+		A medic parked in the middle of Coaltown for thirty five seconds with a patient two
+		thousand units away is either refusing to walk or being told there is no way there, and
+		nothing printed so far could tell those apart. */
+		float pathLength = m_pPath[i].GetLength();
+		
+		ReplyToCommand(client, "%N: healing %N, %.0f behind him, %.0f from the bomb, he is %.0f from it, %s, path %.0f long, %s",
 			i, patient, GetVectorDistance(mine, theirs), fromBomb,
 			haveBomb ? GetVectorDistance(theirs, bomb.vPosition) : -1.0,
-			g_arrPluginBot[i].bPathing ? "walking" : "stood still", stack);
+			g_arrPluginBot[i].bPathing ? "walking" : "stood still", pathLength, stack);
 	}
 
 	return Plugin_Handled;

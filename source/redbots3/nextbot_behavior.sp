@@ -162,6 +162,59 @@ void ResetNextBot(int client)
 #endif
 }
 
+/* What to do when the nav mesh will not give a path to somewhere the bot has to be
+
+Every behaviour in this mod that walks anywhere sets a goal, sets bPathing, and trusts that this
+function gets the bot there. Nothing ever checked whether a path came back. ComputeToTarget returns
+a bool and it was discarded, so a failed computation left an empty path, Update walked the bot
+along nothing, and the behaviour above went on believing it was travelling.
+
+Measured on Coaltown: a medic with a live patient two thousand units away, "walking", path 0 long,
+in the same spot for thirty five seconds while a demoman on half health fought without him. That is
+the medic stuck in the middle of the map, reported four times and blamed on four different things,
+this one included.
+
+The mesh usually refuses from one particular piece of ground rather than for the whole journey, so
+the answer is to get off that ground. A step in the goal's direction, guarded the same way the
+attack strafe guards one, and the next computation is made from somewhere else. Counted, because a
+bot doing this often is a bot the map's nav mesh has a hole in. */
+#define PATH_NUDGE_STEP		120.0
+#define PATH_RETRY_INTERVAL	0.5
+
+static bool m_bPathFailed[MAXPLAYERS + 1];
+static int m_iPathFailures[MAXPLAYERS + 1];
+
+int PathFailuresOf(int client)
+{
+	return m_iPathFailures[client];
+}
+
+static void NudgeTowardsGoal(int client, INextBot myBot, const float goal[3])
+{
+	ILocomotion myLoco = myBot.GetLocomotionInterface();
+	
+	if (!myLoco.IsOnGround())
+		return;
+	
+	float myOrigin[3]; myOrigin = GetAbsOrigin(client);
+	float towards[3]; SubtractVectors(goal, myOrigin, towards);
+	
+	towards[2] = 0.0;
+	
+	if (NormalizeVector(towards, towards) < 1.0)
+		return;
+	
+	float step[3];
+	step[0] = myOrigin[0] + towards[0] * PATH_NUDGE_STEP;
+	step[1] = myOrigin[1] + towards[1] * PATH_NUDGE_STEP;
+	step[2] = myOrigin[2];
+	
+	if (!myLoco.IsPotentiallyTraversable(myOrigin, step, IMMEDIATELY) || myLoco.HasPotentialGap(myOrigin, step))
+		return;
+	
+	myLoco.Approach(step);
+}
+
 #if defined EXTRA_PLUGINBOT
 void PluginBot_SimulateFrame(int client)
 {
@@ -183,21 +236,42 @@ void PluginBot_SimulateFrame(int client)
 		{
 			INextBot myBot = CBaseNPC_GetNextBotOfEntity(client);
 			
+			float goal[3];
+			
+			if (shouldPathToVec)
+				goal = g_arrPluginBot[client].vecPathGoal;
+			else
+				goal = GetAbsOrigin(g_arrPluginBot[client].iPathGoalEntity);
+			
 			if (m_flRepathTime[client] <= GetGameTime())
 			{
 				CBaseCombatCharacter(client).UpdateLastKnownArea();
 				
-				if (shouldPathToVec)
-					m_pPath[client].ComputeToPos(myBot, g_arrPluginBot[client].vecPathGoal);
-				else if (shouldPathToEntity)
-					m_pPath[client].ComputeToTarget(myBot, g_arrPluginBot[client].iPathGoalEntity);
+				bool built;
 				
-				m_flRepathTime[client] = GetGameTime() + 0.2;
+				if (shouldPathToVec)
+					built = m_pPath[client].ComputeToPos(myBot, g_arrPluginBot[client].vecPathGoal);
+				else
+					built = m_pPath[client].ComputeToTarget(myBot, g_arrPluginBot[client].iPathGoalEntity);
+				
+				//An empty path is a failure the same as a refusal, and it is the shape seen in play
+				bool failed = !built || m_pPath[client].GetLength() <= 0.0;
+				
+				if (failed && !m_bPathFailed[client])
+					m_iPathFailures[client]++;
+				
+				m_bPathFailed[client] = failed;
+				
+				//Retrying a refusal on the walking interval is most of a frame's path work for nothing
+				m_flRepathTime[client] = GetGameTime() + (failed ? PATH_RETRY_INTERVAL : 0.2);
 			}
 			
 			//I don't see a reason to use UpdateLastKnownArea again
 			
-			m_pPath[client].Update(myBot);
+			if (m_bPathFailed[client])
+				NudgeTowardsGoal(client, myBot, goal);
+			else
+				m_pPath[client].Update(myBot);
 		}
 	}
 }
