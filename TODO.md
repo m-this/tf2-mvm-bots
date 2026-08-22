@@ -51,6 +51,14 @@ One line each. The spec has the detail and the reasoning.
 - `AddBotsFromChosenTeamComposition` counts who is already on RED. It added the
   whole lineup, which is right only while nothing else fills the team before the
   wave, and tf2-archipelago now does.
+- The dispenser build stopped ending itself three seconds in on a flag only the
+  idle action refreshes. Mannworks went from 13% dispenser uptime to 39%.
+- An engineer with no sentry builds one instead of considering a move, which is
+  what left him standing on Bigrock for most of a wave.
+- The sentry stands in front of the engineer like the other two buildings, and
+  every part of building one has a clock on it.
+- `testbed/sweep.sh` plays every installed map and `testbed/sweepreport` reads a
+  whole sweep. See `specs/sweep-2026-08-22.md`.
 - The loadout file can name a seat of `sm_redbots_manager_team_composition` and
   not only a class, so seat 1 holds the wrangler and seat 2 need not.
 
@@ -175,6 +183,21 @@ about which way to be caught, and it wants a play-test rather than an argument.
 
 No official map names a `TeleporterEntrance` and none needs to: the route out of
 spawn is read from the mesh. The six that name a `TeleporterExit` still use it.
+
+## 6a. The Demoman is the weakest seat, and it is in every lineup. Open
+
+A sweep of every map put it at 1634 damage a wave across forty waves, against
+the Heavy's 8594, with a seat in all seven lineups.
+
+It is not aim. 308 damage a kill is better than the Pyro's 354 and the Heavy's
+425: it is efficient with what it fires and does not fire enough. Three things
+to check before touching `botaim.sp`, in this order:
+
+1. `ShouldUseStickyLauncher` only lets the launcher out for a giant, the bomb
+   carrier, or three enemies within 1200 units. Everything else is the Iron
+   Bomber's four-round clip.
+2. Time laying a trap is time not shooting, and nothing counts it.
+3. Not the tank case: the launcher already scores 110 there, above the primary.
 
 ## 6. The sticky launchers that want playing differently. Open
 
