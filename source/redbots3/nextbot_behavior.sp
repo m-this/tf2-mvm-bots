@@ -1853,7 +1853,14 @@ void EquipBestWeaponForThreat(int client, const CKnownEntity threat)
 			float myOrigin[3]; GetClientAbsOrigin(client, myOrigin);
 			float threatRange = GetVectorDistance(myOrigin, threatOrigin);
 
-			if (secondary != -1 && ShouldUseStickyLauncher(client, secondary, threatEnt, threatRange))
+			bool wantSticky = secondary != -1 && ShouldUseStickyLauncher(client, secondary, threatEnt, threatRange);
+
+			/* An empty launcher is not the weapon that lands, whatever the rule above says
+			
+			It matters more now the launcher is what he reaches for by default: holding eight
+			spent bombs through the reload is a second and a half of nothing with a loaded grenade
+			launcher in the other hand. */
+			if (wantSticky && Clip1(secondary) > 0)
 				gun = secondary;
 			else if (gun != -1 && !Clip1(gun) && secondary != -1 && Clip1(secondary))
 				gun = secondary;
