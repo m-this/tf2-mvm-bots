@@ -1,6 +1,20 @@
 #define BUY_UPGRADES_MAX_TIME	30.0
 #define BUY_UPGRADES_FAST_MAX_TIME	3.0
 
+/* A building rebuilding cannot improve on: finished being built, and at its top level
+
+Its own rather than nextbot_behavior's IsBuildingFinished, which this file is included ahead of. */
+static bool NothingLeftToBuild(int building)
+{
+	if (building == INVALID_ENT_REFERENCE || !IsValidEntity(building))
+		return false;
+	
+	if (TF2_IsBuilding(building))
+		return false;
+	
+	return TF2_IsMiniBuilding(building) || TF2_GetUpgradeLevel(building) >= 3;
+}
+
 static int MAX_INT = 99999999;
 static int MIN_INT = -99999999;
 
@@ -184,24 +198,33 @@ public void CTFBotUpgrade_OnEnd(BehaviorAction action, int actor, BehaviorAction
 	decision, it is a leak. */
 	KV_MvM_UpgradesDone(actor);
 	
-	/* Buildings come down after every shopping trip
+	/* What comes down after a shopping trip, and what is left standing
 
-	Keeping them was tried and reverted: an engineer that keeps a level 1 keeps it, and the wave
-	starts with a level 1 in front of it instead of the level 3 it would have rebuilt. Rebuilding
-	from nothing costs a walk and some metal, and a level 3 is worth both.
+	Everything used to. That was right about a level 1, which is worth less than the level 3 the
+	engineer would rebuild in the time he has, and wrong about a level 3, which is worth more than
+	anything he can do with the break: taking one down means a walk, three hundred metal, and
+	another go at every way placing a building can fail. Reported from play as the engineer
+	destroying perfectly good buildings between waves on a path that had not changed.
 
-	The relocation work wanted this gated on whether the nest moved. That gate is what left the
-	level 1 standing, so it is gone rather than made conditional again */
+	So the test is whether rebuilding could produce anything better. A finished building on ground
+	the nest still occupies cannot be improved on, and stays. Anything short of finished comes
+	down, and so does everything when the nest has moved, because then it is in the wrong place
+	however good it is. */
 	if (TF2_GetPlayerClass(actor) == TFClass_Engineer && GameRules_GetRoundState() == RoundState_BetweenRounds)
 	{
-		if (m_aNestAreaRelocate[actor] != NULL_AREA)
+		bool nestMoved = m_aNestAreaRelocate[actor] != NULL_AREA;
+		
+		if (nestMoved)
 		{
 			m_aNestArea[actor] = m_aNestAreaRelocate[actor];
 			m_aNestAreaRelocate[actor] = NULL_AREA;
 		}
 		
-		DetonateObjectOfType(actor, TFObject_Sentry);
-		DetonateObjectOfType(actor, TFObject_Dispenser);
+		if (nestMoved || !NothingLeftToBuild(GetObjectOfType(actor, TFObject_Sentry)))
+			DetonateObjectOfType(actor, TFObject_Sentry);
+		
+		if (nestMoved || !NothingLeftToBuild(GetObjectOfType(actor, TFObject_Dispenser)))
+			DetonateObjectOfType(actor, TFObject_Dispenser);
 	}
 	
 	// UpdateLookAroundForEnemies(actor, true);

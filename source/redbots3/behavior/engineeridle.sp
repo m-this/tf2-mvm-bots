@@ -493,7 +493,15 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 	if (m_ctSentrySafe[actor] > GetGameTime() && !g_bGoingToGrabBuilding[actor] && ShouldBuildDisposable(actor))
 		return action.SuspendFor(CTFBotMvMEngineerBuildDisposable(), "Nest is up, standing a mini beside it");
 	
-	if (dispenser != INVALID_ENT_REFERENCE && m_ctSentrySafe[actor] > GetGameTime())
+	/* The dispenser is only a job once the sentry is not one
+	
+	This branch comes first and returns, so an engineer whose dispenser was a level two stood at it
+	swinging a wrench while the sentry twenty feet away was being shot to pieces. The sentry is the
+	nest; the dispenser is what feeds it. Reported as the engineer not repairing his buildings,
+	which he was doing, just never the one being destroyed. */
+	bool sentryWantsMetal = sentry != INVALID_ENT_REFERENCE && SentryNeedsMetal(sentry);
+	
+	if (dispenser != INVALID_ENT_REFERENCE && !sentryWantsMetal && m_ctSentrySafe[actor] > GetGameTime())
 	{
 		if (TF2_GetUpgradeLevel(dispenser) < 3 || BaseEntity_GetHealth(dispenser) < TF2Util_GetEntityMaxHealth(dispenser))
 		{
