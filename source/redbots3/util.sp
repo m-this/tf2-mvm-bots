@@ -364,27 +364,90 @@ bool HasSniperRifle(int client)
 	return WeaponID_IsSniperRifle(TF2Util_GetWeaponID(iWeapon));
 }
 
+//More than an engineer is supposed to own, which is the point: he is not supposed to and he does
+#define MAX_PLAYER_OBJECTS	8
+
+/* Whether the toolbox in his hands is set to build the thing this action came here to build
+
+Every build action used to ask only whether he was holding the toolbox at all, and the toolbox
+remembers what it was last told to make. So an engineer walking from one build straight into the
+next never re-issued the command, and pressed fire on a toolbox still set to the last job.
+
+Measured on Coaltown: he finishes the dispenser at his nest, walks to the spawn to put down the
+teleporter entrance, and the entrance never happens because the toolbox is still set to dispenser.
+What goes down at the spawn is a second dispenser, which is both the "dispenser right beside the
+teleporter entrance" and the "two dispensers for one engineer" from play. */
+stock bool IsBuilderSetTo(int client, TFObjectType type, TFObjectMode mode = TFObjectMode_None)
+{
+	int weapon = BaseCombatCharacter_GetActiveWeapon(client);
+	
+	if (weapon < 1 || TF2Util_GetWeaponID(weapon) != TF_WEAPON_BUILDER)
+		return false;
+	
+	if (GetEntProp(weapon, Prop_Send, "m_iObjectType") != view_as<int>(type))
+		return false;
+	
+	//Only the teleporter has two of them, and putting an entrance down for an exit is the same bug
+	if (type == TFObject_Teleporter && GetEntProp(weapon, Prop_Send, "m_iObjectMode") != view_as<int>(mode))
+		return false;
+	
+	return true;
+}
+
+/* Every building of the type, not the first one found
+
+An engineer is not meant to be able to hold two dispensers, and one was measured holding two on
+Coaltown: the working one at his nest, and a second at the spawn a teleporter's width from his
+entrance. Taking down "the" dispenser between waves took down whichever came first in his object
+list, so the other one outlived it, and then outlived every wave after that. The nest was rebuilt
+each break and the stray never was. Reported as two dispensers for one engineer.
+
+Collected before any of them is detonated, because detonating edits the list being walked. */
 void DetonateObjectOfType(int client, TFObjectType iType, TFObjectMode iMode = TFObjectMode_None, bool bIgnoreSapperState = false)
 {
-	int iObj = GetObjectOfType(client, iType, iMode);
+	int found[MAX_PLAYER_OBJECTS];
+	int count = 0;
 	
-	if (iObj == -1)
-		return;
+	int iNumObjects = TF2Util_GetPlayerObjectCount(client);
 	
-	if (!bIgnoreSapperState && (TF2_HasSapper(iObj) || TF2_IsPlasmaDisabled(iObj)))
-		return;
-	
-	Event hEvent = CreateEvent("object_removed");
-	
-	if (hEvent)
+	for (int i = 0; i < iNumObjects && count < MAX_PLAYER_OBJECTS; i++)
 	{
-		hEvent.SetInt("userid", GetClientUserId(client));
-		hEvent.SetInt("objecttype", iType);
-		hEvent.SetInt("index", iObj);
-		hEvent.Fire();
+		int iObj = TF2Util_GetPlayerObject(client, i);
+		
+		if (TF2_GetObjectType(iObj) != iType)
+			continue;
+		
+		if (iType == TFObject_Teleporter && TF2_GetObjectMode(iObj) != iMode)
+			continue;
+		
+		if (TF2_IsDisposableBuilding(iObj))
+			continue;
+		
+		if (!bIgnoreSapperState && (TF2_HasSapper(iObj) || TF2_IsPlasmaDisabled(iObj)))
+			continue;
+		
+		found[count++] = EntIndexToEntRef(iObj);
 	}
 	
-	TF2_DetonateObject(iObj);
+	for (int i = 0; i < count; i++)
+	{
+		int iObj = EntRefToEntIndex(found[i]);
+		
+		if (iObj == INVALID_ENT_REFERENCE || !IsValidEntity(iObj))
+			continue;
+		
+		Event hEvent = CreateEvent("object_removed");
+		
+		if (hEvent)
+		{
+			hEvent.SetInt("userid", GetClientUserId(client));
+			hEvent.SetInt("objecttype", iType);
+			hEvent.SetInt("index", iObj);
+			hEvent.Fire();
+		}
+		
+		TF2_DetonateObject(iObj);
+	}
 }
 
 int GetObjectOfType(int client, TFObjectType iObjectType, TFObjectMode iObjectMode = TFObjectMode_None)
@@ -415,16 +478,6 @@ float[] GetAbsOrigin(int entity)
 	float vec[3]; CBaseEntity(entity).GetAbsOrigin(vec);
 	
 	return vec;
-}
-
-bool IsWeapon(int client, int iWeaponID)
-{
-	int iWeapon = BaseCombatCharacter_GetActiveWeapon(client);
-	
-	if (iWeapon > 0)
-		return TF2Util_GetWeaponID(iWeapon) == iWeaponID;
-	
-	return false;
 }
 
 bool IsSentryBusterRobot(int client)

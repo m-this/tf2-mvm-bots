@@ -134,7 +134,7 @@ public Action CTFBotMvMEngineerBuildSentrygun_Update(BehaviorAction action, int 
 	if (range_to_stand < 200.0) 
 	{
 		//Start building a sentry
-		if (myWeapon != -1 && TF2Util_GetWeaponID(myWeapon) != TF_WEAPON_BUILDER)
+		if (!IsBuilderSetTo(actor, TFObject_Sentry))
 			FakeClientCommandThrottled(actor, "build 2");
 		
 		UpdateLookAroundForEnemies(actor, false);

@@ -175,7 +175,7 @@ public Action CTFBotMvMEngineerBuildDispenser_Update(BehaviorAction action, int 
 	if (range_to_stand < 200.0) 
 	{
 		//Start building a dispenser
-		if (!IsWeapon(actor, TF_WEAPON_BUILDER))
+		if (!IsBuilderSetTo(actor, TFObject_Dispenser))
 			FakeClientCommandThrottled(actor, "build 0");
 		
 		//It goes where he looks, so he looks at the spot. Turning on the spot only turns the problem
