@@ -73,6 +73,13 @@ enum struct esMapConfiguration
 	ArrayList adtNestNoTankLocation;
 	//The lineup this map wants, comma separated, empty when it does not care
 	char strComposition[128];
+	/* Whether the engineers are expected to pick the nest up and move it between waves
+
+	Mannhattan's gates move the front, and Rottenburg wants a different nest for a tank wave than
+	for one without. On a map like that a disposable sentry covers the ground while the real one is
+	in a toolbox, and is worth buying. On every other map it is a hundred and fifty credits for a
+	second sentry nobody moves, which is what the guides mean when they say never. */
+	bool bMovingNests;
 	
 	void Initialize()
 	{
@@ -96,6 +103,7 @@ enum struct esMapConfiguration
 		this.adtNestTankOnlyLocation.Clear();
 		this.adtNestNoTankLocation.Clear();
 		this.strComposition[0] = '\0';
+		this.bMovingNests = false;
 	}
 }
 
@@ -2708,13 +2716,14 @@ void Config_LoadMap()
 	Config_LoadLocations(kv, "NestTankOnly", g_arrMapConfig.adtNestTankOnlyLocation);
 	Config_LoadLocations(kv, "NestNoTank", g_arrMapConfig.adtNestNoTankLocation);
 	kv.GetString("Composition", g_arrMapConfig.strComposition, sizeof(g_arrMapConfig.strComposition), "");
+	g_arrMapConfig.bMovingNests = kv.GetNum("MovingNests", 0) != 0;
 	
 	CloseHandle(kv);
 	
 	/* One line, always. Whoever authored a map file needs to know it was read, and a typo in a
 	block name is otherwise silent: the block is skipped, the list stays empty, and the bots fall
 	back to the nav mesh as though nobody had written anything */
-	LogMessage("Config_LoadMap: %s: %d sniper, %d nest, %d nest-tank, %d nest-notank, %d dispenser, %d tele-in, %d tele-out",
+	LogMessage("Config_LoadMap: %s: %d sniper, %d nest, %d nest-tank, %d nest-notank, %d dispenser, %d tele-in, %d tele-out, moving nests %d",
 		mapName,
 		g_arrMapConfig.adtSniperSpot.Length,
 		g_arrMapConfig.adtEngineerNestLocation.Length,
@@ -2722,7 +2731,8 @@ void Config_LoadMap()
 		g_arrMapConfig.adtNestNoTankLocation.Length,
 		g_arrMapConfig.adtDispenserLocation.Length,
 		g_arrMapConfig.adtTeleporterEntranceLocation.Length,
-		g_arrMapConfig.adtTeleporterExitLocation.Length);
+		g_arrMapConfig.adtTeleporterExitLocation.Length,
+		g_arrMapConfig.bMovingNests);
 }
 
 /* Every "origin" under a named block, in map order
