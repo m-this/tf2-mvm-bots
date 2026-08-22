@@ -976,6 +976,12 @@ int PowerupBottle_GetNumCharges(int bottle)
 	}
 } */
 
+//CTFPowerupBottle::GetPowerupType
+int PowerupBottle_GetType(int bottle)
+{
+	return GetEntProp(bottle, Prop_Send, "m_usAdvancedType");
+}
+
 int GetPowerupBottle(int client)
 {
 	int ent = -1;

@@ -11,7 +11,39 @@ static float m_flNextJumpTime[MAXPLAYERS + 1];
 static float m_flScoutDoubleJumpTime[MAXPLAYERS + 1];
 static int m_iScoutDoubleJumpSide[MAXPLAYERS + 1];
 
-static int m_nCurrentPowerupBottle[MAXPLAYERS + 1];
+/* The bottle this bot is wearing, kept rather than found again every frame
+
+Finding it walks the entity list looking for a tf_powerup_bottle, and this runs on the player
+command, which is every frame for every bot. The bottle is a wearable: it appears when the bot
+spawns and does not move afterwards, so it is worth exactly one lookup a life.
+
+The second was worse. This used to be a cached canteen type, written by the purchase code, and the
+purchase code is gone: nothing wrote it any more, so the switch below always read "no bottle" and
+a bot handed a canteen would never have drunk it. The type comes off the bottle now, which is
+where it was always true. */
+static int m_hPowerupBottle[MAXPLAYERS + 1] = {INVALID_ENT_REFERENCE, ...};
+static float m_ctPowerupBottleLook[MAXPLAYERS + 1];
+
+static int PowerupBottleOf(int client)
+{
+	int bottle = EntRefToEntIndex(m_hPowerupBottle[client]);
+	
+	if (bottle != INVALID_ENT_REFERENCE)
+		return bottle;
+	
+	//A bot with no bottle is the normal case now, and it should not cost an entity walk a frame
+	if (m_ctPowerupBottleLook[client] > GetGameTime())
+		return -1;
+	
+	m_ctPowerupBottleLook[client] = GetGameTime() + 1.0;
+	
+	bottle = GetPowerupBottle(client);
+	
+	if (bottle != -1)
+		m_hPowerupBottle[client] = EntIndexToEntRef(bottle);
+	
+	return bottle;
+}
 static float m_flNextBottleUseTime[MAXPLAYERS + 1];
 
 #if defined EXTRA_PLUGINBOT
@@ -99,7 +131,8 @@ void ResetNextBot(int client)
 	ResetSpyCheck(client);
 	ResetStickyTrap(client);
 	
-	m_nCurrentPowerupBottle[client] = POWERUP_BOTTLE_NONE;
+	m_hPowerupBottle[client] = INVALID_ENT_REFERENCE;
+	m_ctPowerupBottleLook[client] = 0.0;
 	m_flNextBottleUseTime[client] = 0.0;
 	
 	m_iAttackTarget[client] = -1;
@@ -1591,7 +1624,7 @@ bool OpportunisticallyUsePowerupBottle(int client, int activeWeapon, INextBot bo
 	if (m_flNextBottleUseTime[client] > GetGameTime())
 		return false;
 	
-	int bottle = GetPowerupBottle(client);
+	int bottle = PowerupBottleOf(client);
 	
 	if (bottle == -1)
 		return false;
@@ -1599,7 +1632,7 @@ bool OpportunisticallyUsePowerupBottle(int client, int activeWeapon, INextBot bo
 	if (PowerupBottle_GetNumCharges(bottle) < 1)
 		return false;
 	
-	switch (m_nCurrentPowerupBottle[client])
+	switch (PowerupBottle_GetType(bottle))
 	{
 		case POWERUP_BOTTLE_CRITBOOST:
 		{
