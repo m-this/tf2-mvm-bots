@@ -1356,9 +1356,41 @@ Action GetDesiredBotAction(int client, BehaviorAction action)
 					return action.SuspendFor(CTFBotCollectNearMoney(), "Nearby money");
 			}
 		}
+		
+		/* Nothing to shoot, no tank, no money on the floor: go and hold the hatch
+
+		Every branch above needs something to already be happening, and when none of them does the
+		bot was handed back to the game with no instruction at all. What that looks like from
+		inside the game is a Pyro standing next to the spawn door, not moving, for as long as no
+		robot walks into his view. Reported exactly that way, and it is worst right after a
+		respawn, because that is when a defender is furthest from anything worth doing.
+
+		CTFBotGuardPoint has been in this repository the whole time and nothing has ever called it.
+		It walks to the ground around the hatch and stays there, which is the answer to "there is
+		nothing to do yet" on a map where everything eventually comes to the hatch, and it hands
+		the bot back the moment there is something to fight. */
+		if (CanGuardTheHatch(client))
+			return action.SuspendFor(CTFBotGuardPoint(), "Nothing to do, so hold the hatch");
 	}
 	
 	return Plugin_Continue;
+}
+
+/* Whether this bot is one of the ones that should fall back to holding the hatch
+
+The Engineer has his nest, the Spy is lurking, the Sniper has his spot and the Medic follows
+somebody: all four already have somewhere to be when there is nothing to shoot. The Scout is
+collecting money, which is his job and takes him wherever the money is. What is left is the three
+that fight, and standing still is what they were doing instead. */
+static bool CanGuardTheHatch(int client)
+{
+	switch (TF2_GetPlayerClass(client))
+	{
+		case TFClass_Soldier, TFClass_Pyro, TFClass_DemoMan, TFClass_Heavy:
+			return true;
+	}
+
+	return false;
 }
 
 Action GetUpgradePostAction(int client, BehaviorAction action)
