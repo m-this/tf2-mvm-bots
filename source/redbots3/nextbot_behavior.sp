@@ -1519,9 +1519,9 @@ float GetDesiredAttackRange(int client)
 	if (weaponID == TF_WEAPON_ROCKETLAUNCHER)
 		return 1250.0;
 	
-	//A pipe that has to be led is a pipe that rolls past. The same reasoning as the Iron Bomber
+	//The same answer as the Iron Bomber, which is the launcher this loadout actually hands out
 	if (weaponID == TF_WEAPON_GRENADELAUNCHER)
-		return DemoPipeRange();
+		return DEMO_PIPE_SETTLE;
 	
 	return 500.0;
 }

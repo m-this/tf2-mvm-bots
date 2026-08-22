@@ -19,31 +19,36 @@ its weapon ID already gave, so this file only ever narrows behaviour that was pr
 //No opinion: the caller keeps the range its weapon ID produced.
 #define RANGE_TUNING_NONE 0.0
 
-/* How close a Demoman gets before he starts throwing pipes
+/* How close a Demoman gets before he settles, and how far away he will still throw a pipe
 
-Six hundred was the number, and the reasoning written next to it was that the blast should not
-catch the bot. The blast is 146 units across, so six hundred is four times further out than that
-buys, and the cost of the extra distance is the whole difference between a pipe and a roller.
+Two different numbers and it took a measurement to learn which one was the problem.
 
-A grenade leaves the launcher at about 1200 units a second and falls the whole way. At six hundred
-units that is more than half a second in the air, and a robot walking at two hundred and fifty has
-moved a hundred and forty by the time it lands: the bot has to lead it, leading is the one thing
-this bot is worst at, and what actually happens is the pipe bounces past and rolls. At three
-hundred and fifty it is a quarter of a second and sixty or seventy units of lead, which is inside
-the blast, so a shot aimed at where the robot is still hurts it.
+Closing in was tried first, on the reasoning that a pipe thrown from six hundred units is half a
+second in the air and a walking robot has moved a hundred and forty by the time it lands. Three
+fifty instead of six hundred, six waves a side on three maps:
 
-The wiki's Demoman page is written around direct hits for exactly this reason: two direct pipes
-kill every small robot short of a Heavy, and no number of rollers does. Three fifty is still more
-than twice the blast radius, so the bot does not blow itself up getting there.
+  settles at 600   1403, 2096, 1305 damage a wave on Coaltown, Decoy, Mannworks
+  settles at 350    929, 1274, 1238
 
-Reported from play before it was measured: the Demomen shoot from too far away. */
-#define DEMO_PIPE_RANGE_CLOSE	350.0
-#define DEMO_PIPE_RANGE_FAR		600.0
+Down on all three. Walking in is time not shooting, and in this mode the robots are walking to him
+anyway, so the ground he gives up to reach them is ground he has to cross again.
 
-//Which of the two, so the pair can be played against each other rather than argued about
-stock float DemoPipeRange()
+The number that was wrong is the other one. maxRange is where the bot stops firing at all, and at
+fourteen hundred units a pipe is well over a second in the air and lands wherever the robot is
+not. The bot fires the whole way in from there, which is a clip and a reload spent on nothing, and
+it is what "the Demomen shoot from too far away" looks like from outside. The stock launcher was
+worse: absent from this table, it fell through to no limit at all and threw pipes across the map.
+
+Nine hundred still covers the approach: he settles at six hundred, so there is room to fire while
+closing without firing at a rumour. */
+#define DEMO_PIPE_SETTLE		600.0
+#define DEMO_PIPE_HOLD_FIRE		900.0
+#define DEMO_PIPE_FIRE_ANYWAY	1400.0
+
+//Which of the two, so the pair get played against each other rather than argued about
+stock float DemoPipeMaxRange()
 {
-	return Feature(FEATURE_DEMO_CLOSE_IN) ? DEMO_PIPE_RANGE_CLOSE : DEMO_PIPE_RANGE_FAR;
+	return Feature(FEATURE_DEMO_HOLD_FIRE) ? DEMO_PIPE_HOLD_FIRE : DEMO_PIPE_FIRE_ANYWAY;
 }
 
 /* Ranges for one weapon. False when the table says nothing about it, and neither output is
@@ -104,8 +109,8 @@ stock bool GetTunedWeaponRanges(int weapon, float &desired, float &maxRange)
 		}
 		case 1151: //Iron Bomber
 		{
-			desired = DemoPipeRange();
-			maxRange = 1400.0;
+			desired = DEMO_PIPE_SETTLE;
+			maxRange = DemoPipeMaxRange();
 		}
 		case 730: //Beggar's Bazooka
 		{

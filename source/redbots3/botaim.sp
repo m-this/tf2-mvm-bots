@@ -816,6 +816,13 @@ float GetMaxAttackRange(int client)
 	if (myWeaponID == TF_WEAPON_ROCKETLAUNCHER)
 		return 3000.0;
 	
+	/* The stock launcher gets the same answer the Iron Bomber does
+	
+	It is absent from the tuning table, so it fell through to no limit at all and threw pipes
+	across the map at anything it could see. */
+	if (myWeaponID == TF_WEAPON_GRENADELAUNCHER)
+		return DemoPipeMaxRange();
+	
 	return FLT_MAX;
 }
 
