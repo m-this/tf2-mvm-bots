@@ -963,6 +963,18 @@ bool IsBetterPatient(int candidate, int incumbent)
 	if (incumbent <= 0 || !IsClientInGame(incumbent) || !IsPlayerAlive(incumbent))
 		return true;
 
+	/* A Heavy outranks everybody, said as a class rather than left to the arithmetic
+
+	Maximum health picks him out on its own most of the time, and "most of the time" is the
+	problem: a Soldier who has bought health and a Heavy who has not are a coin toss, and the beam
+	moving off the Heavy for that is the beam on the wrong man. He is the body the team is built
+	around and there is no wave where somebody else is the better pocket. */
+	bool candidateIsHeavy = TF2_GetPlayerClass(candidate) == TFClass_Heavy;
+	bool incumbentIsHeavy = TF2_GetPlayerClass(incumbent) == TFClass_Heavy;
+
+	if (candidateIsHeavy != incumbentIsHeavy)
+		return candidateIsHeavy;
+
 	int candidateHealth = TF2Util_GetEntityMaxHealth(candidate);
 	int incumbentHealth = TF2Util_GetEntityMaxHealth(incumbent);
 
@@ -1111,6 +1123,19 @@ public Action CTFBotMedicHeal_UpdatePost(BehaviorAction action, int actor, float
 	The game's action picks its own patient and there is no safe way to tell it otherwise, so it
 	is stood down rather than argued with. It gets the medic back the moment nobody is left to
 	heal, which is where its own answer for that, walking to the bomb, is redirected above. */
+	/* Shopping and taking up a position come before chasing anybody
+
+	Between rounds this suspended into the heal action the same as during a wave, so a medic spent
+	the whole upgrade period walking after whoever he had picked: to the station, out of it, across
+	the map, wherever that man went. Reported as the medic getting lost.
+
+	Nothing is trying to kill anybody in that window and a full health bar does not need him, so
+	the ordinary between-rounds behaviour has it instead. That buys upgrades and then walks to the
+	front with the rest of them, which is where he wanted to be standing when the wave starts.
+	Once he is ready he can go back to picking a patient. */
+	if (GameRules_GetRoundState() == RoundState_BetweenRounds && !IsPlayerReady(actor))
+		return Plugin_Continue;
+
 	if (PreferredPatient(actor) > 0)
 		return action.SuspendFor(CTFBotDefenderMedicHeal(), "Heal the biggest body");
 	
