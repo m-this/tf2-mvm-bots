@@ -15,6 +15,7 @@
 #include <sourcemod>
 #include <tf2_stocks>
 #include <sdkhooks>
+#include <tf2utils>
 
 #pragma semicolon 1
 #pragma newdecls required
@@ -23,6 +24,26 @@
 
 //A wave is hundreds of deaths and a line is written per wave, so the file is small on purpose
 #define STATS_LINE_LENGTH	2048
+
+/* A frame the server did not finish inside its own tick
+
+The mod runs a path computation or two per bot per second and there are a dozen bots, so the
+question of whether it fits in a tick is a real one and it is not answerable by watching. The
+server runs at 66 ticks a second, which is a budget of about fifteen milliseconds a frame; twice
+that is a frame somebody felt, and four times it is the watchdog's territory.
+
+Counted rather than averaged. A mean frame time hides exactly the thing worth finding, which is
+the one frame in a thousand that took a third of a second. */
+#define FRAME_BUDGET_MS		15.0
+#define FRAME_SLOW_MS		30.0
+#define FRAME_STALL_MS		100.0
+
+/* How far a building may sit from the nest before it is worth writing down as wrong
+
+A dispenser is meant to be beside the sentry. One at the other end of the map feeds nothing, and
+it is the shape of the bug the reach deadline used to cause, so the distance goes in the file
+rather than a verdict about it. */
+#define ENGINEER_LINE_LENGTH	512
 
 public Plugin myinfo =
 {
@@ -93,9 +114,20 @@ enum struct WaveCounters
 	int deathsToTank;
 	//How it happened, which is a different question from who did it
 	int deathsByCause[DEATH_CAUSE_COUNT];
+	//What the server's own frame times did while the wave ran, which is the mod's cost to the tick
+	int frames;
+	int framesSlow;
+	int framesStalled;
+	float frameWorstMs;
+	float frameTotalMs;
 
 	void Reset()
 	{
+		this.frames = 0;
+		this.framesSlow = 0;
+		this.framesStalled = 0;
+		this.frameWorstMs = 0.0;
+		this.frameTotalMs = 0.0;
 		this.robotKills = 0;
 		this.giantKills = 0;
 		this.tankKills = 0;
@@ -147,6 +179,36 @@ public void OnPluginStart()
 	g_Wave.Reset();
 }
 
+/* The wall clock either side of a frame, which is the only honest way to ask what a frame cost
+
+GetGameFrameTime is the tick interval the server intends, not the time it spent, so it says
+fifteen milliseconds through a stall as happily as through an idle frame. The gap between one
+frame starting and the next one starting is what actually elapsed. */
+static float g_flLastFrame;
+
+public void OnGameFrame()
+{
+	float now = GetEngineTime();
+
+	if (g_flLastFrame > 0.0 && g_flWaveStart > 0.0)
+	{
+		float ms = (now - g_flLastFrame) * 1000.0;
+
+		g_Wave.frames++;
+		g_Wave.frameTotalMs += ms;
+
+		if (ms > g_Wave.frameWorstMs)
+			g_Wave.frameWorstMs = ms;
+
+		if (ms > FRAME_STALL_MS)
+			g_Wave.framesStalled++;
+		else if (ms > FRAME_SLOW_MS)
+			g_Wave.framesSlow++;
+	}
+
+	g_flLastFrame = now;
+}
+
 public void OnMapStart()
 {
 	GetCurrentMap(g_sMap, sizeof(g_sMap));
@@ -180,11 +242,112 @@ static void Event_WaveBegin(Event event, const char[] name, bool dontBroadcast)
 		g_sMap, g_iWave, CountTeam(TFTeam_Red, false), CountTeam(TFTeam_Red, true), features);
 
 	WriteLine(line);
+
+	/* Both ends of the wave, because the two questions are different
+
+	At the beginning it says what the engineer had time to finish between rounds, which is where a
+	teleporter comes from and where a nest that never reached level three shows up. At the end it
+	says what survived. */
+	WriteEngineers("begin");
 }
 
 static void Event_WaveComplete(Event event, const char[] name, bool dontBroadcast)
 {
 	WriteWaveResult("cleared");
+}
+
+/* What every engineer had standing, and where, written as its own line per engineer
+
+Not folded into the wave line, because there is one of these per engineer and the wave line is a
+fixed shape that two runs are diffed on. What it is for is the complaint that reads "the engineer
+misbehaves on this map": a nest that never got a level three sentry, a dispenser at the other end
+of the map from it, a teleporter that never went up. All three are distances and levels rather
+than opinions, and a map that produces them every wave is a map with bad data or bad ground. */
+static void WriteEngineers(const char[] when)
+{
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || TF2_GetClientTeam(i) != TFTeam_Red)
+			continue;
+
+		if (TF2_GetPlayerClass(i) != TFClass_Engineer)
+			continue;
+
+		int sentry = FindOwnedObject(i, TFObject_Sentry);
+		int dispenser = FindOwnedObject(i, TFObject_Dispenser);
+		int entrance = FindOwnedTeleporter(i, TFObjectMode_Entrance);
+		int teleExit = FindOwnedTeleporter(i, TFObjectMode_Exit);
+
+		float sentryAt[3];
+		bool haveSentry = sentry != -1;
+
+		if (haveSentry)
+			GetEntPropVector(sentry, Prop_Send, "m_vecOrigin", sentryAt);
+
+		char name[MAX_NAME_LENGTH]; GetClientName(i, name, sizeof(name));
+
+		char line[ENGINEER_LINE_LENGTH];
+		FormatEx(line, sizeof(line),
+			"{\"event\":\"engineer\",\"map\":\"%s\",\"wave\":%d,\"when\":\"%s\",\"who\":\"%s\","
+			... "\"sentry\":%d,\"dispenser\":%d,\"entrance\":%d,\"exit\":%d,"
+			... "\"dispenser_from_sentry\":%.0f,\"exit_from_sentry\":%.0f,\"alive\":%d}",
+			g_sMap, g_iWave, when, name,
+			BuildingLevel(sentry), BuildingLevel(dispenser), BuildingLevel(entrance), BuildingLevel(teleExit),
+			haveSentry ? RangeToBuilding(sentryAt, dispenser) : -1.0,
+			haveSentry ? RangeToBuilding(sentryAt, teleExit) : -1.0,
+			IsPlayerAlive(i) ? 1 : 0);
+
+		WriteLine(line);
+	}
+}
+
+//Level, or zero when there is no such building, which is the answer the file wants either way
+static int BuildingLevel(int building)
+{
+	if (building == -1)
+		return 0;
+
+	return GetEntProp(building, Prop_Send, "m_iUpgradeLevel");
+}
+
+static float RangeToBuilding(const float from[3], int building)
+{
+	if (building == -1)
+		return -1.0;
+
+	float at[3]; GetEntPropVector(building, Prop_Send, "m_vecOrigin", at);
+
+	return GetVectorDistance(from, at);
+}
+
+static int FindOwnedObject(int client, TFObjectType type)
+{
+	int count = TF2Util_GetPlayerObjectCount(client);
+
+	for (int i = 0; i < count; i++)
+	{
+		int owned = TF2Util_GetPlayerObject(client, i);
+
+		if (TF2_GetObjectType(owned) == type)
+			return owned;
+	}
+
+	return -1;
+}
+
+static int FindOwnedTeleporter(int client, TFObjectMode mode)
+{
+	int count = TF2Util_GetPlayerObjectCount(client);
+
+	for (int i = 0; i < count; i++)
+	{
+		int owned = TF2Util_GetPlayerObject(client, i);
+
+		if (TF2_GetObjectType(owned) == TFObject_Teleporter && TF2_GetObjectMode(owned) == mode)
+			return owned;
+	}
+
+	return -1;
 }
 
 static void Event_WaveFailed(Event event, const char[] name, bool dontBroadcast)
