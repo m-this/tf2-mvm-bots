@@ -651,20 +651,34 @@ static int ClassUpgradePriority(TFClassType pclass, int slot, const char[] attri
 				return 50;
 			}
 
-			//The sentry is the damage. The shotgun only defends it
-			if (StrEqual(attribute, "engy sentry fire rate increased")) return 320;
-			if (StrEqual(attribute, "engy building health bonus")) return 260;
-			if (StrEqual(attribute, "engy disposable sentries")) return 230;
-			/* Dispenser radius is bought early, not last
+			/* The sentry is the damage. The shotgun only defends it
 
-			It used to rank below everything because it heals one engineer standing next to his own
-			dispenser. It does not any more: a bot that is hurt or low on ammo now holds the bomb
-			from a friendly dispenser instead of walking off to a health pack, so the radius is how
-			much of the team that covers. Reported after the 1.3 play-test as "incredibly useful,
-			a very good upgrade to max out early" */
-			if (StrEqual(attribute, "engy dispenser radius increased")) return 240;
+			These rankings are the mod's own and they stay: the wiki puts dispenser range first and
+			sentry firing speed under what to avoid, and a play-test of this mod put the radius
+			where it is for a reason the wiki has no way to know about. A bot that is hurt or low
+			on ammo holds the bomb from a friendly dispenser rather than walking off to a health
+			pack, so the radius is how much of the team that covers, and it was reported as
+			"incredibly useful, a very good upgrade to max out early" from play here.
+
+			Measured beats read. If the ordering is to change it should change because a run said
+			so, not because a page did. */
+			if (StrEqual(attribute, "engy dispenser radius increased")) return 330;
+			if (StrEqual(attribute, "engy sentry fire rate increased")) return 320;
+			/* A second sentry is worth buying only where the first one has to move
+
+			Every guide says never, and every guide is describing an engineer who picks one spot
+			and holds it. On a map whose front moves the sentry spends part of each wave in a
+			toolbox, and a disposable one covers the ground while it does. So it is ranked third
+			where the map says its nests move, and refused everywhere else: a hundred and fifty
+			credits for a second sentry nobody moves is the mistake the guides are warning about. */
+			if (StrEqual(attribute, "engy disposable sentries"))
+				return g_arrMapConfig.bMovingNests ? 310 : -10;
+			
+			if (StrEqual(attribute, "engy building health bonus")) return 260;
 			if (StrEqual(attribute, "metal regen")) return 220;
 			if (StrEqual(attribute, "maxammo metal increased")) return 210;
+			//The Jag swings faster, and swinging is what builds and repairs the nest
+			if (StrEqual(attribute, "melee attack rate bonus")) return 200;
 		}
 		case TFClass_Medic:
 		{
@@ -679,30 +693,43 @@ static int ClassUpgradePriority(TFClassType pclass, int slot, const char[] attri
 		}
 		case TFClass_Sniper:
 		{
-			//One shot through a line of robots, which is what a Sniper is for here
+			/* One shot through a line of robots, then the speed to take the next one
+
+			"The first upgrade you should always get, regardless of context or starting credits,
+			is one tick of Explosive Headshot", then reload speed, then the rest of it.
+
+			Charge rate was ranked second here and the guides rank it nowhere: it is better to
+			land repeated quick shots than to hold one full-damage shot, so damage buys more than
+			charge does. */
 			if (StrEqual(attribute, "explosive sniper shot")) return 330;
-			if (StrEqual(attribute, "SRifle Charge rate increased")) return 240;
+			if (StrEqual(attribute, "faster reload rate")) return 300;
+			if (StrEqual(attribute, "SRifle Charge rate increased")) return 60;
 		}
 		case TFClass_Spy:
 		{
 			if (slot == TF_LOADOUT_SLOT_MELEE)
 			{
 				//A backstab through a giant's armour is the whole class in this mode
+				//Full armour penetration first, then the swing speed, and the sapper long after
 				if (StrEqual(attribute, "armor piercing")) return 330;
 				if (StrEqual(attribute, "melee attack rate bonus")) return 280;
-				if (StrEqual(attribute, "robo sapper")) return 240;
+				if (StrEqual(attribute, "robo sapper")) return 70;
 			}
 		}
 		case TFClass_Pyro:
 		{
-			//Reflecting what is aimed at the team is the job. The flames themselves come first
+			/* The flames first, and as fast as the wallet allows
+
+			"You should try to max out your primary's damage as quickly as possible." Reflecting
+			what is aimed at the team comes after that, not before it. */
+			if (StrEqual(attribute, "damage bonus")) return 320;
 			if (StrEqual(attribute, "attack projectiles")) return 250;
 			/* Afterburn is the last thing to spend a credit on, whatever the flamethrower
 			It does not scale with the upgrade the way direct damage does, a robot dies before it
 			finishes ticking, and a giant outlives it. That holds for the Phlogistinator too: its
 			taunt fills from damage dealt, and direct flame damage is most of what it deals */
-			if (StrEqual(attribute, "weapon burn dmg increased")) return 20;
-			if (StrEqual(attribute, "weapon burn time increased")) return 15;
+			if (StrEqual(attribute, "weapon burn dmg increased")) return -10;
+			if (StrEqual(attribute, "weapon burn time increased")) return -10;
 		}
 		case TFClass_Soldier:
 		{
@@ -714,6 +741,8 @@ static int ClassUpgradePriority(TFClassType pclass, int slot, const char[] attri
 			a blast radius nobody needed. Then damage, then the rest of the general table */
 			if (StrEqual(attribute, "faster reload rate")) return 310;
 			if (StrEqual(attribute, "rocket specialist")) return 290;
+			//"Very helpful throughout the whole game", and it goes under the damage, not over it
+			if (StrEqual(attribute, "heal on kill")) return 250;
 		}
 		case TFClass_DemoMan:
 		{
@@ -731,6 +760,16 @@ static int ClassUpgradePriority(TFClassType pclass, int slot, const char[] attri
 		}
 		case TFClass_Heavy:
 		{
+			/* Staying alive is the first upgrade, because a dead Heavy shoots nothing
+
+			"If you're dead, you're not shooting the robots" is the whole argument and it is the
+			first line of every Heavy guide. This class had one rule before, for shooting down
+			rockets, and took the general table's damage-first answer for everything else.
+
+			Firing speed is deliberately not raised here. The second tick of it does nothing at
+			all, which is a known bug rather than an opinion, so it is capped at one in
+			UpgradeTierCap and left to rank where the general table puts it. */
+			if (StrEqual(attribute, "heal on kill")) return 320;
 			//Shooting down the rockets aimed at the team
 			if (StrEqual(attribute, "attack projectiles")) return 230;
 		}
@@ -738,6 +777,12 @@ static int ClassUpgradePriority(TFClassType pclass, int slot, const char[] attri
 		{
 			//Milk marks a wave for the whole team, which is worth more than what one Scout shoots
 			if (StrEqual(attribute, "applies snare effect")) return 250;
+			/* Two ticks of jump height, early, and the general table had it last of everything
+
+			"On maps like Mannhattan and Decoy, it's usually recommended to get 2 ticks of jump
+			height right away." It is what reaches the credits on a ledge before they expire,
+			which is the job. Two and no more, capped in UpgradeTierCap. */
+			if (StrEqual(attribute, "increased jump height")) return 240;
 			if (StrEqual(attribute, "mad milk syringes")) return 200;
 			//Money is the Scout's job here and it needs the legs to do it
 			if (StrEqual(attribute, "move speed bonus")) return 190;
