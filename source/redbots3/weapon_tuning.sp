@@ -83,6 +83,16 @@ stock bool GetTunedWeaponRanges(int weapon, float &desired, float &maxRange)
 			desired = 250.0;
 			maxRange = 650.0;
 		}
+		/* The stock shotgun, which was absent and took the five hundred unit default
+		
+		Five hundred is minigun ground. Every other shotgun in this table sits between two and
+		three hundred, because that is where the pellets are worth anything, and the one four
+		classes actually carry was the one nobody had written down. */
+		case 199: //Shotgun
+		{
+			desired = 280.0;
+			maxRange = 700.0;
+		}
 		case 527: //Widowmaker
 		{
 			desired = 300.0;

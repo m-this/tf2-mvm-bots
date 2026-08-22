@@ -1565,6 +1565,25 @@ float GetDesiredAttackRange(int client)
 	if (IsMeleeWeapon(weapon) || weaponID == TF_WEAPON_FLAMETHROWER)
 		return 100.0;
 	
+	/* A Pyro closes whatever is in his hands, because the flamethrower is the only reason he is here
+	
+	Reported from play: the Pyro stands a long way back and never gets to use the Phlogistinator.
+	The weapon is chosen by range and the range he closes to is chosen by the weapon, and those two
+	disagreed. Past seven hundred and fifty units he pulls the shotgun; holding the shotgun he
+	settles at shotgun range; and at shotgun range he is inside seven hundred and fifty again, so
+	he swaps back, walks in, swaps out. What that produces is a Pyro parked between the two
+	distances holding the wrong gun.
+	
+	So the distance he closes to is the flamethrower's, always. The shotgun is what he shoots with
+	on the way in, not a reason to stop there. */
+	if (TF2_GetPlayerClass(client) == TFClass_Pyro)
+	{
+		int flamethrower = GetPlayerWeaponSlot(client, TFWeaponSlot_Primary);
+		
+		if (flamethrower != -1 && TF2Util_GetWeaponID(flamethrower) == TF_WEAPON_FLAMETHROWER)
+			return 100.0;
+	}
+	
 	if (WeaponID_IsSniperRifle(weaponID))
 		return FLT_MAX;
 	
