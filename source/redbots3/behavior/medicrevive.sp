@@ -94,8 +94,33 @@ public Action CTFBotMedicRevive_OnInjured(BehaviorAction action, int actor, Addr
 	return action.Continue();
 }
 
+/* Whether there is somebody to revive, held for a moment after it is worked out
+
+The reachability test is a full NavAreaBuildPath and this runs on the tactical monitor's frame,
+twice: once from the game's heal action and once from the mod's. A wave leaves revive markers
+lying about wherever a defender died, so a medic in a fight had one in range most of the time and
+paid for a nav mesh search on every frame of it to be told what it was told last frame.
+
+That is the third call of this shape found in one night, after the health and ammo search and the
+nest scoring. The pattern is worth naming: a nav mesh question inside something that reads like a
+cheap predicate, on a path that runs every frame.
+
+Half a second, which is a medic walking about a hundred and fifty units. A marker does not appear
+and expire inside that. */
+#define MEDIC_REVIVE_ASK_INTERVAL	0.5
+
+static float m_ctReviveAsk[MAXPLAYERS + 1];
+static bool m_bRevivePossible[MAXPLAYERS + 1];
+
 bool CTFBotMedicRevive_IsPossible(int client)
 {
+	if (m_ctReviveAsk[client] > GetGameTime())
+		return m_bRevivePossible[client];
+	
+	m_ctReviveAsk[client] = GetGameTime() + MEDIC_REVIVE_ASK_INTERVAL;
+	
+	m_bRevivePossible[client] = false;
+	
 	int marker = GetNearestReviveMarker(client, MEDIC_REVIVE_RANGE);
 	
 	if (marker == -1)
@@ -103,6 +128,8 @@ bool CTFBotMedicRevive_IsPossible(int client)
 	
 	if (!IsPathToVectorPossible(client, GetAbsOrigin(marker)))
 		return false;
+	
+	m_bRevivePossible[client] = true;
 	
 	return true;
 }
