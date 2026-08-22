@@ -110,19 +110,24 @@ public Action CTFBotMvMEngineerBuildDispenser_Update(BehaviorAction action, int 
 		return action.Done("No hint entity");
 	}
 	
-	if (GetObjectOfType(actor, TFObject_Sentry) == INVALID_ENT_REFERENCE)
+	int sentry = GetObjectOfType(actor, TFObject_Sentry);
+	
+	if (sentry == INVALID_ENT_REFERENCE)
 	{
 		//Fuck you.
 		
 		return action.Done("No sentry");
 	}
-	else
+	
+	/* Asked of the sentry, not of the flag the idle action keeps
+	
+	Suspending the idle action stops its update running, so its three second flag expires three
+	seconds after this one starts however well the sentry is doing. This ended itself on that,
+	every time, and only ever finished a dispenser where the walk and the placement both fitted
+	inside those three seconds. */
+	if (!IsSentrySafe(sentry))
 	{
-		//sentry is not safe.
-		if (m_ctSentrySafe[actor] < GetGameTime())
-		{
-			return action.Done("Sentry not safe");
-		}
+		return action.Done("Sentry not safe");
 	}
 	
 	if (CTFBotMvMEngineerIdle_ShouldAdvanceNestSpot(actor))
