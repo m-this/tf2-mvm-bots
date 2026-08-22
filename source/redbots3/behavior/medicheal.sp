@@ -50,9 +50,9 @@ public Action CTFBotDefenderMedicHeal_Update(BehaviorAction action, int actor, f
 	if (CTFBotMedicRevive_IsPossible(actor))
 		return action.SuspendFor(CTFBotMedicRevive(), "Revive teammate");
 	
-	//The upgrade period belongs to shopping and to standing where the team stands
-	if (GameRules_GetRoundState() == RoundState_BetweenRounds && !IsPlayerReady(actor))
-		return action.Done("Shopping comes first");
+	//The break belongs to shopping and to standing where the team stands
+	if (GameRules_GetRoundState() == RoundState_BetweenRounds)
+		return action.Done("Shopping and taking up a position come first");
 	
 	int patient = PreferredPatient(actor);
 	

@@ -217,6 +217,7 @@ public void CTFBotUpgrade_OnEnd(BehaviorAction action, int actor, BehaviorAction
 			UpgradeMidRoundPostActivity(actor);
 		
 		g_bHasUpgraded[actor] = true;
+		g_bShoppedThisBreak[actor] = true;
 		g_iBuyUpgradesNumber[actor] = 0;
 		
 		TF2_SetInUpgradeZone(actor, false);

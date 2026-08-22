@@ -1133,8 +1133,8 @@ public Action CTFBotMedicHeal_UpdatePost(BehaviorAction action, int actor, float
 	Nothing is trying to kill anybody in that window and a full health bar does not need him, so
 	the ordinary between-rounds behaviour has it instead. That buys upgrades and then walks to the
 	front with the rest of them, which is where he wanted to be standing when the wave starts.
-	Once he is ready he can go back to picking a patient. */
-	if (GameRules_GetRoundState() == RoundState_BetweenRounds && !IsPlayerReady(actor))
+	The wave beginning ends that and hands him back a patient. */
+	if (GameRules_GetRoundState() == RoundState_BetweenRounds)
 		return Plugin_Continue;
 
 	if (PreferredPatient(actor) > 0)
@@ -1264,7 +1264,7 @@ Action GetDesiredBotAction(int client, BehaviorAction action)
 			//Collect any leftover money that my team didn't collect
 			return action.SuspendFor(CTFBotCollectMoney(), "Is possible");
 		}
-		else if (!TF2_IsInUpgradeZone(client) && !IsPlayerReady(client) && ActionsManager.LookupEntityActionByName(client, "DefenderMoveToFront") == INVALID_ACTION)
+		else if (!TF2_IsInUpgradeZone(client) && !g_bShoppedThisBreak[client] && ActionsManager.LookupEntityActionByName(client, "DefenderMoveToFront") == INVALID_ACTION)
 		{
 			if (redbots_manager_bot_use_upgrades.BoolValue)
 			{
@@ -1275,6 +1275,16 @@ Action GetDesiredBotAction(int client, BehaviorAction action)
 				SetPlayerReady(client, true);
 				return action.SuspendFor(CTFBotMoveToFront(), "Skip upgrading");
 			}
+		}
+		else if (ShouldTakeUpPosition(client) && ActionsManager.LookupEntityActionByName(client, "DefenderMoveToFront") == INVALID_ACTION)
+		{
+			/* Shopping is finished, so go and stand where the robots come out
+
+			Without this the break has nothing left to say to a bot that has bought its upgrades,
+			and a behaviour that says nothing hands the bot back to the game, whose answer for a
+			defender with no mission is to roam. Reported as the Heavy, the Medic and the Pyro
+			wandering off before the wave, and found inside the middle house on Coaltown. */
+			return action.SuspendFor(CTFBotMoveToFront(), "Shopping is done, so take up a position");
 		}
 	}
 	else if (state == RoundState_RoundRunning)
@@ -1375,6 +1385,26 @@ Action GetDesiredBotAction(int client, BehaviorAction action)
 	}
 	
 	return Plugin_Continue;
+}
+
+/* Whether this bot has nowhere of its own to wait out the break
+
+The Engineer has a nest to build, the Spy has somewhere to lurk and the Sniper has a perch, and
+all three get there under their own behaviour. Everybody else, the Medic included, waits at the
+front: he wants to be stood next to the bodies he is about to heal when the wave starts, not
+wherever the man he picked wandered off to. */
+static bool ShouldTakeUpPosition(int client)
+{
+	switch (TF2_GetPlayerClass(client))
+	{
+		case TFClass_Engineer, TFClass_Spy:
+			return false;
+		
+		case TFClass_Sniper:
+			return !HasSniperRifle(client);
+	}
+
+	return true;
 }
 
 /* Whether this bot is one of the ones that should fall back to holding the hatch
