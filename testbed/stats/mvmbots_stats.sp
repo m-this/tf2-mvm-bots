@@ -530,6 +530,23 @@ static void WriteWaveResult(const char[] result)
 
 	WriteLine(line);
 
+	/* What the server's frames cost while that was happening
+
+	Its own line, because it is about the machine rather than about the bots, and it should be
+	possible to read a run's frame times without parsing everything else. */
+	char perf[ENGINEER_LINE_LENGTH];
+	FormatEx(perf, sizeof(perf),
+		"{\"event\":\"perf\",\"map\":\"%s\",\"wave\":%d,\"frames\":%d,"
+		... "\"frames_slow\":%d,\"frames_stalled\":%d,\"frame_mean_ms\":%.2f,\"frame_worst_ms\":%.1f,"
+		... "\"red\":%d}",
+		g_sMap, g_iWave, g_Wave.frames, g_Wave.framesSlow, g_Wave.framesStalled,
+		g_Wave.frames > 0 ? g_Wave.frameTotalMs / float(g_Wave.frames) : 0.0,
+		g_Wave.frameWorstMs, CountTeam(TFTeam_Red, false));
+
+	WriteLine(perf);
+
+	WriteEngineers("end");
+
 	g_flWaveStart = 0.0;
 }
 
