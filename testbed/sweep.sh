@@ -81,12 +81,15 @@ for map in $maps; do
 	fi
 
 	elapsed=$(( $(date +%s) - started ))
-	results=$(grep -c '"event":"wave_end"' "$out/$map.jsonl" 2>/dev/null || echo 0)
+	# grep -c prints its count and then exits 1 when the count is zero, so an
+	# "|| echo 0" on the end of it appends a second zero to the line rather than
+	# supplying the first one. || true, and a default for the file that is not there.
+	results=$(grep -c '"event":"wave_end"' "$out/$map.jsonl" 2>/dev/null || true)
 
 	# A map the server crashed on is the single most important line in the file
-	crashed=$(grep -ciE 'core dumped|Segmentation fault|Bus error' "$out/$map.log" 2>/dev/null || echo 0)
+	crashed=$(grep -ciE 'core dumped|Segmentation fault|Bus error' "$out/$map.log" 2>/dev/null || true)
 
-	say "$map: $status, $results wave results, ${elapsed}s, crashes $crashed"
+	say "$map: $status, ${results:-0} wave results, ${elapsed}s, crashes ${crashed:-0}"
 done
 
 say "done, results in $out"
