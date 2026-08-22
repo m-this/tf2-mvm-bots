@@ -326,6 +326,24 @@ The spot is chosen once when the action starts now.
 Worth knowing for the next one: `IsPathToVectorPossible` is a full
 `NavAreaBuildPath`, and it reads like a cheap predicate.
 
+A sweep of every map found two more of the same shape, and both are fixed:
+
+- An engineer with no sentry answered yes to "should the nest advance", and the
+  idle action returns without acting when the answer is yes. So he never
+  rebuilt, and every one of those frames ran `PickBuildArea` twice, which calls
+  `GetBombInfo`, which walks every nav area on the map. Sixty-six times a
+  second, per engineer, for as long as he had no sentry. On Bigrock that was
+  most of a wave.
+- The tactical monitor asked whether health or ammo was worth walking to on
+  every frame for every bot, and the slow path computed a path to every
+  candidate. MvM floors are covered in `tf_ammo_pack`. The answer is held for
+  half a second now and the search is run for the nearest four candidates
+  rather than all of them.
+
+The pattern is worth naming, because it has now produced three separate
+crashes: a nav mesh call inside something that reads like a predicate, called
+from a per-frame path. Anything asking the mesh a question wants a clock on it.
+
 ## 13. The test-bed needs a machine with memory free. Open
 
 Measurement stopped being possible partway through a session, on both builds at
