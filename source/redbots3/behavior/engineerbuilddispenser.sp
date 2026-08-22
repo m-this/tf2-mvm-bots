@@ -1,29 +1,27 @@
 #define DISPENSER_SPOT_TAKEN_RANGE	150.0
 
-/* How far from the nest a named spot may be and still be this nest's dispenser spot
+/* Which nest a named dispenser spot belongs to, and how far above or below it may sit
 
-The pairing was whichever named spot was nearest the nest in a straight line, with no ceiling on
-it, so a map that names three nests and three spots can hand a nest a spot that belongs to another
-one. Coaltown does: the nest above the track at z 496 is 415 units from the spot on the floor at
-z 273, which is nearer than any spot on its own level, and the engineer walked off looking for it,
-failed to place anything for the whole reach deadline and dropped the dispenser where he stood.
+The pairing was whichever named spot was nearest the nest in a straight line with no ceiling on
+it, so a map naming several of each can hand a nest a spot belonging to another one. Coaltown
+does: the nest above the track at z 496 is 415 units from the spot on the floor at z 273, nearer
+than any spot on its own level, and the engineer walked off looking for it, placed nothing for the
+whole reach deadline and dropped the dispenser where he stood. Reported twice.
 
-The height is a separate test from the distance because two floors are close in plan and a
-staircase apart in fact. Past either, the nest area itself is the better answer: a dispenser beside
-the sentry is the point of the thing. */
-#define DISPENSER_NEST_RANGE	400.0
+The first answer was a distance bound, and a sweep of every map showed what is wrong with picking
+a number: Bigrock's authored spots sit four to six hundred units from its authored nests, on
+purpose, and a bound tight enough to reject Coaltown's rejected all of Bigrock's. There is no
+distance that is right on both, because distance was never the question.
+
+What is the question is ownership. A spot belongs to the nest nearest to it, and every map that
+names several of each already says which is which by where they are. No number to tune, and it
+answers correctly on a map nobody has walked yet.
+
+The height stays, and separately, because ownership is a plan-view idea and two floors are close
+in plan and a staircase apart in fact. Coaltown's spot is 223 units below the nest that owns it,
+which is the whole of the original bug. */
 #define DISPENSER_NEST_HEIGHT	120.0
 
-/* How long an engineer may spend walking to where the dispenser goes
-
-Reported on Rottenburg: engineers stuck on a rock trying to build one. The action pathed to a
-spot and, if the geometry would not let it arrive, asked again next frame forever. A nav mesh
-says ground is connected; it does not promise a bot can squeeze past a boulder to reach the
-middle of it.
-
-Past the deadline the dispenser goes down where the engineer is standing. A dispenser two metres
-from the intended spot is worth all of one that never gets built, and the engineer is back in the
-wave instead of walking into a rock for the rest of it. */
 #define DISPENSER_REACH_TIME	12.0
 
 /* How far from the nest "where he stands" is still somewhere worth putting a dispenser
@@ -279,7 +277,8 @@ bool ConfiguredDispenserSpot(int actor, float spot[3])
 	if (spots.Length == 0)
 		return false;
 	
-	float nest[3]; m_aNestArea[actor].GetCenter(nest);
+	//The authored point rather than the area centre, so the ownership test compares like with like
+	float nest[3]; NestBuildPosition(m_aNestArea[actor], nest);
 	
 	ArrayList free = new ArrayList(3);
 	
@@ -287,9 +286,8 @@ bool ConfiguredDispenserSpot(int actor, float spot[3])
 	{
 		float candidate[3]; spots.GetArray(i, candidate);
 		
-		//Somebody else's nest named this one
-		if (GetVectorDistance(nest, candidate) > DISPENSER_NEST_RANGE
-			|| FloatAbs(candidate[2] - nest[2]) > DISPENSER_NEST_HEIGHT)
+		//Somebody else's nest named this one, or it is on another floor of this one
+		if (!SpotBelongsToNest(candidate, nest) || FloatAbs(candidate[2] - nest[2]) > DISPENSER_NEST_HEIGHT)
 			continue;
 		
 		//A spot the engineer cannot walk to is not a spot. Rottenburg has a rock in front of one
@@ -312,6 +310,33 @@ bool ConfiguredDispenserSpot(int actor, float spot[3])
 	}
 	
 	return found;
+}
+
+/* Whether this nest is the one that spot was authored for, which is the nest nearest to it
+
+Every nest but this one gets a vote, and a nest closer to the spot than this one is takes it. The
+engineer's own nest is skipped by position rather than by index, because what he holds is a nav
+area centre and what the map names is a point somebody stood on, and those are close without being
+equal. */
+static bool SpotBelongsToNest(const float spot[3], const float nest[3])
+{
+	float mine = GetVectorDistance(spot, nest);
+	
+	ArrayList nests = g_arrMapConfig.adtEngineerNestLocation;
+	
+	for (int i = 0; i < nests.Length; i++)
+	{
+		float other[3]; nests.GetArray(i, other);
+		
+		//This nest, near enough
+		if (GetVectorDistance(other, nest) < NEST_SPOT_MATCH_RANGE)
+			continue;
+		
+		if (GetVectorDistance(spot, other) < mine)
+			return false;
+	}
+	
+	return true;
 }
 
 //Spreads several engineers over the spots the map names instead of stacking them on the nearest one
