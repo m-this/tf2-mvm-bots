@@ -94,7 +94,15 @@ void GiveBotCosmeticsSoon(int client)
 	
 	g_bCosmeticsPending[client] = true;
 	
-	CreateTimer(0.5, Timer_GiveBotCosmetics, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
+	/* Spread across a second rather than all landing on the same frame
+	
+	A team spawns together, so six of these used to be scheduled for the same tenth of a second and
+	fired on one frame. Dressing a bot creates an entity and precaches a model, and a precache
+	that has to go to disk is not a thing to do six times inside one tick of a server that is also
+	starting a wave. The half second is what it was; the rest is one bot after another. */
+	float when = 0.5 + 0.15 * float(client % 8);
+	
+	CreateTimer(when, Timer_GiveBotCosmetics, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
 }
 
 static Action Timer_GiveBotCosmetics(Handle timer, int userid)

@@ -38,6 +38,16 @@ the one frame in a thousand that took a third of a second. */
 #define FRAME_SLOW_MS		30.0
 #define FRAME_STALL_MS		100.0
 
+/* Every frame long enough to be worth a line of its own, with when it happened
+
+The per-wave counts say how many frames went over a hundred milliseconds and how bad the worst was.
+They do not say when, and when is the whole question: the watchdog killed three runs on the frame a
+wave starts on and none in the middle of one, so a count that mixes the two answers nothing.
+
+A quarter of a second is four times the tick and a quarter of the way to the watchdog, and frames
+that long are rare enough that a line each costs nothing. */
+#define FRAME_REPORT_MS		250.0
+
 /* How far a building may sit from the nest before it is worth writing down as wrong
 
 A dispenser is meant to be beside the sentry. One at the other end of the map feeds nothing, and
@@ -284,6 +294,9 @@ public void OnGameFrame()
 
 		if (sinceLast > g_flWorstFrameBetween)
 			g_flWorstFrameBetween = sinceLast;
+
+		if (sinceLast > FRAME_REPORT_MS)
+			ReportStall(sinceLast);
 	}
 
 	if (g_flLastFrame > 0.0 && g_flWaveStart > 0.0)
@@ -305,6 +318,16 @@ public void OnGameFrame()
 	g_flLastFrame = now;
 
 	SampleEngineers();
+}
+
+static void ReportStall(float ms)
+{
+	char line[ENGINEER_LINE_LENGTH];
+	FormatEx(line, sizeof(line),
+		"{\"event\":\"stall\",\"map\":\"%s\",\"wave\":%d,\"ms\":%.0f,\"round\":%d,\"in_wave\":%d}",
+		g_sMap, g_iWave, ms, GameRules_GetRoundState(), g_flWaveStart > 0.0 ? 1 : 0);
+
+	WriteLine(line);
 }
 
 public void OnMapStart()
