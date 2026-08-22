@@ -698,6 +698,12 @@ and a teleporter half of a pair looks the same as none. This says which, and whe
 ended up, so a spot that refuses everything can be walked to with sm_dump_spot. */
 public Action Command_DumpNest(int client, int args)
 {
+	/* How many areas a nest decision walks, which is the size of everything else here
+
+	PickBuildArea and GetBombInfo both walk the whole mesh, so this number is the unit that any
+	"why did the frame take that long" answer is counted in. */
+	ReplyToCommand(client, "%d nav areas on this map", TheNavAreas.Count);
+
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (!IsClientInGame(i) || TF2_GetPlayerClass(i) != TFClass_Engineer)
