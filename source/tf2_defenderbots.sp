@@ -68,6 +68,8 @@ enum struct esMapConfiguration
 	ArrayList adtTeleporterEntranceLocation;
 	ArrayList adtTeleporterExitLocation;
 	ArrayList adtDispenserLocation;
+	//One zone name per dispenser spot, same order, so a nest in a zone takes the dispenser in it
+	ArrayList adtDispenserZone;
 	//Nests that only apply to a wave with a tank in it, and nests that only apply to one without
 	ArrayList adtNestTankOnlyLocation;
 	ArrayList adtNestNoTankLocation;
@@ -89,6 +91,7 @@ enum struct esMapConfiguration
 		this.adtTeleporterEntranceLocation = new ArrayList(3);
 		this.adtTeleporterExitLocation = new ArrayList(3);
 		this.adtDispenserLocation = new ArrayList(3);
+		this.adtDispenserZone = new ArrayList(ByteCountToCells(NEST_ZONE_LENGTH));
 		this.adtNestTankOnlyLocation = new ArrayList(3);
 		this.adtNestNoTankLocation = new ArrayList(3);
 	}
@@ -100,6 +103,7 @@ enum struct esMapConfiguration
 		this.adtTeleporterEntranceLocation.Clear();
 		this.adtTeleporterExitLocation.Clear();
 		this.adtDispenserLocation.Clear();
+		this.adtDispenserZone.Clear();
 		this.adtNestTankOnlyLocation.Clear();
 		this.adtNestNoTankLocation.Clear();
 		this.strComposition[0] = '\0';
@@ -2757,7 +2761,7 @@ void Config_LoadMap()
 	Config_LoadNestSpots(kv, "EngineerNest", g_arrMapConfig.adtEngineerNestLocation, g_arrMapConfig.adtEngineerNestZone);
 	Config_LoadLocations(kv, "TeleporterEntrance", g_arrMapConfig.adtTeleporterEntranceLocation);
 	Config_LoadLocations(kv, "TeleporterExit", g_arrMapConfig.adtTeleporterExitLocation);
-	Config_LoadLocations(kv, "DispenserSpot", g_arrMapConfig.adtDispenserLocation);
+	Config_LoadNestSpots(kv, "DispenserSpot", g_arrMapConfig.adtDispenserLocation, g_arrMapConfig.adtDispenserZone);
 	Config_LoadLocations(kv, "NestTankOnly", g_arrMapConfig.adtNestTankOnlyLocation);
 	Config_LoadLocations(kv, "NestNoTank", g_arrMapConfig.adtNestNoTankLocation);
 	kv.GetString("Composition", g_arrMapConfig.strComposition, sizeof(g_arrMapConfig.strComposition), "");

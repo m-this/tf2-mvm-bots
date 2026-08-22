@@ -58,6 +58,7 @@ def find(node, name):
     return None
 
 def points(node, name):
+    """Every origin under a block, with the zone beside it when the map names one."""
     b = find(node, name)
     if b is None:
         return []
@@ -65,9 +66,10 @@ def points(node, name):
     for _, entry in b:
         if not isinstance(entry, list):
             continue
-        for k, v in entry:
-            if k == 'origin':
-                out.append(tuple(float(x) for x in v.split()))
+        fields = dict((k, v) for k, v in entry if not isinstance(v, list))
+        if 'origin' in fields:
+            out.append((tuple(float(x) for x in fields['origin'].split()),
+                        fields.get('zone', '')))
     return out
 
 HEIGHT = 120.0
@@ -76,20 +78,20 @@ d = math.dist
 
 for path in sorted(glob.glob("configs/defenderbots/map/*.cfg")):
     root = parse(open(path).read())
-    nests = points(root, 'EngineerNest')
-    extra = points(root, 'NestTankOnly') + points(root, 'NestNoTank')
+    allnests = points(root, 'EngineerNest') + points(root, 'NestTankOnly') + points(root, 'NestNoTank')
     spots = points(root, 'DispenserSpot')
-    allnests = nests + extra
     if not allnests or not spots:
         continue
     print(f"{os.path.basename(path)}: {len(allnests)} nests, {len(spots)} dispenser spots")
-    for i, nest in enumerate(allnests, 1):
+    for i, (nest, nest_zone) in enumerate(allnests, 1):
         owned, rejected = [], []
-        for spot in spots:
+        for spot, spot_zone in spots:
             mine = d(spot, nest)
-            if any(d(spot, o) < mine for o in allnests if d(o, nest) >= MATCH):
-                continue
-            if abs(spot[2] - nest[2]) > HEIGHT:
+            # A zone on either side decides it outright; only unzoned pairs fall to height
+            if nest_zone or spot_zone:
+                if nest_zone != spot_zone:
+                    continue
+            elif abs(spot[2] - nest[2]) > HEIGHT:
                 rejected.append((round(mine), round(abs(spot[2]-nest[2]))))
                 continue
             owned.append((round(mine), spot))
@@ -98,6 +100,6 @@ for path in sorted(glob.glob("configs/defenderbots/map/*.cfg")):
             note = "  (rejected on height: " + ", ".join(f"{r}u away, {h}u below/above" for r, h in rejected) + ")"
         if owned:
             best = min(owned)
-            print(f"  nest {i} {nest} -> {best[1]} at {best[0]}u{note}")
+            print(f"  nest {i} {nest} zone={nest_zone!r} -> {best[1]} at {best[0]}u{note}")
         else:
-            print(f"  nest {i} {nest} -> falls back to the nest area{note}")
+            print(f"  nest {i} {nest} zone={nest_zone!r} -> falls back to the nest area{note}")
