@@ -350,12 +350,66 @@ bool ShouldBuildTeleporter(int actor)
 		m_nTeleporterMode[actor] = TFObjectMode_Exit;
 
 		//The nest itself when the map names no exit: the point of the pair is to arrive at the nest
-		m_bTeleporterNamedSpot[actor] = NearestConfiguredSpot(g_arrMapConfig.adtTeleporterExitLocation,
-			m_vTeleporterNest[actor], m_vTeleporterSpot[actor]);
+		m_bTeleporterNamedSpot[actor] = NearestFreeExitSpot(actor, m_vTeleporterNest[actor], m_vTeleporterSpot[actor]);
 
 		return true;
 	}
 
+	return false;
+}
+
+/* The nearest named exit spot another engineer has not already put one on
+
+Coaltown names one exit and a team can field two engineers, and nothing stopped the second from
+building his on top of the first: reported from play as two exits sitting next to each other on the
+same platform. Two exits work, but the second one is a walk and fifty metal spent arriving where
+somebody could already arrive.
+
+With every named spot taken, this says no and the exit goes beside his own nest instead, which is
+where an exit is for anyway. The dispenser has had this rule for a while; the exit had not. */
+#define TELEPORTER_EXIT_TAKEN_RANGE	200.0
+
+static bool NearestFreeExitSpot(int actor, const float nest[3], float spot[3])
+{
+	ArrayList spots = g_arrMapConfig.adtTeleporterExitLocation;
+	
+	if (spots.Length == 0)
+		return false;
+	
+	ArrayList free = new ArrayList(3);
+	
+	for (int i = 0; i < spots.Length; i++)
+	{
+		float candidate[3]; spots.GetArray(i, candidate);
+		
+		if (!IsExitSpotTaken(actor, candidate))
+			free.PushArray(candidate);
+	}
+	
+	bool found = NearestConfiguredSpot(free, nest, spot);
+	
+	delete free;
+	
+	return found;
+}
+
+//Somebody else's exit is already standing here
+static bool IsExitSpotTaken(int actor, const float spot[3])
+{
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (i == actor || !IsClientInGame(i))
+			continue;
+		
+		int exitTele = GetObjectOfType(i, TFObject_Teleporter, TFObjectMode_Exit);
+		
+		if (exitTele == INVALID_ENT_REFERENCE)
+			continue;
+		
+		if (GetVectorDistance(spot, GetAbsOrigin(exitTele)) < TELEPORTER_EXIT_TAKEN_RANGE)
+			return true;
+	}
+	
 	return false;
 }
 
