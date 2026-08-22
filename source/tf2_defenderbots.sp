@@ -161,6 +161,15 @@ bool g_bAllowBotTeamRedo;
 bool g_bIsDefenderBot[MAXPLAYERS + 1];
 bool g_bIsBeingRevived[MAXPLAYERS + 1];
 bool g_bHasUpgraded[MAXPLAYERS + 1];
+
+/* Whether this bot has done its shopping since the last wave started
+
+Readiness used to stand in for this, and it stopped being able to: with a person on RED every bot
+is held ready from the first frame of the break so the person alone decides when the wave starts.
+Every "has he finished preparing" test that read the ready flag then answered yes before he had
+bought anything, which skipped the shopping trip and, from the second wave on, skipped it for the
+rest of the mission. */
+bool g_bShoppedThisBreak[MAXPLAYERS + 1];
 esButtonInput g_arrExtraButtons[MAXPLAYERS + 1];
 static float m_flDeadRethinkTime[MAXPLAYERS + 1];
 int g_iBuybackNumber[MAXPLAYERS + 1];
@@ -351,6 +360,7 @@ public void OnPluginStart()
 	RegAdminCmd("sm_dump_hats", Command_DumpHats, ADMFLAG_GENERIC);
 	RegAdminCmd("sm_dump_nest", Command_DumpNest, ADMFLAG_GENERIC);
 	RegAdminCmd("sm_dump_medic", Command_DumpMedic, ADMFLAG_GENERIC);
+	RegAdminCmd("sm_dump_front", Command_DumpFront, ADMFLAG_GENERIC);
 	
 	AddCommandListener(Listener_TournamentPlayerReadystate, "tournament_player_readystate");
 	
@@ -494,6 +504,7 @@ public void OnClientPutInServer(int client)
 		TakeBotSeat(client);
 
 	g_bHasUpgraded[client] = false;
+	g_bShoppedThisBreak[client] = false;
 	g_arrExtraButtons[client].Reset();
 	m_flDeadRethinkTime[client] = 0.0;
 	g_iBuybackNumber[client] = 0;

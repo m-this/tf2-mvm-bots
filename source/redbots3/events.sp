@@ -190,6 +190,10 @@ static void Event_MvmWaveBegin(Event event, const char[] name, bool dontBroadcas
 	//One a tick, because the frame this runs on is the one the server dies on
 	QueueBehaviourReset();
 	
+	//The next break is a fresh shopping trip for everybody
+	for (int i = 1; i <= MaxClients; i++)
+		g_bShoppedThisBreak[i] = false;
+	
 	if (redbots_manager_mode.IntValue == MANAGER_MODE_AUTO_BOTS)
 		ManageDefenderBots(true);
 	
