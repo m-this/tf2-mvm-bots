@@ -110,6 +110,67 @@ static void Event_RevivePlayerNotify(Event event, const char[] name, bool dontBr
 	g_bIsBeingRevived[client] = true;
 }
 
+/* Every defender rethinks what it is doing when a wave begins, one of them per tick
+
+Resetting the intention throws away a bot's behaviour and has it rebuilt on its next update, and
+rebuilding runs the OnStart of whatever it picks. Several of those are not cheap: MoveToFront
+walks every prop_dynamic on the map and computes a path to each robot hologram, GetHealth and
+GetAmmo search for something to walk to, the engineer scores a nest.
+
+Doing that for six bots inside the wave_begin frame puts all of it on the one frame of a mission
+that is already the most expensive: every robot spawns there and starts pathing at the same
+moment, which is what "NextBot tickrate changed from 0 to 7" in the console is. Three runs of an
+A/B died on exactly that frame, and the watchdog does not care that the work is finite.
+
+So the resets are a queue and the queue is drained a bot a tick. The wave is minutes long and the
+queue is at most the server's player count, which is a rounding error against it. The same shape,
+and the same reason, as the nest relocation evaluator. */
+#define BEHAVIOUR_RESET_INTERVAL	0.1
+
+static int m_iBehaviourResetNext;
+static Handle m_hBehaviourResetTimer;
+
+static void QueueBehaviourReset()
+{
+	StopBehaviourReset();
+	
+	m_iBehaviourResetNext = 1;
+	m_hBehaviourResetTimer = CreateTimer(BEHAVIOUR_RESET_INTERVAL, Timer_ResetOneBehaviour, _, TIMER_REPEAT);
+}
+
+//Killed by handle rather than deleted, because a map change closes it and leaves this one stale
+static void StopBehaviourReset()
+{
+	if (m_hBehaviourResetTimer != null)
+		KillTimer(m_hBehaviourResetTimer);
+	
+	m_hBehaviourResetTimer = null;
+}
+
+static Action Timer_ResetOneBehaviour(Handle timer)
+{
+	//Walked once, forwards, so a bot that joins mid-drain is not reset twice and none is skipped
+	while (m_iBehaviourResetNext <= MaxClients)
+	{
+		int client = m_iBehaviourResetNext++;
+		
+		if (!IsClientInGame(client) || !g_bIsDefenderBot[client] || !IsPlayerAlive(client))
+			continue;
+		
+		if (!ShouldResetBehavior(client))
+			continue;
+		
+		//Rethink what we're supposed to do
+		ResetIntentionInterface(client);
+		
+		return Plugin_Continue;
+	}
+	
+	m_hBehaviourResetTimer = null;
+	
+	return Plugin_Stop;
+}
+
 static void Event_MvmWaveBegin(Event event, const char[] name, bool dontBroadcast)
 {
 	/* Publish here rather than only on a timer after the map loads
@@ -125,17 +186,8 @@ static void Event_MvmWaveBegin(Event event, const char[] name, bool dontBroadcas
 	//A new wave is a new chance at a spot that refused him last time
 	EngineerTeleporter_ForgetGivingUp();
 	
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (IsClientInGame(i) && g_bIsDefenderBot[i] && IsPlayerAlive(i))
-		{
-			if (!ShouldResetBehavior(i))
-				continue;
-			
-			//Rethink what we're supposed to do
-			ResetIntentionInterface(i);
-		}
-	}
+	//One a tick, because the frame this runs on is the one the server dies on
+	QueueBehaviourReset();
 	
 	if (redbots_manager_mode.IntValue == MANAGER_MODE_AUTO_BOTS)
 		ManageDefenderBots(true);
