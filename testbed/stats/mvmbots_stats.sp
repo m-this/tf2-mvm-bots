@@ -218,6 +218,15 @@ result yet, so nothing in the file said how close the frames had been getting.
 Reported on the wave_begin line, which is the first thing written after that frame. */
 static float g_flWorstFrameBetween;
 
+/* When the worst one happened, in seconds since the map started
+
+Without it the number is unattributable, and I have already read it wrong once: a gap of one and a
+half seconds before wave one reads as a server about to be killed by the watchdog, and if it lands
+twenty seconds into a map that has just finished loading it is the server starting up and nothing
+to do with a wave at all. */
+static float g_flWorstFrameAt;
+static float g_flMapStart;
+
 /* How much of the wave each engineer spent with something standing
 
 Counted in samples rather than seconds because the sample is what is actually observed, and a
@@ -293,7 +302,10 @@ public void OnGameFrame()
 		float sinceLast = (now - g_flLastFrame) * 1000.0;
 
 		if (sinceLast > g_flWorstFrameBetween)
+		{
 			g_flWorstFrameBetween = sinceLast;
+			g_flWorstFrameAt = GetGameTime() - g_flMapStart;
+		}
 
 		if (sinceLast > FRAME_REPORT_MS)
 			ReportStall(sinceLast);
@@ -343,6 +355,8 @@ public void OnMapStart()
 	Nothing was. It was the map loading, which every server does and no watchdog counts. */
 	g_flLastFrame = 0.0;
 	g_flWorstFrameBetween = 0.0;
+	g_flWorstFrameAt = 0.0;
+	g_flMapStart = GetGameTime();
 
 	g_iWave = 0;
 	g_flWaveStart = 0.0;
@@ -372,13 +386,14 @@ static void Event_WaveBegin(Event event, const char[] name, bool dontBroadcast)
 	
 	char line[STATS_LINE_LENGTH];
 	FormatEx(line, sizeof(line), "{\"event\":\"wave_begin\",\"map\":\"%s\",\"wave\":%d,\"red\":%d,\"bots\":%d,"
-		... "\"worst_frame_before_ms\":%.0f,\"features\":\"%s\"}",
+		... "\"worst_frame_before_ms\":%.0f,\"worst_frame_at_s\":%.0f,\"features\":\"%s\"}",
 		g_sMap, g_iWave, CountTeam(TFTeam_Red, false), CountTeam(TFTeam_Red, true),
-		g_flWorstFrameBetween, features);
+		g_flWorstFrameBetween, g_flWorstFrameAt, features);
 
 	WriteLine(line);
 
 	g_flWorstFrameBetween = 0.0;
+	g_flWorstFrameAt = 0.0;
 
 	/* Both ends of the wave, because the two questions are different
 
