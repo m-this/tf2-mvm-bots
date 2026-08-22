@@ -386,10 +386,7 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 	{
 		if (sentry != INVALID_ENT_REFERENCE)
 		{
-			if (BaseEntity_GetHealth(sentry) >= TF2Util_GetEntityMaxHealth(sentry)
-			&& !TF2_IsBuilding(sentry)
-			&& (TF2_IsMiniBuilding(sentry) || TF2_GetUpgradeLevel(sentry) >= 3)
-			&& GetEntProp(sentry, Prop_Send, "m_iAmmoShells") > 50)
+			if (IsSentrySafe(sentry))
 			{
 				m_ctSentrySafe[actor] = GetGameTime() + 3.0;
 			}
@@ -758,6 +755,38 @@ static void DumpBuilding(int client, const char[] what, int building)
 		what, TF2_GetUpgradeLevel(building), BaseEntity_GetHealth(building),
 		TF2Util_GetEntityMaxHealth(building), origin[0], origin[1], origin[2],
 		TF2_IsBuilding(building) ? ", still going up" : "");
+}
+
+/* Whether the sentry is finished and in no trouble, asked of the sentry rather than of a clock
+
+m_ctSentrySafe is this answer with three seconds of life on it, and the three seconds are there so
+that the flag survives a frame where the sentry is briefly not full. It is refreshed by the idle
+action and only by the idle action.
+
+That is fine for the idle action's own branches and wrong for anything the idle action suspends
+into, because suspending stops its update running: the flag then expires three seconds later
+whatever the sentry is actually doing. The dispenser build read it and ended itself with "Sentry
+not safe" three seconds after starting, every time, on every map. It got a dispenser up only where
+the walk and the placement both fitted inside those three seconds, which is why the dispenser was
+standing for 13% of a wave on Mannworks and 45% on Mannhattan.
+
+So the question is asked of the sentry where the answer has to be current, and the flag stays for
+what it was for. */
+bool IsSentrySafe(int sentry)
+{
+	if (sentry == INVALID_ENT_REFERENCE)
+		return false;
+	
+	if (TF2_IsBuilding(sentry))
+		return false;
+	
+	if (BaseEntity_GetHealth(sentry) < TF2Util_GetEntityMaxHealth(sentry))
+		return false;
+	
+	if (!TF2_IsMiniBuilding(sentry) && TF2_GetUpgradeLevel(sentry) < 3)
+		return false;
+	
+	return GetEntProp(sentry, Prop_Send, "m_iAmmoShells") > 50;
 }
 
 bool CTFBotMvMEngineerIdle_ShouldAdvanceNestSpot(int actor)
