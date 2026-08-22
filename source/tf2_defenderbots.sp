@@ -1825,97 +1825,60 @@ void MakePlayerDance(int client)
 	}
 }
 
+/* What a bot is actually carrying, by name, printed wherever the command came from
+
+Every line of this used PrintToChat, which needs a client, and rcon has not got one: run from the
+console it printed nothing at all and looked like a bot with no upgrades. That is the one place
+anybody would run it from on a test server.
+
+The attribute index alone was not much better. "INDEX 56, VALUE 0.800000" is the answer to a
+question nobody asked; the schema has the name and it costs a lookup. */
+static void ShowUpgradesOn(int client, int entity, const char[] what)
+{
+	int attribIndexes[MAX_RUNTIME_ATTRIBUTES];
+	int count = TF2Attrib_ListDefIndices(entity, attribIndexes, sizeof(attribIndexes));
+	
+	ReplyToCommand(client, "%s: %d upgrades", what, count);
+	
+	for (int i = 0; i < count; i++)
+	{
+		Address pAttr = TF2Attrib_GetByDefIndex(entity, attribIndexes[i]);
+		float value = TF2Attrib_GetValue(pAttr);
+		
+		char name[128];
+		
+		if (!TF2Econ_GetAttributeName(attribIndexes[i], name, sizeof(name)))
+			strcopy(name, sizeof(name), "(unnamed)");
+		
+		ReplyToCommand(client, "  %-48s %.3f", name, value);
+	}
+}
+
 void ShowPlayerUpgrades(int client, int target, int slot)
 {
-	Address pAttr;
-	float value;
-	int attribIndexes[MAX_RUNTIME_ATTRIBUTES];
+	char who[MAX_NAME_LENGTH]; GetClientName(target, who, sizeof(who));
 	
-	switch (slot)
+	if (slot == -1)
 	{
-		case -1: //Player
-		{
-			PrintToChat(client, "UPGRADES FOR %N", target);
-			
-			int count = TF2Attrib_ListDefIndices(target, attribIndexes, sizeof(attribIndexes));
-			
-			for (int i = 0; i < count; i++)
-			{
-				pAttr = TF2Attrib_GetByDefIndex(target, attribIndexes[i]);
-				value = TF2Attrib_GetValue(pAttr);
-				
-				PrintToChat(client, "INDEX %d, VALUE %f", attribIndexes[i], value);
-			}
-		}
-		case 0: //Primary
-		{
-			int weapon = GetPlayerWeaponSlot(target, TFWeaponSlot_Primary);
-			
-			if (weapon == -1)
-			{
-				PrintToChat(client, "%N doesn't have a primary weapon.", target);
-				return;
-			}
-			
-			PrintToChat(client, "UPGRADES FOR %N's primary", target);
-			
-			int count = TF2Attrib_ListDefIndices(weapon, attribIndexes, sizeof(attribIndexes));
-			
-			for (int i = 0; i < count; i++)
-			{
-				pAttr = TF2Attrib_GetByDefIndex(weapon, attribIndexes[i]);
-				value = TF2Attrib_GetValue(pAttr);
-				
-				PrintToChat(client, "INDEX %d, VALUE %f", attribIndexes[i], value);
-			}
-		}
-		case 1: //Secondary
-		{
-			int weapon = GetPlayerWeaponSlot(target, TFWeaponSlot_Secondary);
-			
-			if (weapon == -1)
-			{
-				PrintToChat(client, "%N doesn't have a secondary weapon.", target);
-				return;
-			}
-			
-			PrintToChat(client, "UPGRADES FOR %N's secondary", target);
-			
-			int count = TF2Attrib_ListDefIndices(weapon, attribIndexes, sizeof(attribIndexes));
-			
-			for (int i = 0; i < count; i++)
-			{
-				pAttr = TF2Attrib_GetByDefIndex(weapon, attribIndexes[i]);
-				value = TF2Attrib_GetValue(pAttr);
-				
-				PrintToChat(client, "INDEX %d, VALUE %f", attribIndexes[i], value);
-			}
-		}
-		case 2: //Melee
-		{
-			int weapon = GetPlayerWeaponSlot(target, TFWeaponSlot_Melee);
-			
-			if (weapon == -1)
-			{
-				PrintToChat(client, "%N doesn't have a melee weapon.", target);
-				return;
-			}
-			
-			PrintToChat(client, "UPGRADES FOR %N's melee", target);
-			
-			int count = TF2Attrib_ListDefIndices(weapon, attribIndexes, MAX_RUNTIME_ATTRIBUTES);
-			
-			for (int i = 0; i < count; i++)
-			{
-				pAttr = TF2Attrib_GetByDefIndex(weapon, attribIndexes[i]);
-				value = TF2Attrib_GetValue(pAttr);
-				
-				PrintToChat(client, "INDEX %d, VALUE %f", attribIndexes[i], value);
-			}
-		}
+		char label[160]; FormatEx(label, sizeof(label), "%s, on himself", who);
+		
+		ShowUpgradesOn(client, target, label);
+		
+		return;
 	}
 	
-	PrintToChat(client, "%N currently has %d credits.", target, TF2_GetCurrency(target));
+	int weapon = GetPlayerWeaponSlot(target, slot);
+	
+	if (weapon == -1)
+	{
+		ReplyToCommand(client, "%s has nothing in slot %d.", who, slot);
+		
+		return;
+	}
+	
+	char label[160]; FormatEx(label, sizeof(label), "%s, slot %d", who, slot);
+	
+	ShowUpgradesOn(client, weapon, label);
 }
 
 int GetHumanAndDefenderBotCount(TFTeam team)

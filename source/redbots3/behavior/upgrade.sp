@@ -171,13 +171,17 @@ public Action CTFBotUpgrade_Update(BehaviorAction action, int actor, float inter
 
 public void CTFBotUpgrade_OnEnd(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
 {
-	/* Lastly, try to purchase any canteens we can afford
-	Only at a station: this action also ends when the bot is nowhere near one, where the game refuses
-	the purchase and the bot walks back to try again, once per bounce, for as long as it takes it to
-	reach the station */
-	if (TF2_IsInUpgradeZone(actor))
-		PurchaseAffordableCanteens(actor);
+	/* What is left over stays in the wallet
 	
+	This spent it on canteens, every session, on the reasoning that money not spent is money wasted.
+	It is the other way round in this mode. Credits carry between waves and upgrades do not expire,
+	so an unspent hundred is a hundred towards the four hundred upgrade that actually changes a
+	wave. A canteen is used once and gone, and a bot that empties its wallet into them every wave
+	never saves for anything.
+	
+	If a canteen is worth buying it is worth ranking against everything else that money could buy,
+	which is what the upgrade path is for. Buying it with whatever happened to be left is not a
+	decision, it is a leak. */
 	KV_MvM_UpgradesDone(actor);
 	
 	/* Buildings come down after every shopping trip
@@ -310,11 +314,12 @@ void CollectUpgrades(int client)
 			if (upgrades.m_iUIGroup() == UIGROUP_UPGRADE_ATTACHED_TO_PLAYER && slot != -1) 
 				continue;
 			
-			/* Canteens are not bought here
+			/* Canteens are not bought at all
 			The player slot takes every upgrade the game does not attach to a weapon, which sweeps
 			up the powerup bottle charges too. The game refuses those on slot -1, the bot pays
 			nothing, and the next interval picks the same charge again for as long as the upgrade
-			window lasts. PurchaseAffordableCanteens buys them, on TF_LOADOUT_SLOT_ACTION */
+			window lasts. Nothing buys them now: see CTFBotUpgrade_OnEnd for why the leftovers stay
+			in the wallet instead. */
 			if (upgrades.m_iUIGroup() == UIGROUP_POWERUPBOTTLE)
 				continue;
 			
