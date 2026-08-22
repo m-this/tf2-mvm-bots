@@ -2875,8 +2875,37 @@ stock bool IsZeroVector(float origin[3])
 	return origin[0] == NULL_VECTOR[0] && origin[1] == NULL_VECTOR[1] && origin[2] == NULL_VECTOR[2];
 }
 
+/* How long an engineer's walk to a build spot is allowed to take
+
+A flat clock is a clock that is right for one distance. Twelve seconds is generous inside a nest
+and nowhere near enough to come back from the upgrade station, and what expiring meant was building
+where he stood: a sentry six hundred units from its nest on Decoy, a dispenser beside the
+teleporter entrance instead of on the ground the map names for it.
+
+So the walk is priced by how far it is, floored so a short one still has room to go round the spot,
+and capped so nothing waits on an engineer for ever. */
+#define BUILD_WALK_SPEED	180.0
+#define BUILD_WALK_TIME_MIN	12.0
+#define BUILD_WALK_TIME_MAX	40.0
+
+stock float BuildReachTime(const float from[3], const float to[3])
+{
+	float seconds = BUILD_WALK_TIME_MIN + GetVectorDistance(from, to) / BUILD_WALK_SPEED;
+	
+	return seconds > BUILD_WALK_TIME_MAX ? BUILD_WALK_TIME_MAX : seconds;
+}
+
+/* Saying it again is not free, so it is only said when the answer changes
+
+Readiness is reasserted every frame, on purpose, because several places set a bot ready and
+gating each of them would be four chances to miss one. What that turned into on the wire was a
+tournament_player_readystate command per bot per frame, and a ready screen flickering through
+every one of them. The command is the announcement; the flag is the state. */
 stock void SetPlayerReady(int client, bool state)
 {
+	if (IsPlayerReady(client) == state)
+		return;
+	
 	FakeClientCommand(client, "tournament_player_readystate %d", state);
 }
 

@@ -17,8 +17,6 @@ So the authored spot is respected. What chooses between several of them is the z
 names one and the nearest otherwise, and the only things that refuse a spot now are another
 engineer already standing a dispenser on it, and the engineer being unable to walk there. */
 
-#define DISPENSER_REACH_TIME	12.0
-
 /* How far from the nest "where he stands" is still somewhere worth putting a dispenser
 
 The deadline above assumes the walk is inside the nest, which it is when the engineer is at his
@@ -31,7 +29,7 @@ A dispenser two metres from the intended spot is worth all of one that never get
 the other end of the map is worth nothing at all: it feeds no sentry, it heals nobody who is
 fighting, and it is a hundred metal the nest wanted. Past this he keeps walking, and the build
 time above is what stops him. */
-#define DISPENSER_SETTLE_RANGE	500.0
+#define DISPENSER_SETTLE_RANGE	200.0
 
 /* Where he stands to put a dispenser on the spot, which is not the spot
 
@@ -54,8 +52,12 @@ there. Eight of them, which is a look from every side at forty five degrees. */
 
 The readiness gate holds a wave until the engineer's nest is finished, and a nest is not finished
 without a dispenser. An engineer who can never place one is an engineer holding every wave for
-the length of that grace, which is what a spot with no room around it costs. */
-#define DISPENSER_BUILD_TIME	25.0
+the length of that grace, which is what a spot with no room around it costs.
+
+Long enough to cover the longest walk BuildReachTime will price plus the eight looks around the
+spot, because a give-up clock that expires during the walk is a give-up clock that never lets him
+arrive. */
+#define DISPENSER_BUILD_TIME	45.0
 
 static float m_ctDispenserReachDeadline[MAXPLAYERS + 1];
 static float m_ctDispenserGiveUpTime[MAXPLAYERS + 1];
@@ -79,7 +81,6 @@ public Action CTFBotMvMEngineerBuildDispenser_OnStart(BehaviorAction action, int
 {
 	UpdateLookAroundForEnemies(actor, true);
 	
-	m_ctDispenserReachDeadline[actor] = GetGameTime() + DISPENSER_REACH_TIME;
 	m_ctDispenserGiveUpTime[actor] = GetGameTime() + DISPENSER_BUILD_TIME;
 	m_ctDispenserTryDeadline[actor] = GetGameTime() + DISPENSER_TRY_TIME;
 	m_iDispenserTry[actor] = 0;
@@ -94,6 +95,14 @@ public Action CTFBotMvMEngineerBuildDispenser_OnStart(BehaviorAction action, int
 	}
 	
 	DispenserStandPoint(actor, m_iDispenserTry[actor], m_vDispenserStand[actor]);
+	
+	/* Priced by the walk, because the spot the map names is not always next to the nest
+	
+	Coaltown's right-hand spot is 857 units from the nest it serves, on purpose, and he starts the
+	walk at the upgrade station. A flat twelve seconds expired somewhere along the way and he built
+	it wherever that was, which is how a hand-walked spot turned into a dispenser beside the
+	teleporter entrance. */
+	m_ctDispenserReachDeadline[actor] = GetGameTime() + BuildReachTime(GetAbsOrigin(actor), m_vDispenserStand[actor]);
 	
 	return action.Continue();
 }

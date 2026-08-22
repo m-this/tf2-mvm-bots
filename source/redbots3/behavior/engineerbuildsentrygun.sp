@@ -27,11 +27,20 @@ the nav mesh every time it happened. */
 
 /* How long the walk and the whole business may take
 
-The walk is inside the nest, so twelve seconds is generous. Past the build time he goes back to
+The walk is priced by its length, because "the walk is inside the nest" stopped being true the
+moment he started every one of them at the upgrade station. Past the build time he goes back to
 the idle action rather than settling for where he stands: a sentry is not a dispenser, and one
-pointed at a wall is worse than three more seconds spent finding somewhere it can see from. */
+pointed at a wall is worse than three more seconds spent finding somewhere it can see from.
+
+The settle range is the important one. Running out of clock used to mean building beside himself
+wherever he had got to, with no distance test of any kind: that is a sentry at a random place on
+the map, reported from play on Coaltown, and this file's own comment admits to one 625 units from
+its nest on Decoy. Two build reaches is close enough that what he settles for still sees what the
+nest was chosen to see. Further out he keeps walking, and the give-up clock hands him back to the
+idle action, which scores a nest again and tries afresh. */
 #define SENTRY_REACH_TIME	12.0
-#define SENTRY_BUILD_TIME	30.0
+#define SENTRY_SETTLE_RANGE	200.0
+#define SENTRY_BUILD_TIME	45.0
 
 static float m_ctSentryReachDeadline[MAXPLAYERS + 1];
 static float m_ctSentryGiveUpTime[MAXPLAYERS + 1];
@@ -55,7 +64,6 @@ public Action CTFBotMvMEngineerBuildSentrygun_OnStart(BehaviorAction action, int
 {
 	UpdateLookAroundForEnemies(actor, true);
 	
-	m_ctSentryReachDeadline[actor] = GetGameTime() + SENTRY_REACH_TIME;
 	m_ctSentryGiveUpTime[actor] = GetGameTime() + SENTRY_BUILD_TIME;
 	m_ctSentryTryDeadline[actor] = GetGameTime() + SENTRY_TRY_TIME;
 	m_iSentryTry[actor] = 0;
@@ -72,6 +80,9 @@ public Action CTFBotMvMEngineerBuildSentrygun_OnStart(BehaviorAction action, int
 	}
 	
 	SentryStandPoint(actor);
+	
+	//After the teleport above, so a between-rounds walk is priced from where he actually starts it
+	m_ctSentryReachDeadline[actor] = GetGameTime() + BuildReachTime(GetAbsOrigin(actor), m_vSentryStand[actor]);
 	
 	return action.Continue();
 }
@@ -103,7 +114,8 @@ public Action CTFBotMvMEngineerBuildSentrygun_Update(BehaviorAction action, int 
 	the nest from three metres short of it is the same thing; aiming at it from twenty metres short
 	puts the sentry twenty metres from where anybody wanted it, facing a direction chosen by where
 	he happened to get stuck. Decoy produced one 625 units from its own nest that way. */
-	bool outOfTime = GetGameTime() > m_ctSentryReachDeadline[actor];
+	bool outOfTime = GetGameTime() > m_ctSentryReachDeadline[actor]
+		&& GetVectorDistance(GetAbsOrigin(actor), m_vSentrySpot[actor]) < SENTRY_SETTLE_RANGE;
 	
 	if (outOfTime)
 	{
