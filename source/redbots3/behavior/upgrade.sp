@@ -353,90 +353,86 @@ void CollectUpgrades(int client)
 	}*/
 	
 	
-	//NEW!
-	JSONArray new_json = new JSONArray();
-	/////
+	SortUpgradesByPriority(client);
 	
-	while (CTFPlayerUpgrades[client].Length > 0)
-	{	
-		JSONObject mObj = view_as<JSONObject>(CTFPlayerUpgrades[client].Get(0));
-		int minimum = mObj.GetInt("priority"); // arbitrary number in list
-		
-		//NEW!
-		JSONObject tempObj = new JSONObject();
-		tempObj.SetInt("pclass",   mObj.GetInt("pclass"));
-		tempObj.SetInt("slot",     mObj.GetInt("slot"));
-		tempObj.SetInt("index",    mObj.GetInt("index"));
-		tempObj.SetInt("random",   mObj.GetInt("random"));
-		tempObj.SetInt("priority", mObj.GetInt("priority"));
-		/////
-		
-		delete mObj;
-		
-		for (int x = 0; x < CTFPlayerUpgrades[client].Length; x++)
-		{
-			JSONObject xObj = view_as<JSONObject>(CTFPlayerUpgrades[client].Get(x)); // arbitrary number in list
-			
-			if (xObj.GetInt("priority") > minimum)
-			{
-				minimum = xObj.GetInt("priority");
-				
-				//NEW!
-				tempObj.SetInt("pclass",   xObj.GetInt("pclass"));
-				tempObj.SetInt("slot",     xObj.GetInt("slot"));
-				tempObj.SetInt("index",    xObj.GetInt("index"));
-				tempObj.SetInt("random",   xObj.GetInt("random"));
-				tempObj.SetInt("priority", xObj.GetInt("priority"));
-				/////
-			}
-
-			delete xObj;
-		}
-		
-		//NEW!
-		new_json.Push(tempObj);
-		delete tempObj;
-		/////
-		
-		int index = FindPriorityIndex(CTFPlayerUpgrades[client], "priority", minimum);
-		
-		/* The only way out of this loop, so it is worth saying what happens when it is not there
-		
-		The priority came out of an element of this list, so it is found. If it ever is not,
-		Remove(-1) throws out of the callback and the loop that was supposed to be draining the
-		list has not removed anything: the shopping list is left half sorted and the next call
-		starts again on it. Better to stop with the list intact and say so. */
-		if (index < 0)
-		{
-			LogError("SortPlayerUpgrades: priority %d is in the list and then is not, for %L", minimum, client);
-			break;
-		}
-		
-		CTFPlayerUpgrades[client].Remove(index);
-	}
-    
 	if (redbots_manager_debug_actions.BoolValue)
 	{
 		PrintToServer("\nPreferred upgrades for #%d \"%N\"\n", client, client);
 		PrintToServer("%3s %4s %4s %5s %-64s\n", "#", "SLOT", "COST", "INDEX", "ATTRIBUTE");
-	}
-	
-	for (int i = 0; i < new_json.Length; i++) 
-	{
-		JSONObject info = view_as<JSONObject>(new_json.Get(i));
-		CTFPlayerUpgrades[client].Push(info);
 		
-		if (redbots_manager_debug_actions.BoolValue)
+		for (int i = 0; i < CTFPlayerUpgrades[client].Length; i++)
 		{
+			JSONObject info = view_as<JSONObject>(CTFPlayerUpgrades[client].Get(i));
+			
 			CMannVsMachineUpgradeManager manager = CMannVsMachineUpgradeManager();
 			int cost = GetCostForUpgrade(manager.GetUpgradeByIndex(info.GetInt("index")).Address, info.GetInt("slot"), info.GetInt("pclass"), client);
+			
 			PrintToServer("%3d %4d %4d %5d %-64s", i, info.GetInt("slot"), cost, info.GetInt("index"), manager.GetUpgradeByIndex(info.GetInt("index")).m_szAttribute());
+			
+			delete info;
 		}
+	}
+}
+
+/* Highest priority first, in one pass over the list rather than one pass per entry
+
+This was a selection sort that walked the whole remaining list to find the next highest, and every
+comparison in it read an element out of a JSONArray, which is a handle allocated and freed. For a
+shopping list of a hundred and fifty that is over twenty thousand handles, per bot.
+
+It was not once a wave either. CollectUpgrades ends in this sort and was being called again for
+every single purchase, so six bots at the station between rounds were doing it several times a
+second between them. That is the shape of the frame the watchdog kills.
+
+Priorities come out into a plain list, that gets sorted, and the entries are moved once into the
+order it gives. Two handles an entry instead of two per comparison. */
+static void SortUpgradesByPriority(int client)
+{
+	JSONArray unsorted = CTFPlayerUpgrades[client];
+	int count = unsorted.Length;
+	
+	ArrayList order = new ArrayList(2);
+	
+	for (int i = 0; i < count; i++)
+	{
+		JSONObject info = view_as<JSONObject>(unsorted.Get(i));
+		
+		int at = order.Push(info.GetInt("priority"));
+		order.Set(at, i, 1);
 		
 		delete info;
 	}
 	
-	delete new_json;
+	order.SortCustom(SortUpgradesHighestFirst);
+	
+	JSONArray sorted = new JSONArray();
+	
+	for (int i = 0; i < count; i++)
+	{
+		JSONObject info = view_as<JSONObject>(unsorted.Get(order.Get(i, 1)));
+		
+		sorted.Push(info);
+		
+		delete info;
+	}
+	
+	delete order;
+	delete unsorted;
+	
+	CTFPlayerUpgrades[client] = sorted;
+}
+
+static int SortUpgradesHighestFirst(int index1, int index2, Handle array, Handle hndl)
+{
+	ArrayList list = view_as<ArrayList>(array);
+	
+	int first = list.Get(index1, 0);
+	int second = list.Get(index2, 0);
+	
+	if (first > second)
+		return -1;
+	
+	return first < second ? 1 : 0;
 }
 
 /* What a bot buys at the upgrade station, highest number first
@@ -828,27 +824,6 @@ static int UnrankedUpgradePriority()
 	return GetRandomInt(50, 100);
 }
 
-int FindPriorityIndex(JSONArray array, const char[] key, int value)
-{
-	int index = -1;
-	
-	for (int i = 0; i < array.Length; i++)
-	{
-		JSONObject iObj = view_as<JSONObject>(array.Get(i));
-		if (value == iObj.GetInt(key))
-		{
-			index = i;
-			
-			delete iObj;
-			break;
-		}
-		
-		delete iObj;
-	}
-	
-	return index;
-}
-
 void KV_MvM_UpgradesBegin(int client)
 {
 	m_nPurchasedUpgrades[client] = 0;
@@ -879,7 +854,19 @@ JSONObject CTFBotPurchaseUpgrades_ChooseUpgrade(int actor)
 {
 	int currency = TF2_GetCurrency(actor);
 	
-	CollectUpgrades(actor);
+	/* The list is built once a session, not once a purchase
+	
+	This rebuilt and re-sorted the whole shopping list every time a bot bought anything, which is
+	every 0.1 to 1.25 seconds each, and six bots at the station between rounds did it several
+	times a second between them.
+	
+	It bought nothing. Everything the rebuild filters on, the walk below re-asks per entry anyway:
+	whether the attribute can still be upgraded, what it costs now, whether the wallet share is
+	spent, what the priority is. A rebuild can only ever remove entries, never add one, because
+	buying an upgrade does not make another available. So the only thing it changed was how long
+	the walk is, and the walk skips the same entries either way. */
+	if (CTFPlayerUpgrades[actor] == null || CTFPlayerUpgrades[actor].Length == 0)
+		CollectUpgrades(actor);
 	
 	for (int i = 0; i < CTFPlayerUpgrades[actor].Length; i++) 
 	{
