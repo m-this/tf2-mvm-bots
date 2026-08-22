@@ -23,6 +23,13 @@ this. The TODO for it stands. */
 //A crowd worth spending the cluster on. One robot is not worth eight bombs and a reload
 #define STICKY_DETONATE_ENEMIES	2
 
+/* Bombs with somebody standing on them, which is the other way the cluster is worth pressing
+
+Counting enemies alone misses the shape a sticky Demoman actually produces: two robots walking a
+corridor, each on a different bomb. Neither bomb has a crowd on it and the pair is worth the same
+as a crowd on one. */
+#define STICKY_DETONATE_BOMBS	2
+
 //A tank is a hull rather than a point, so a bomb stuck to it is further from its middle than the blast
 #define STICKY_TANK_RANGE	300.0
 
@@ -61,6 +68,15 @@ bool ShouldDetonateStickies(int client)
 	int examined = 0;
 	int sticky = -1;
 
+	/* Counted across the whole cluster rather than answered by the first bomb that qualifies
+	
+	Alt-fire blows all of them, so the question is what the cluster catches, not what one bomb
+	catches. Asking it a bomb at a time meant two robots on two different bombs read as two bombs
+	with one robot each and the button was never pressed. */
+	int caughtTotal = 0;
+	int bombsWithEnemies = 0;
+	bool worthItAlone = false;
+
 	while ((sticky = FindEntityByClassname(sticky, "tf_projectile_pipe_remote")) != -1)
 	{
 		//Somebody else's bombs, and blowing those up is not a button this bot has
@@ -77,7 +93,6 @@ bool ShouldDetonateStickies(int client)
 			continue;
 
 		int caught = 0;
-		bool giant = false;
 
 		for (int i = 1; i <= MaxClients; i++)
 		{
@@ -92,22 +107,30 @@ bool ShouldDetonateStickies(int client)
 
 			caught++;
 
-			//A giant, or whoever is carrying the bomb, is worth the cluster by itself
-			if (TF2_IsMiniBoss(i) || TF2_HasTheFlag(i))
-				giant = true;
+			/* A giant, the bomb carrier, or a Medic is worth the cluster by itself
+			
+			The Medic is the addition and it is the whole job on a wave that has them: a giant
+			with one attached cannot be killed by anybody until the Medic is, and a Demoman is
+			one of the two classes that can reach it. */
+			if (TF2_IsMiniBoss(i) || TF2_HasTheFlag(i) || TF2_GetPlayerClass(i) == TFClass_Medic)
+				worthItAlone = true;
 		}
 
-		if (giant || caught >= STICKY_DETONATE_ENEMIES)
-			return true;
+		if (caught > 0)
+			bombsWithEnemies++;
+
+		caughtTotal += caught;
 
 		/* A tank is not a player, so none of the counting above sees one
 		Without this a bot puts a clip into the hull and never presses the button, which is the
 		same weapon doing nothing that this file exists to fix */
 		if (IsStickyOnTank(stickyOrigin))
-			return true;
+			worthItAlone = true;
 	}
 
-	return false;
+	return worthItAlone
+		|| caughtTotal >= STICKY_DETONATE_ENEMIES
+		|| bombsWithEnemies >= STICKY_DETONATE_BOMBS;
 }
 
 //Whether a bomb at this position is stuck to a tank, or close enough to hurt one
@@ -130,11 +153,23 @@ static bool IsStickyOnTank(const float stickyOrigin[3])
 /* Whether this Demoman should be holding the sticky launcher rather than the pipes
 
 Both are the same arc and the same splash, so this is not about which does more damage. It is
-about which one lands. A pipe has to be timed onto a moving robot; a sticky sticks where it hits
-and waits for the bot to decide, which is a decision a bot makes better than a lead.
+about which one a bot can land.
 
-So: stickies at the things worth a cluster, pipes at everything else. Close in it is pipes
-whatever the target, because a sticky under the bot's own feet is a bot blowing itself up */
+A pipe has to be timed onto a robot that is walking. A sticky does not: it sticks where it hits
+and sits there, and the bot decides afterwards, by reading where the bombs actually are and who is
+standing near them. That is a position check rather than a lead, and a position check is a thing a
+bot is exactly as good at as a person.
+
+Which is why the default is the wrong way round when it is written for a human. A sweep of every
+map put this Demoman last of every class that holds a seat, at 1634 damage a wave against the
+Heavy's 8594, while spending 308 damage a kill, which is better than the Pyro or the Heavy. It
+lands what it fires and does not fire enough of the thing it can land.
+
+So under demo_sticky_first the launcher is what he holds against anything he is fighting, and the
+pipes are the exception: close in, where a sticky is the bot blowing itself up, and out past the
+range where the arc is guesswork. With the feature off this is the older rule, which is stickies
+for a giant, the bomb carrier or a crowd, and pipes for everything else. The two are a switch
+apart on purpose, because which of them is right is a question about numbers. */
 bool ShouldUseStickyLauncher(int client, int launcher, int threat, float range)
 {
 	if (launcher == -1 || TF2Util_GetWeaponID(launcher) != TF_WEAPON_PIPEBOMBLAUNCHER)
@@ -154,6 +189,13 @@ bool ShouldUseStickyLauncher(int client, int launcher, int threat, float range)
 		return false;
 
 	if (TF2_IsMiniBoss(threat) || TF2_HasTheFlag(threat))
+		return true;
+
+	//A Medic is the one robot the rest of the team cannot finish around, so it is worth the switch
+	if (TF2_GetPlayerClass(threat) == TFClass_Medic)
+		return true;
+
+	if (Feature(FEATURE_DEMO_STICKY_FIRST))
 		return true;
 
 	//A crowd, counted where it stands rather than where the bombs would land
