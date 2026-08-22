@@ -197,6 +197,17 @@ fifteen milliseconds through a stall as happily as through an idle frame. The ga
 frame starting and the next one starting is what actually elapsed. */
 static float g_flLastFrame;
 
+/* The worst frame since the last wave began, counted whether or not one is running
+
+The per-wave numbers only ever covered frames inside a wave, and the frame that matters is the one
+the wave starts on: every robot spawns and begins pathing at once, and the watchdog kills the
+server there rather than in the middle of a wave. Three runs of an A/B died on it, all of them
+immediately after "NextBot tickrate changed from 0 to 7", and none of them had written a wave
+result yet, so nothing in the file said how close the frames had been getting.
+
+Reported on the wave_begin line, which is the first thing written after that frame. */
+static float g_flWorstFrameBetween;
+
 /* How much of the wave each engineer spent with something standing
 
 Counted in samples rather than seconds because the sample is what is actually observed, and a
@@ -267,6 +278,14 @@ public void OnGameFrame()
 {
 	float now = GetEngineTime();
 
+	if (g_flLastFrame > 0.0)
+	{
+		float sinceLast = (now - g_flLastFrame) * 1000.0;
+
+		if (sinceLast > g_flWorstFrameBetween)
+			g_flWorstFrameBetween = sinceLast;
+	}
+
 	if (g_flLastFrame > 0.0 && g_flWaveStart > 0.0)
 	{
 		float ms = (now - g_flLastFrame) * 1000.0;
@@ -319,10 +338,14 @@ static void Event_WaveBegin(Event event, const char[] name, bool dontBroadcast)
 		cvFeatures.GetString(features, sizeof(features));
 	
 	char line[STATS_LINE_LENGTH];
-	FormatEx(line, sizeof(line), "{\"event\":\"wave_begin\",\"map\":\"%s\",\"wave\":%d,\"red\":%d,\"bots\":%d,\"features\":\"%s\"}",
-		g_sMap, g_iWave, CountTeam(TFTeam_Red, false), CountTeam(TFTeam_Red, true), features);
+	FormatEx(line, sizeof(line), "{\"event\":\"wave_begin\",\"map\":\"%s\",\"wave\":%d,\"red\":%d,\"bots\":%d,"
+		... "\"worst_frame_before_ms\":%.0f,\"features\":\"%s\"}",
+		g_sMap, g_iWave, CountTeam(TFTeam_Red, false), CountTeam(TFTeam_Red, true),
+		g_flWorstFrameBetween, features);
 
 	WriteLine(line);
+
+	g_flWorstFrameBetween = 0.0;
 
 	/* Both ends of the wave, because the two questions are different
 
