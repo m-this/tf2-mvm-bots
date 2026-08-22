@@ -418,6 +418,20 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	return APLRes_Success;
 }
 
+/* The features that are on, published once the server's own configs have run
+
+They were published only when a wave began, and the statistics plugin reads the list in its own
+handler for that same event. Whichever of the two hooks first is whichever SourceMod loaded first,
+so the first wave of every run recorded an empty list: a results file that does not say which mod
+produced it, which is the one thing the list exists for.
+
+OnConfigsExecuted is after server.cfg and before anybody plays, which is where the answer stops
+being the defaults and starts being what the server was asked for. */
+public void OnConfigsExecuted()
+{
+	PublishActiveFeatures();
+}
+
 public void OnMapStart()
 {
 	g_bBotsEnabled = false;
