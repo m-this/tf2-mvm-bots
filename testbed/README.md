@@ -117,6 +117,41 @@ Which of those to read depends on what changed:
 | stickies, scout jumps  | `robot_kills`, `duration`                   |
 | anything at all        | `result` and `duration`                     |
 
+## Every map, and A against B
+
+One map says whether a change works on that map. Most of what an engineer does
+is a property of geometry, so it takes all of them to tell a map-shaped bug from
+a mod-shaped one.
+
+```sh
+testbed/sweep.sh                       # every installed map, six waves each
+testbed/sweep.sh --waves 4 --tag night
+go run ./testbed/sweepreport testbed/results/sweep-night
+```
+
+The sweep report adds two tables the per-run report has no way to produce: what
+every engineer had standing at the start of each wave and for how much of it,
+and what each class did with its seat measured against the waves that class
+actually played.
+
+A feature is a named switch (`source/redbots3/features.sp`), which means the
+same build can play both sides of an argument:
+
+```sh
+testbed/ab.sh --feature demo_sticky_first --maps "mvm_coaltown mvm_decoy"
+go run ./testbed/sweepreport results/ab-demo_sticky_first/on \
+                             results/ab-demo_sticky_first/off
+```
+
+It plays off then on per map, rather than every off run followed by every on
+run, so the halves of a pair are minutes apart instead of hours. Every results
+file records the features that were on, so a file says which arm it is without
+anybody having to remember.
+
+Six waves an arm is a small sample and the bots are not deterministic. A
+difference of one cleared wave is noise; only a large move in damage per wave is
+worth reading as anything.
+
 ## When the server crashes
 
 `run.sh` greps the container's log for `core dumped` on every poll and stops
@@ -163,7 +198,11 @@ does not say whether the bots look right, and somebody still has to watch them.
 | file                    | what it is                                            |
 | ----------------------- | ----------------------------------------------------- |
 | `run.sh`                | brings the server up, runs the mission, reads results  |
+| `sweep.sh`              | plays every installed map, one results file each       |
+| `ab.sh`                 | plays the same maps twice with one feature switched    |
 | `report/`               | turns a results file into a table, and compares two    |
+| `sweepreport/`          | reads a whole sweep, or one A/B arm against the other  |
+| `checkspots.py`         | which dispenser spot each authored nest would take     |
 | `build.sh`              | compiles the mod on the host, into `build/package`     |
 | `seed-volume.sh`        | copies an existing game install into the test-bed's    |
 | `compose.yml`           | one service, loopback only                             |
