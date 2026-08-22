@@ -334,6 +334,16 @@ public void OnMapStart()
 {
 	GetCurrentMap(g_sMap, sizeof(g_sMap));
 
+	/* The clock starts again, because a map load is not a frame
+
+	OnGameFrame does not run while the server is loading, so the gap between the last frame of the
+	old map and the first frame of the new one is the whole load. Left running across the change,
+	that gap was reported as the worst frame before wave one: 1256ms on Coaltown, which read as a
+	server a quarter of a second from the watchdog and sent me looking for what was on that frame.
+	Nothing was. It was the map loading, which every server does and no watchdog counts. */
+	g_flLastFrame = 0.0;
+	g_flWorstFrameBetween = 0.0;
+
 	g_iWave = 0;
 	g_flWaveStart = 0.0;
 	g_Wave.Reset();
