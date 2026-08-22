@@ -261,7 +261,7 @@ nest for the whole mission. It now asks the convar too, so with the feature off
 `CTFBotUpgrade_OnEnd` detonates after every shopping trip exactly as it did
 before, and nothing else in the release depends on this being fixed.
 
-## 12. The Gas Passer crashes the server. Open, and it is out of the loadout
+## 12. The Gas Passer crashed the server. Fixed; the rest of the watchdog is still open
 
 A Pyro carrying a Gas Passer trips the watchdog at a wave transition:
 
@@ -280,10 +280,15 @@ gas whenever `HasAmmo(secondary)` is true, and `HasAmmo` on a weapon that fires
 off a charge meter rather than a clip is always true. So the Pyro equips a jar
 it cannot throw, every tick, and never picks the flamethrower back up.
 
-The fix is a charge test rather than an ammo test before the bot commits to the
-jar, and the same question applies to every meter weapon in that switch: Jarate,
-Mad Milk and the banners all go through `HasAmmo` in the same way. Until then
-the loadout gives the Pyro a shotgun.
+Fixed: `IsThrowableReady` asks the meter instead of the ammo, and the three
+places in that switch which reached for `HasAmmo` on a jar now go through it.
+The Gas Passer's meter is on the player, per loadout slot, because it fills from
+damage dealt; Jarate, Mad Milk and the Cleaver fill on a clock the weapon
+carries. Both are read.
+
+The loadout still gives the Pyro a shotgun. Putting the Gas Passer back is a
+balance question rather than a crash one now, and the file already says the
+airblast it costs is worth measuring rather than assuming.
 
 The Gas Passer is not the whole story. 1.5.5-tf2ap.10, which has no loadout file
 at all, crashed twice in three runs of the same mission afterwards, with the same

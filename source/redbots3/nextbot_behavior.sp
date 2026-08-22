@@ -1725,6 +1725,34 @@ bool OpportunisticallyUsePowerupBottle(int client, int activeWeapon, INextBot bo
 	return false;
 }
 
+/* Whether a weapon that fires off a meter has enough of it to fire, which HasAmmo cannot say
+
+HasAmmo is CBaseCombatWeapon::HasAmmo, and a weapon carrying a meter instead of a clip has no ammo
+to run out of, so it answers yes for ever. "Always throw gas whenever HasAmmo" therefore reads as
+"always hold the jar": the Pyro equipped one it could not throw, on every tick, and never picked
+the flamethrower back up. Four runs in six of Decoy ended on the watchdog line because of it, and
+the loadout has carried a shotgun in that slot ever since to keep away from it.
+
+The two kinds of meter are kept in different places, which is why this is not one line. Jarate,
+Mad Milk and the Cleaver refill on a clock the weapon itself carries. The Gas Passer refills out
+of damage dealt, and the game keeps that on the player, per loadout slot, rather than on the
+weapon.
+
+Anything else is asked the question it was always asked. */
+static bool IsThrowableReady(int client, int weapon)
+{
+	switch (TF2Util_GetWeaponID(weapon))
+	{
+		case TF_WEAPON_JAR_GAS:
+			return GetEntPropFloat(client, Prop_Send, "m_flItemChargeMeter", TF_LOADOUT_SLOT_SECONDARY) >= 100.0;
+		
+		case TF_WEAPON_JAR, TF_WEAPON_JAR_MILK, TF_WEAPON_CLEAVER:
+			return GetEntPropFloat(weapon, Prop_Send, "m_flEffectBarRegenTime") <= GetGameTime();
+	}
+	
+	return HasAmmo(weapon);
+}
+
 void EquipBestWeaponForThreat(int client, const CKnownEntity threat)
 {
 	//Don't care about any weapon restrictions here
@@ -1822,7 +1850,7 @@ void EquipBestWeaponForThreat(int client, const CKnownEntity threat)
 			{
 				int weaponID = TF2Util_GetWeaponID(secondary);
 				
-				if ((weaponID == TF_WEAPON_JAR_MILK || weaponID == TF_WEAPON_CLEAVER) && HasAmmo(secondary) && BaseEntity_IsPlayer(threatEnt) && !TF2_IsInvulnerable(threatEnt))
+				if ((weaponID == TF_WEAPON_JAR_MILK || weaponID == TF_WEAPON_CLEAVER) && IsThrowableReady(client, secondary) && BaseEntity_IsPlayer(threatEnt) && !TF2_IsInvulnerable(threatEnt))
 				{
 					//Always throw milk at them if we can
 					gun = secondary;
@@ -1852,7 +1880,7 @@ void EquipBestWeaponForThreat(int client, const CKnownEntity threat)
 		}
 		case TFClass_Sniper:
 		{
-			if (secondary != -1 && TF2Util_GetWeaponID(secondary) == TF_WEAPON_JAR && HasAmmo(secondary) && BaseEntity_IsPlayer(threatEnt) && !TF2_IsInvulnerable(threatEnt))
+			if (secondary != -1 && TF2Util_GetWeaponID(secondary) == TF_WEAPON_JAR && IsThrowableReady(client, secondary) && BaseEntity_IsPlayer(threatEnt) && !TF2_IsInvulnerable(threatEnt))
 			{
 				//Always throw pee at them if we can
 				gun = secondary;
@@ -1874,7 +1902,7 @@ void EquipBestWeaponForThreat(int client, const CKnownEntity threat)
 		}
 		case TFClass_Pyro:
 		{
-			if (secondary != -1 && TF2Util_GetWeaponID(secondary) == TF_WEAPON_JAR_GAS && HasAmmo(secondary) && BaseEntity_IsPlayer(threatEnt) && !TF2_IsInvulnerable(threatEnt))
+			if (secondary != -1 && TF2Util_GetWeaponID(secondary) == TF_WEAPON_JAR_GAS && IsThrowableReady(client, secondary) && BaseEntity_IsPlayer(threatEnt) && !TF2_IsInvulnerable(threatEnt))
 			{
 				//Always throw gas
 				gun = secondary;
