@@ -153,23 +153,24 @@ static bool IsStickyOnTank(const float stickyOrigin[3])
 /* Whether this Demoman should be holding the sticky launcher rather than the pipes
 
 Both are the same arc and the same splash, so this is not about which does more damage. It is
-about which one a bot can land.
+about which one lands. A pipe has to be timed onto a moving robot; a sticky sticks where it hits
+and waits for the bot to decide, which is a decision a bot makes better than a lead.
 
-A pipe has to be timed onto a robot that is walking. A sticky does not: it sticks where it hits
-and sits there, and the bot decides afterwards, by reading where the bombs actually are and who is
-standing near them. That is a position check rather than a lead, and a position check is a thing a
-bot is exactly as good at as a person.
+That reasoning is why the launcher was tried as the default weapon, and it was measured and it was
+wrong. Six waves of Coaltown either way, one build, one switch between them:
 
-Which is why the default is the wrong way round when it is written for a human. A sweep of every
-map put this Demoman last of every class that holds a seat, at 1634 damage a wave against the
-Heavy's 8594, while spending 308 damage a kill, which is better than the Pyro or the Heavy. It
-lands what it fires and does not fire enough of the thing it can land.
+  pipes first    1821 damage a wave, 27 kills, five waves of six cleared
+  stickies first  880 damage a wave, 11 kills, four waves of six cleared
 
-So under demo_sticky_first the launcher is what he holds against anything he is fighting, and the
-pipes are the exception: close in, where a sticky is the bot blowing itself up, and out past the
-range where the arc is guesswork. With the feature off this is the older rule, which is stickies
-for a giant, the bomb carrier or a crowd, and pipes for everything else. The two are a switch
-apart on purpose, because which of them is right is a question about numbers. */
+Half the damage. The hole in the argument is that the bot fires at where a robot is rather than
+where it is going, and a sticky thrown at a walking robot lands behind it and catches nobody. The
+clip and the reload are spent for nothing, where a pipe at least does its damage when it connects.
+Sticky spam is a human laying bombs on ground the robots have not reached yet, and none of that is
+what this does.
+
+So: stickies at the things worth a cluster, pipes at everything else. Close in it is pipes whatever
+the target, because a sticky under the bot's own feet is a bot blowing itself up. The trap is the
+part that would actually pay, and it is TODO item 6a rather than a switch on this function. */
 bool ShouldUseStickyLauncher(int client, int launcher, int threat, float range)
 {
 	if (launcher == -1 || TF2Util_GetWeaponID(launcher) != TF_WEAPON_PIPEBOMBLAUNCHER)
@@ -193,9 +194,6 @@ bool ShouldUseStickyLauncher(int client, int launcher, int threat, float range)
 
 	//A Medic is the one robot the rest of the team cannot finish around, so it is worth the switch
 	if (TF2_GetPlayerClass(threat) == TFClass_Medic)
-		return true;
-
-	if (Feature(FEATURE_DEMO_STICKY_FIRST))
 		return true;
 
 	//A crowd, counted where it stands rather than where the bombs would land

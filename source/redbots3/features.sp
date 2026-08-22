@@ -27,7 +27,6 @@ enum
 	FEATURE_NEST_ZONES,
 	FEATURE_READY_WHEN_PREPARED,
 	FEATURE_WAVE_RESISTANCES,
-	FEATURE_DEMO_STICKY_FIRST,
 	FEATURE_COUNT
 }
 
@@ -40,8 +39,7 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"sticky_stack",
 	"nest_zones",
 	"ready_when_prepared",
-	"wave_resistances",
-	"demo_sticky_first"
+	"wave_resistances"
 };
 
 static ConVar g_arrFeatureConVars[FEATURE_COUNT];
@@ -77,9 +75,6 @@ void LoadFeatures()
 
 	g_arrFeatureConVars[FEATURE_WAVE_RESISTANCES] = MakeFeature(FEATURE_WAVE_RESISTANCES,
 		"Buy the resistance the coming wave's robots call for, rather than ranking resistances last.");
-
-	g_arrFeatureConVars[FEATURE_DEMO_STICKY_FIRST] = MakeFeature(FEATURE_DEMO_STICKY_FIRST,
-		"The Demoman holds the stickybomb launcher by default and the pipes as the exception.");
 
 	/* What is on, as one string, for whoever reads the results later
 

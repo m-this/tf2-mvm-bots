@@ -190,14 +190,33 @@ A sweep of every map put it at 1634 damage a wave across forty waves, against
 the Heavy's 8594, with a seat in all seven lineups.
 
 It is not aim. 308 damage a kill is better than the Pyro's 354 and the Heavy's
-425: it is efficient with what it fires and does not fire enough. Three things
-to check before touching `botaim.sp`, in this order:
+425: it is efficient with what it fires and does not fire enough.
 
-1. `ShouldUseStickyLauncher` only lets the launcher out for a giant, the bomb
-   carrier, or three enemies within 1200 units. Everything else is the Iron
-   Bomber's four-round clip.
-2. Time laying a trap is time not shooting, and nothing counts it.
-3. Not the tank case: the launcher already scores 110 there, above the primary.
+Holding the launcher by default was tried and measured and it is worse. Six
+waves of Coaltown either way, one build, one switch between them:
+
+| | damage a wave | kills | cleared |
+| --- | --- | --- | --- |
+| pipes first | 1821 | 27 | 5 of 6 |
+| stickies first | 880 | 11 | 4 of 6 |
+
+Half the damage, so the switch is gone rather than left off. The hole in the
+argument was that the bot fires at where a robot is rather than where it is
+going: a sticky thrown at a walking robot lands behind it and catches nobody,
+and the clip and the reload are spent for nothing where a pipe at least does its
+damage when it connects.
+
+Which leaves the trap, and the trap is the thing the guides are actually
+describing when they say a Demoman's damage is in his secondary. Bombs go on
+ground the robots have not reached yet, and the bot waits. `behavior/stickytrap.sp`
+lays one, and it only ever runs when no threat is visible at all, on a twenty
+second cooldown, so during a wave it never runs. That gate is the next thing to
+move, and it wants measuring the same way this was.
+
+Two smaller things went in alongside and are unmeasured, because they were in
+both arms: a Medic is always worth the switch to the launcher, and detonation is
+counted across the whole cluster rather than answered by the first bomb that
+qualifies.
 
 ## 6. The sticky launchers that want playing differently. Open
 
