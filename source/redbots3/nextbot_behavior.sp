@@ -673,6 +673,25 @@ static void UpdateDefenderReadiness(int actor)
 		return;
 	}
 
+	/* With a person on the team, the person decides and the bots follow
+
+	Everything below this exists for a team of nothing but bots, where somebody has to decide the
+	nest is finished before the wave starts. With a player on RED it is his call and only his: he
+	presses F4 when he has finished shopping, and a bot holding the wave for its own reasons is a
+	player staring at "Waiting for team to organize" with no way to find out which bot, or why, or
+	how long for. Reported from play, with two engineers still building.
+
+	So the bots are simply ready, always, and the wave starts exactly when the players say. */
+	if (HumansOnTeam(TFTeam_Red) > 0)
+	{
+		m_ctEngineerReadyDeadline[actor] = 0.0;
+
+		if (!IsPlayerReady(actor))
+			SetPlayerReady(actor, true);
+
+		return;
+	}
+
 	if (m_ctEngineerReadyDeadline[actor] <= 0.0)
 		m_ctEngineerReadyDeadline[actor] = GetGameTime() + ENGINEER_READY_GRACE;
 

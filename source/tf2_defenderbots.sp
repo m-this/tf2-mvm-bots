@@ -1506,6 +1506,20 @@ public Action Listener_TournamentPlayerReadystate(int client, const char[] comma
 	if (g_bIsDefenderBot[client])
 		return Plugin_Continue;
 	
+	/* A person pressing F4 presses it for the whole team
+	
+	The readiness rules below decide whether this player may ready up. Once he has, nothing should
+	stand between that and the wave starting, and what used to stand there was a bot: an engineer
+	still building, a medic who had not been told, six seats of somebody else's judgement about
+	when the round should begin.
+	
+	Next frame rather than now, because the game applies this player's own state after the listener
+	returns and a bot readied inside it is readied before the man who asked for it. */
+	char ready[4]; GetCmdArg(1, ready, sizeof(ready));
+	
+	if (StringToInt(ready) > 0 && TF2_GetClientTeam(client) == TFTeam_Red)
+		RequestFrame(Frame_ReadyEveryDefenderBot);
+	
 	switch (redbots_manager_mode.IntValue)
 	{
 		case MANAGER_MODE_MANUAL_BOTS:
@@ -1762,6 +1776,22 @@ public Action Timer_ForgetDetonatingPlayer(Handle timer, any data)
 	return Plugin_Stop;
 }
 
+//Everybody the mod put on RED, said once, because the person on the team has said so
+static void Frame_ReadyEveryDefenderBot()
+{
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || !g_bIsDefenderBot[i])
+			continue;
+		
+		if (TF2_GetClientTeam(i) != TFTeam_Red)
+			continue;
+		
+		if (!IsPlayerReady(i))
+			SetPlayerReady(i, true);
+	}
+}
+
 public void Timer_ReadyPlayer(Handle timer, int data)
 {
 	if (!IsClientInGame(data))
@@ -1951,6 +1981,21 @@ bool ShouldProcessCommand(int client)
 }
 
 //Players, on any team: the bots are here to play with somebody, and a spectator still counts
+/* How many people, as opposed to bots, are standing on a team
+
+GetRealPlayerCount counts every human on the server including spectators, which is the wrong
+question for "is anybody waiting on these bots" */
+int HumansOnTeam(TFTeam team)
+{
+	int count = 0;
+	
+	for (int i = 1; i <= MaxClients; i++)
+		if (IsClientInGame(i) && !IsFakeClient(i) && TF2_GetClientTeam(i) == team)
+			count++;
+	
+	return count;
+}
+
 int GetRealPlayerCount()
 {
 	int count = 0;
