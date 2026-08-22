@@ -206,6 +206,14 @@ static int g_iSamplesWithSentry[MAXPLAYERS + 1];
 static int g_iSamplesWithLevel3[MAXPLAYERS + 1];
 static int g_iSamplesWithDispenser[MAXPLAYERS + 1];
 
+/* Sampled off the frame hook rather than a repeating timer
+
+A timer without TIMER_FLAG_NO_MAPCHANGE dies with the map, and one created in OnPluginStart is
+created once. The first results file this wrote had a sample count of zero for every engineer on
+every map, which is a measurement that says nothing and looks like a measurement. The frame hook
+is already running for the frame times and cannot be killed out from under this. */
+static float g_flNextEngineerSample;
+
 static void ResetEngineerSamples()
 {
 	for (int i = 1; i <= MaxClients; i++)
@@ -215,13 +223,20 @@ static void ResetEngineerSamples()
 		g_iSamplesWithLevel3[i] = 0;
 		g_iSamplesWithDispenser[i] = 0;
 	}
+
+	g_flNextEngineerSample = 0.0;
 }
 
-public Action Timer_SampleEngineers(Handle timer)
+static void SampleEngineers()
 {
 	//Only while a wave is being played: between rounds he is building, and that is not uptime
 	if (g_flWaveStart <= 0.0 || GameRules_GetRoundState() != RoundState_RoundRunning)
-		return Plugin_Continue;
+		return;
+
+	if (GetGameTime() < g_flNextEngineerSample)
+		return;
+
+	g_flNextEngineerSample = GetGameTime() + ENGINEER_SAMPLE_INTERVAL;
 
 	for (int i = 1; i <= MaxClients; i++)
 	{
@@ -246,8 +261,6 @@ public Action Timer_SampleEngineers(Handle timer)
 		if (FindOwnedObject(i, TFObject_Dispenser) != -1)
 			g_iSamplesWithDispenser[i]++;
 	}
-
-	return Plugin_Continue;
 }
 
 public void OnGameFrame()
@@ -271,6 +284,8 @@ public void OnGameFrame()
 	}
 
 	g_flLastFrame = now;
+
+	SampleEngineers();
 }
 
 public void OnMapStart()
