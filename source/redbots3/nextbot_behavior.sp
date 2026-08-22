@@ -880,6 +880,19 @@ and that number crosses back and forth while both are being shot at. Without a m
 follows the crossings and heals neither. */
 #define MEDIC_PATIENT_MARGIN	0.15
 
+/* How far away a patient stops being worth crossing the map for
+
+What a medic delivers is the heal rate times the time he spends in range of somebody, so the walk
+is the cost and it is paid in healing not delivered. At a medic's speed twenty metres is about
+eight seconds of beaming nobody, and a Demoman standing next to him is worth more over those eight
+seconds than a Heavy at the other end of the map is worth after them.
+
+So the biggest body nearby wins, and the biggest body anywhere is only the answer when there is
+nobody nearby at all. That fallback is the part that matters: without it this is the nine metre
+range gate that left the medic in the house in the middle of Coaltown, and a patient out of range
+has to stay a patient to walk to when he is the only one there is. */
+#define MEDIC_PATIENT_NEARBY	1200.0
+
 static float m_ctNextPatientCheck[MAXPLAYERS + 1];
 static int m_iPreferredPatient[MAXPLAYERS + 1];
 
@@ -931,8 +944,11 @@ int PreferredPatient(int medic)
 
 	m_ctNextPatientCheck[medic] = GetGameTime() + MEDIC_PATIENT_INTERVAL;
 
-	int best = -1;
+	int bestNearby = -1;
+	int bestAnywhere = -1;
 	bool heldIsStillOne = false;
+
+	float myOrigin[3]; myOrigin = GetAbsOrigin(medic);
 
 	for (int i = 1; i <= MaxClients; i++)
 	{
@@ -958,11 +974,25 @@ int PreferredPatient(int medic)
 		if (i == held)
 			heldIsStillOne = true;
 
-		if (IsBetterPatient(i, best))
-			best = i;
+		if (IsBetterPatient(i, bestAnywhere))
+			bestAnywhere = i;
+
+		if (GetVectorDistance(myOrigin, GetAbsOrigin(i)) <= MEDIC_PATIENT_NEARBY
+			&& IsBetterPatient(i, bestNearby))
+			bestNearby = i;
 	}
 
-	if (!heldIsStillOne || (best > 0 && IsBetterPatient(best, held)))
+	int best = bestNearby > 0 ? bestNearby : bestAnywhere;
+
+	/* The beam stays where it is unless the man it is on has walked out of reach of it
+
+	The ranking on its own would keep a Heavy at the far end of the map, because he is still the
+	biggest body: the margin that stops the beam flapping between two men standing together also
+	stops it letting go of one who has left. Distance is what overrules it, and only when there is
+	somebody nearby to move to. */
+	bool heldIsNearby = held > 0 && GetVectorDistance(myOrigin, GetAbsOrigin(held)) <= MEDIC_PATIENT_NEARBY;
+
+	if (!heldIsStillOne || (bestNearby > 0 && !heldIsNearby) || (best > 0 && IsBetterPatient(best, held)))
 		held = best;
 
 	m_iPreferredPatient[medic] = held;
