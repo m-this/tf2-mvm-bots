@@ -72,7 +72,6 @@ def points(node, name):
                         fields.get('zone', '')))
     return out
 
-HEIGHT = 120.0
 MATCH = 400.0
 d = math.dist
 
@@ -84,20 +83,13 @@ for path in sorted(glob.glob("configs/defenderbots/map/*.cfg")):
         continue
     print(f"{os.path.basename(path)}: {len(allnests)} nests, {len(spots)} dispenser spots")
     for i, (nest, nest_zone) in enumerate(allnests, 1):
-        owned, rejected = [], []
-        for spot, spot_zone in spots:
-            mine = d(spot, nest)
-            # A zone on either side decides it outright; only unzoned pairs fall to height
-            if nest_zone or spot_zone:
-                if nest_zone != spot_zone:
-                    continue
-            elif abs(spot[2] - nest[2]) > HEIGHT:
-                rejected.append((round(mine), round(abs(spot[2]-nest[2]))))
-                continue
-            owned.append((round(mine), spot))
+        # His own zone if the map put a spot in it, the unreserved ones if it did not
+        owned = [(round(d(s, nest)), s) for s, z in spots if z == nest_zone]
+
+        if not owned and nest_zone:
+            owned = [(round(d(s, nest)), s) for s, z in spots if not z]
+
         note = ""
-        if rejected:
-            note = "  (rejected on height: " + ", ".join(f"{r}u away, {h}u below/above" for r, h in rejected) + ")"
         if owned:
             best = min(owned)
             print(f"  nest {i} {nest} zone={nest_zone!r} -> {best[1]} at {best[0]}u{note}")

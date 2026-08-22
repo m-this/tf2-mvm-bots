@@ -1,26 +1,21 @@
 #define DISPENSER_SPOT_TAKEN_RANGE	150.0
 
-/* Which nest a named dispenser spot belongs to, and how far above or below it may sit
+/* Which nest a named dispenser spot belongs to
 
-The pairing was whichever named spot was nearest the nest in a straight line with no ceiling on
-it, so a map naming several of each can hand a nest a spot belonging to another one. Coaltown
-does: the nest above the track at z 496 is 415 units from the spot on the floor at z 273, nearer
-than any spot on its own level, and the engineer walked off looking for it, placed nothing for the
-whole reach deadline and dropped the dispenser where he stood. Reported twice.
+A dispenser is the team's, not the sentry's. It heals and reloads whoever stands on it, so where
+somebody walked the map and wrote a spot down, that is the ground they meant, however far it sits
+from the nest it serves.
 
-The first answer was a distance bound, and a sweep of every map showed what is wrong with picking
-a number: Bigrock's authored spots sit four to six hundred units from its authored nests, on
-purpose, and a bound tight enough to reject Coaltown's rejected all of Bigrock's. There is no
-distance that is right on both, because distance was never the question.
+This kept arguing with that. First a distance bound, which a sweep of every map killed: Bigrock's
+authored spots sit four to six hundred units from its authored nests on purpose, and a bound tight
+enough to reject Coaltown's rejected all of Bigrock's. Then an ownership rule and a height test,
+and between them they threw away most of the authoring in the directory. Coaltown's right building
+ended up with no spot at all and put its dispenser on the roof beside the sentry, which is exactly
+what somebody had walked the map to avoid.
 
-What is the question is ownership. A spot belongs to the nest nearest to it, and every map that
-names several of each already says which is which by where they are. No number to tune, and it
-answers correctly on a map nobody has walked yet.
-
-The height stays, and separately, because ownership is a plan-view idea and two floors are close
-in plan and a staircase apart in fact. Coaltown's spot is 223 units below the nest that owns it,
-which is the whole of the original bug. */
-#define DISPENSER_NEST_HEIGHT	120.0
+So the authored spot is respected. What chooses between several of them is the zone where the map
+names one and the nearest otherwise, and the only things that refuse a spot now are another
+engineer already standing a dispenser on it, and the engineer being unable to walk there. */
 
 #define DISPENSER_REACH_TIME	12.0
 
@@ -293,41 +288,20 @@ bool ConfiguredDispenserSpot(int actor, float spot[3])
 	which nest, and a zone is how it already says that about nests. */
 	char myZone[NEST_ZONE_LENGTH]; NestZoneOf(m_aNestArea[actor], myZone, sizeof(myZone));
 	
-	ArrayList zones = g_arrMapConfig.adtDispenserZone;
+	/* His own zone if the map put a spot in it, and the spots belonging to nobody if it did not
 	
+	Two passes rather than one condition, because the two ideas are different. A spot in a zone is
+	reserved for it: Coaltown's right building has one and nothing else may take it, or the nearest
+	rule hands it to the nest in the middle. A nest in a zone is a separate and older idea, about
+	spreading engineers over the map, and it must not stop that engineer using a spot nobody
+	reserved. Mannhattan names zones on all four of its nests and on none of its spots, and one
+	condition covering both left it with nothing at all. */
 	ArrayList free = new ArrayList(3);
 	
-	for (int i = 0; i < spots.Length; i++)
-	{
-		float candidate[3]; spots.GetArray(i, candidate);
-		
-		char zone[NEST_ZONE_LENGTH];
-		
-		if (i < zones.Length)
-			zones.GetString(i, zone, sizeof(zone));
-		
-		/* A zoned spot is that zone's and nobody else's, both ways round
-		
-		A nest in a zone will not take a spot from another one, and a spot in a zone is not offered
-		to a nest that is in none. Everything unzoned falls through to the rules below, which is
-		every map that has never needed this. */
-		if (myZone[0] != '\0' || zone[0] != '\0')
-		{
-			if (!StrEqual(myZone, zone))
-				continue;
-		}
-		else if (FloatAbs(candidate[2] - nest[2]) > DISPENSER_NEST_HEIGHT)
-		{
-			//Two floors are close in plan and a staircase apart in fact
-			continue;
-		}
-		
-		//A spot the engineer cannot walk to is not a spot. Rottenburg has a rock in front of one
-		if (IsDispenserSpotTaken(actor, candidate) || !IsPathToVectorPossible(actor, candidate))
-			continue;
-		
-		free.PushArray(candidate);
-	}
+	CollectDispenserSpots(actor, myZone, free);
+	
+	if (free.Length == 0 && myZone[0] != '\0')
+		CollectDispenserSpots(actor, "", free);
 	
 	bool found = NearestConfiguredSpot(free, nest, spot);
 	
@@ -342,6 +316,32 @@ bool ConfiguredDispenserSpot(int actor, float spot[3])
 	}
 	
 	return found;
+}
+
+//Every named spot in one zone the engineer can still get to and nobody has taken
+static void CollectDispenserSpots(int actor, const char[] wanted, ArrayList free)
+{
+	ArrayList spots = g_arrMapConfig.adtDispenserLocation;
+	ArrayList zones = g_arrMapConfig.adtDispenserZone;
+	
+	for (int i = 0; i < spots.Length; i++)
+	{
+		char zone[NEST_ZONE_LENGTH];
+		
+		if (i < zones.Length)
+			zones.GetString(i, zone, sizeof(zone));
+		
+		if (!StrEqual(zone, wanted))
+			continue;
+		
+		float candidate[3]; spots.GetArray(i, candidate);
+		
+		//A spot the engineer cannot walk to is not a spot. Rottenburg has a rock in front of one
+		if (IsDispenserSpotTaken(actor, candidate) || !IsPathToVectorPossible(actor, candidate))
+			continue;
+		
+		free.PushArray(candidate);
+	}
 }
 
 //Spreads several engineers over the spots the map names instead of stacking them on the nearest one
