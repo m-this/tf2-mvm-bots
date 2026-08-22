@@ -3,7 +3,12 @@
 #
 #   testbed/ab.sh --feature demo_sticky_first
 #   testbed/ab.sh --feature demo_sticky_first --maps "mvm_coaltown mvm_decoy"
-#   testbed/ab.sh --feature nest_zones --waves 4 --tag nests
+#   testbed/ab.sh --feature "demo_hold_fire,attack_strafe" --tag demo
+#
+# More than one feature is a comma separated list, and they move together: both
+# off in one arm, both on in the other. That answers whether the pair is worth
+# having and does not answer which of them did it, so it is a first screen and
+# not a conclusion. Split it afterwards if it wins.
 #
 # A feature is a named switch with a default, and the point of one is that the
 # same build can play both sides of an argument. This is the loop that does it:
@@ -47,7 +52,8 @@ if [ -z "$feature" ]; then
 	exit 2
 fi
 
-[ -n "$tag" ] || tag=$feature
+# A list of features makes a poor directory name
+[ -n "$tag" ] || tag=$(echo "$feature" | tr ',' '-')
 
 if [ -z "$maps" ]; then
 	maps=$(docker exec mvmbots-testbed-srcds-1 sh -c \
@@ -79,9 +85,17 @@ for map in $maps; do
 		value=0
 		[ "$arm" = on ] && value=1
 
-		say "=== $map, $feature=$value ==="
+		# One name=value per feature, which is the format BOT_FEATURES already takes
+		features=""
 
-		TESTBED_BOT_FEATURES="$feature=$value" \
+		for name in $(echo "$feature" | tr ',' ' '); do
+			[ -n "$features" ] && features="$features,"
+			features="$features$name=$value"
+		done
+
+		say "=== $map, $features ==="
+
+		TESTBED_BOT_FEATURES="$features" \
 			sh "$here/run.sh" --map "$map" --waves "$waves" --timeout "$timeout" \
 			$build --out "$out/$arm/$map.jsonl" >"$out/$arm/$map.log" 2>&1 || true
 
@@ -92,9 +106,10 @@ for map in $maps; do
 		# The results file records which features were on. If that disagrees with
 		# what this asked for, the run measured the wrong thing and saying so here
 		# is cheaper than finding out from the numbers.
-		seen=$(grep -o "$feature" "$out/$arm/$map.jsonl" 2>/dev/null | head -1 || true)
+		first=$(echo "$feature" | cut -d, -f1)
+		seen=$(grep -o "$first" "$out/$arm/$map.jsonl" 2>/dev/null | head -1 || true)
 
-		say "$map $arm: ${results:-0} wave results, feature named in file: ${seen:-no}"
+		say "$map $arm: ${results:-0} wave results, $first named in file: ${seen:-no}"
 	done
 done
 
