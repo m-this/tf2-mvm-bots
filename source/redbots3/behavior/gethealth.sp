@@ -1,5 +1,16 @@
 int m_iHealthPack[MAXPLAYERS + 1];
 
+/* Whether there is health worth walking to, kept for a moment after it is worked out
+
+The same reasoning as the ammo the tactical monitor asks about on the same frame, and the same
+cost: a nav mesh search per candidate, for a bot that is below the health ratio and has nothing
+reachable, sixty-six times a second. Half a second is a bot walking about a hundred and fifty
+units, and nothing that matters appears inside that. */
+#define HEALTH_ASK_INTERVAL	0.5
+
+static float m_ctHealthAsk[MAXPLAYERS + 1];
+static bool m_bHealthPossible[MAXPLAYERS + 1];
+
 BehaviorAction CTFBotGetHealth()
 {
 	BehaviorAction action = ActionsManager.Create("DefenderGetHealth");
@@ -27,7 +38,7 @@ public Action CTFBotGetHealth_OnStart(BehaviorAction action, int actor, Behavior
 	float max_range = ratio * (tf_bot_health_search_near_range.FloatValue - far_range);
 	max_range += far_range;
 	
-	JSONArray ammo = new JSONArray();
+	ArrayList ammo = new ArrayList(2);
 	ComputeHealthAndAmmoVectors(actor, ammo, max_range);
 	
 	if (ammo.Length <= 0)
@@ -40,23 +51,18 @@ public Action CTFBotGetHealth_OnStart(BehaviorAction action, int actor, Behavior
 	
 	for (int i = 0; i < ammo.Length; i++)
 	{
-		JSONObject entity = view_as<JSONObject>(ammo.Get(i));
+		int entity = ammo.Get(i, 0);
 		
-		if (!IsValidHealth(entity.GetInt("entity_index")))
-		{
-			delete entity;
+		if (!IsValidHealth(entity))
 			continue;
-		}
 		
-		float flDistance = entity.GetFloat("path_length");
+		float flDistance = view_as<float>(ammo.Get(i, 1));
 		
 		if (flDistance <= flSmallestDistance)
 		{
-			m_iHealthPack[actor] = entity.GetInt("entity_index");
+			m_iHealthPack[actor] = entity;
 			flSmallestDistance = flDistance;
 		}
-		
-		delete entity;
 	}
 	
 	delete ammo;
@@ -208,36 +214,31 @@ bool CTFBotGetHealth_IsPossible(int actor)
 		return true;
 	}
 
+	if (m_ctHealthAsk[actor] > GetGameTime())
+		return m_bHealthPossible[actor];
+
+	m_ctHealthAsk[actor] = GetGameTime() + HEALTH_ASK_INTERVAL;
+
 	if (redbots_manager_debug_actions.BoolValue)
 		PrintToServer("ratio %f max_range %f", ratio, max_range);
 	
-	JSONArray ammo = new JSONArray();
+	ArrayList ammo = new ArrayList(2);
 	ComputeHealthAndAmmoVectors(actor, ammo, max_range);
-	
-	if (ammo.Length <= 0)
-	{
-		delete ammo;
-		return false;
-	}
 
 	bool bPossible = false;
 	
 	for (int i = 0; i < ammo.Length; i++)
 	{
-		JSONObject entity = view_as<JSONObject>(ammo.Get(i));
-		
-		if (!IsValidHealth(entity.GetInt("entity_index")))
-		{
-			delete entity;
+		if (!IsValidHealth(ammo.Get(i, 0)))
 			continue;
-		}
 		
 		bPossible = true;
-		delete entity;
 		break;
 	}
 	
 	delete ammo;
+
+	m_bHealthPossible[actor] = bPossible;
 	
 	// UpdateLookAroundForEnemies(actor, true);
 	return bPossible;
