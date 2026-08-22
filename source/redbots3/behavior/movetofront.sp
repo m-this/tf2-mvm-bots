@@ -14,6 +14,15 @@ float m_ctMoveTimeout[MAXPLAYERS + 1];
 int m_iMoveToFrontTry[MAXPLAYERS + 1];
 bool m_bAtTheFront[MAXPLAYERS + 1];
 
+/* Whether this bot has finished taking up its position for the coming wave
+
+Standing where he meant to stand and giving up short of it are the same answer here: both mean
+he has stopped walking and is not going to move again before the wave. */
+bool IsWaitingAtTheFront(int client)
+{
+	return m_bAtTheFront[client];
+}
+
 BehaviorAction CTFBotMoveToFront()
 {
 	BehaviorAction action = ActionsManager.Create("DefenderMoveToFront");

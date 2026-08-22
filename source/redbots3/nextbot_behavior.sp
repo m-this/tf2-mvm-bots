@@ -616,10 +616,10 @@ takes the ready away again while the nest is unfinished, every frame, wherever i
 
 The grace is the important part. A bot that cannot finish, because a buster took the sentry or
 the metal ran out, must not hold the wave forever: past it it is ready whatever it has. */
-#define ENGINEER_READY_GRACE	90.0
+#define READY_GRACE	90.0
 #define BUILDING_MAX_LEVEL		3
 
-static float m_ctEngineerReadyDeadline[MAXPLAYERS + 1];
+static float m_ctReadyDeadline[MAXPLAYERS + 1];
 
 static bool IsBuildingFinished(int building)
 {
@@ -641,6 +641,18 @@ bool IsEngineerNestFinished(int client)
 //Whether this bot has done the thing its seat exists for, before the wave starts
 static bool IsDefenderPrepared(int client)
 {
+	//Credits in a pocket are worth nothing, and the whole break exists for spending them
+	if (redbots_manager_bot_use_upgrades.BoolValue && !g_bShoppedThisBreak[client])
+		return false;
+
+	/* Whoever walks to the front is prepared once he is stood there
+
+	Without this the last bot to finish shopping starts the wave, and the walk to the front is
+	whatever fits in the time nobody is waiting for: measured on Coaltown, where the front is five
+	thousand units from the station, that was never the whole walk. Nobody ever arrived. */
+	if (ShouldTakeUpPosition(client))
+		return IsWaitingAtTheFront(client);
+
 	if (TF2_GetPlayerClass(client) != TFClass_Engineer)
 		return true;
 
@@ -670,11 +682,11 @@ static void UpdateDefenderReadiness(int actor)
 	
 	if (GameRules_GetRoundState() != RoundState_BetweenRounds)
 	{
-		m_ctEngineerReadyDeadline[actor] = 0.0;
+		m_ctReadyDeadline[actor] = 0.0;
 		return;
 	}
 
-	/* With a person on the team, the person decides and the bots follow
+	/* With a person on the team, the bots are a mirror of what the people have said
 
 	Everything below this exists for a team of nothing but bots, where somebody has to decide the
 	nest is finished before the wave starts. With a player on RED it is his call and only his: he
@@ -682,19 +694,20 @@ static void UpdateDefenderReadiness(int actor)
 	player staring at "Waiting for team to organize" with no way to find out which bot, or why, or
 	how long for. Reported from play, with two engineers still building.
 
-	So the bots are simply ready, always, and the wave starts exactly when the players say. */
-	if (HumansOnTeam(TFTeam_Red) > 0)
+	One person saying ready readies the bots, and the last person taking it back takes theirs back
+	too, so somebody who changes his mind gets his upgrade time and does not have to fight six bots
+	for it. */
+	if (AnyHumanOnRed())
 	{
-		m_ctEngineerReadyDeadline[actor] = 0.0;
-
-		if (!IsPlayerReady(actor))
-			SetPlayerReady(actor, true);
-
+		m_ctReadyDeadline[actor] = 0.0;
+		
+		SetPlayerReady(actor, AnyHumanReadyOnRed());
+		
 		return;
 	}
 
-	if (m_ctEngineerReadyDeadline[actor] <= 0.0)
-		m_ctEngineerReadyDeadline[actor] = GetGameTime() + ENGINEER_READY_GRACE;
+	if (m_ctReadyDeadline[actor] <= 0.0)
+		m_ctReadyDeadline[actor] = GetGameTime() + READY_GRACE;
 
 	/* Past the grace he says he is ready, rather than merely stopping being made unready
 	
@@ -702,7 +715,7 @@ static void UpdateDefenderReadiness(int actor)
 	front, and an engineer whose nest will not finish does neither: he is still trying to build.
 	Letting go of the ready was not the same as pressing it, so the wave waited for him for as
 	long as he kept trying, which is the whole round. */
-	if (GetGameTime() > m_ctEngineerReadyDeadline[actor])
+	if (GetGameTime() > m_ctReadyDeadline[actor])
 	{
 		if (!IsPlayerReady(actor))
 			SetPlayerReady(actor, true);
@@ -1011,6 +1024,7 @@ int PreferredPatient(int medic)
 
 	int bestNearby = -1;
 	int bestAnywhere = -1;
+	int bestUnreachable = -1;
 	bool heldIsStillOne = false;
 
 	float myOrigin[3]; myOrigin = GetAbsOrigin(medic);
@@ -1033,8 +1047,19 @@ int PreferredPatient(int medic)
 		if (TF2_GetPlayerClass(i) == TFClass_Engineer && HealthFraction(i) >= 1.0)
 			continue;
 
+		/* Not being able to path to him makes him the last resort, not a non-candidate
+		
+		It was a hard filter, and a hard filter has a cliff: one tick where the path query comes
+		back false for everybody and the medic has no patient at all, which drops him out of the
+		heal action and into the game's answer for an idle medic, walking to the bomb. That is the
+		medic leaving the front line as the wave starts and turning up in the middle of the map. */
 		if (!IsPathToVectorPossible(medic, GetAbsOrigin(i)))
+		{
+			if (IsBetterPatient(i, bestUnreachable))
+				bestUnreachable = i;
+			
 			continue;
+		}
 
 		if (i == held)
 			heldIsStillOne = true;
@@ -1048,6 +1073,9 @@ int PreferredPatient(int medic)
 	}
 
 	int best = bestNearby > 0 ? bestNearby : bestAnywhere;
+
+	if (best <= 0)
+		best = bestUnreachable;
 
 	/* The beam stays where it is unless the man it is on has walked out of reach of it
 
@@ -1104,8 +1132,13 @@ public Action CTFBotMedicHeal_UpdatePost(BehaviorAction action, int actor, float
 		BehaviorAction resultingAction = result.action;
 		char name[ACTION_NAME_LENGTH]; resultingAction.GetName(name);
 		
+		/* Nobody to heal, so he holds the hatch like the rest of them
+		
+		The game's answer here is to go and fetch the bomb, and the answer this had for that was to
+		go and fight whatever is on it, which is the same walk into the middle of the map by a
+		different name. Everything the team is defending comes to the hatch eventually. */
 		if (StrEqual(name, "FetchFlag"))
-			return action.SuspendFor(CTFBotDefenderAttack(), "Stop the bomb");
+			return action.SuspendFor(CTFBotGuardPoint(), "Nothing to heal, so hold the hatch");
 	}
 	
 	int secondary = GetPlayerWeaponSlot(actor, TFWeaponSlot_Secondary);
@@ -1124,17 +1157,17 @@ public Action CTFBotMedicHeal_UpdatePost(BehaviorAction action, int actor, float
 	The game's action picks its own patient and there is no safe way to tell it otherwise, so it
 	is stood down rather than argued with. It gets the medic back the moment nobody is left to
 	heal, which is where its own answer for that, walking to the bomb, is redirected above. */
-	/* Shopping and taking up a position come before chasing anybody
+	/* Only his own shopping comes before healing
 
-	Between rounds this suspended into the heal action the same as during a wave, so a medic spent
-	the whole upgrade period walking after whoever he had picked: to the station, out of it, across
-	the map, wherever that man went. Reported as the medic getting lost.
+	This used to be the whole break, so a medic spent the upgrade period walking after whoever he
+	had picked: to the station, out of it, across the map, wherever that man went. Then it was the
+	other extreme, and he walked to the front and stood there with a medigun and nobody in front of
+	it until the wave started.
 
-	Nothing is trying to kill anybody in that window and a full health bar does not need him, so
-	the ordinary between-rounds behaviour has it instead. That buys upgrades and then walks to the
-	front with the rest of them, which is where he wanted to be standing when the wave starts.
-	The wave beginning ends that and hands him back a patient. */
-	if (GameRules_GetRoundState() == RoundState_BetweenRounds)
+	Buying his upgrades is the one thing nobody else can do for him. After that the man he beams is
+	walking to the front regardless, so following him is both the healing and the walk, and the
+	team starts the wave with the overheal it spent the break earning. */
+	if (GameRules_GetRoundState() == RoundState_BetweenRounds && !g_bShoppedThisBreak[actor])
 		return Plugin_Continue;
 
 	if (PreferredPatient(actor) > 0)
@@ -1390,14 +1423,17 @@ Action GetDesiredBotAction(int client, BehaviorAction action)
 /* Whether this bot has nowhere of its own to wait out the break
 
 The Engineer has a nest to build, the Spy has somewhere to lurk and the Sniper has a perch, and
-all three get there under their own behaviour. Everybody else, the Medic included, waits at the
-front: he wants to be stood next to the bodies he is about to heal when the wave starts, not
-wherever the man he picked wandered off to. */
+all three get there under their own behaviour.
+
+So does the Medic, once he has done his shopping: his place is beside the man he is beaming, and
+that man is walking to the front anyway. Sending him there himself made him stand on the front
+line with a medigun and nobody in front of it, which is a medic doing nothing for the length of the
+break when he could be handing out overheal the whole way there. */
 static bool ShouldTakeUpPosition(int client)
 {
 	switch (TF2_GetPlayerClass(client))
 	{
-		case TFClass_Engineer, TFClass_Spy:
+		case TFClass_Engineer, TFClass_Spy, TFClass_Medic:
 			return false;
 		
 		case TFClass_Sniper:
