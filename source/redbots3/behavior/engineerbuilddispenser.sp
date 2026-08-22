@@ -94,7 +94,9 @@ public Action CTFBotMvMEngineerBuildDispenser_OnStart(BehaviorAction action, int
 			m_vDispenserSpot[actor] = GetAbsOrigin(actor);
 	}
 	
-	DispenserStandPoint(actor, m_iDispenserTry[actor], m_vDispenserStand[actor]);
+	//Sides he cannot stand on are skipped here rather than walked at and waited out
+	if (!DispenserStandPoint(actor, m_iDispenserTry[actor], m_vDispenserStand[actor]))
+		NextDispenserStandPoint(actor);
 	
 	/* Priced by the walk, because the spot the map names is not always next to the nest
 	
@@ -227,47 +229,32 @@ public Action CTFBotMvMEngineerBuildDispenser_Update(BehaviorAction action, int 
 	return action.Done("Built a dispenser");
 }
 
-/* One build's reach short of the spot, on the side the try asks for
+/* One build's reach short of the spot, on the side the try asks for, and on ground he can stand on
 
 Try zero is the side he is walking in from, so the first look costs him no walking at all. Each
-one after it is forty five degrees round from there. */
-static void DispenserStandPoint(int actor, int attempt, float stand[3])
+one after it is forty five degrees round from there. False when the nav mesh has nothing walkable
+there, which is the caller's cue to go round to the next one. */
+static bool DispenserStandPoint(int actor, int attempt, float stand[3])
 {
-	float spot[3]; spot = m_vDispenserSpot[actor];
-	float fromSpot[3]; SubtractVectors(GetAbsOrigin(actor), spot, fromSpot);
-	
-	fromSpot[2] = 0.0;
-	
-	//Standing on it himself, so any side will do to start from
-	if (NormalizeVector(fromSpot, fromSpot) < 1.0)
-	{
-		fromSpot[0] = 1.0;
-		fromSpot[1] = 0.0;
-	}
-	
-	float yaw = ArcTangent2(fromSpot[1], fromSpot[0]) + DegToRad(360.0 / DISPENSER_TRY_POINTS * attempt);
-	
-	stand[0] = spot[0] + Cosine(yaw) * DISPENSER_BUILD_REACH;
-	stand[1] = spot[1] + Sine(yaw) * DISPENSER_BUILD_REACH;
-	stand[2] = spot[2];
+	return BuildStandPoint(m_vDispenserSpot[actor], GetAbsOrigin(actor), attempt,
+		DISPENSER_TRY_POINTS, DISPENSER_BUILD_REACH, stand);
 }
 
-//The next side of the spot, or the end of them, which is when he takes whatever he can get
+//The next side of the spot he can actually stand on, or the end of them, which is when he settles
 static void NextDispenserStandPoint(int actor)
 {
-	m_iDispenserTry[actor]++;
-	
-	if (m_iDispenserTry[actor] >= DISPENSER_TRY_POINTS)
+	while (++m_iDispenserTry[actor] < DISPENSER_TRY_POINTS)
 	{
-		//A dispenser two metres from the spot beats an engineer who never builds one
-		m_ctDispenserReachDeadline[actor] = GetGameTime();
+		if (!DispenserStandPoint(actor, m_iDispenserTry[actor], m_vDispenserStand[actor]))
+			continue;
+		
+		m_ctDispenserTryDeadline[actor] = GetGameTime() + DISPENSER_TRY_TIME;
 		
 		return;
 	}
 	
-	DispenserStandPoint(actor, m_iDispenserTry[actor], m_vDispenserStand[actor]);
-	
-	m_ctDispenserTryDeadline[actor] = GetGameTime() + DISPENSER_TRY_TIME;
+	//A dispenser two metres from the spot beats an engineer who never builds one
+	m_ctDispenserReachDeadline[actor] = GetGameTime();
 }
 
 public void CTFBotMvMEngineerBuildDispenser_OnEnd(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)

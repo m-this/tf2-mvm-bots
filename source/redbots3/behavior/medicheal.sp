@@ -113,9 +113,11 @@ public Action Command_DumpMedic(int client, int args)
 
 		int patient = PreferredPatient(i);
 
+		char stack[512]; ActionStackOf(i, stack, sizeof(stack));
+
 		if (patient <= 0)
 		{
-			ReplyToCommand(client, "%N: nobody to heal, %.0f from the bomb", i, fromBomb);
+			ReplyToCommand(client, "%N: nobody to heal, %.0f from the bomb, %s", i, fromBomb, stack);
 
 			continue;
 		}
@@ -125,8 +127,7 @@ public Action Command_DumpMedic(int client, int args)
 		ReplyToCommand(client, "%N: healing %N, %.0f behind him, %.0f from the bomb, he is %.0f from it, %s, %s",
 			i, patient, GetVectorDistance(mine, theirs), fromBomb,
 			haveBomb ? GetVectorDistance(theirs, bomb.vPosition) : -1.0,
-			ActionsManager.LookupEntityActionByName(i, "DefenderMedicHeal") != INVALID_ACTION ? "healing action up" : "healing action down",
-			g_arrPluginBot[i].bPathing ? "walking" : "stood still");
+			g_arrPluginBot[i].bPathing ? "walking" : "stood still", stack);
 	}
 
 	return Plugin_Handled;

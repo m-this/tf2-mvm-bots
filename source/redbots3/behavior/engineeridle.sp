@@ -756,6 +756,36 @@ public Action Command_DumpNest(int client, int args)
 	"why did the frame take that long" answer is counted in. */
 	ReplyToCommand(client, "%d nav areas on this map", TheNavAreas.Count);
 
+	/* Every building standing, and who the game says owns it
+
+	Asked for because a play-test found two dispensers with one engineer on the team, which is a
+	thing the game does not let a player do: an engineer placing a second one has his first taken
+	down for him. So one of them belongs to somebody else, or to nobody, and the per-engineer
+	listing below cannot show either. This walks the entities instead of the players. */
+	int building = -1;
+	int standing = 0;
+
+	while ((building = FindEntityByClassname(building, "obj_*")) != -1)
+	{
+		char class[64]; GetEntityClassname(building, class, sizeof(class));
+
+		int owner = GetEntPropEnt(building, Prop_Send, "m_hBuilder");
+		float at[3]; at = GetAbsOrigin(building);
+
+		char whose[64];
+		
+		if (owner > 0 && owner <= MaxClients && IsClientInGame(owner))
+			Format(whose, sizeof(whose), "%N", owner);
+		else
+			Format(whose, sizeof(whose), "nobody (orphan, owner index %d)", owner);
+		
+		ReplyToCommand(client, "%s #%d at %.0f %.0f %.0f, built by %s", class, building, at[0], at[1], at[2], whose);
+
+		standing++;
+	}
+
+	ReplyToCommand(client, "%d buildings standing", standing);
+
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (!IsClientInGame(i) || TF2_GetPlayerClass(i) != TFClass_Engineer)
