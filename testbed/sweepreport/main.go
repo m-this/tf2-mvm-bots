@@ -1,6 +1,9 @@
 // Read a whole sweep and say which map, and which class, is the weak one.
 //
 //	go run ./testbed/sweepreport testbed/results/sweep-night
+//	go run ./testbed/sweepreport results/ab-x/on results/ab-x/off
+//
+// With two directories it compares them, the first being the arm under test.
 //
 // The per-run report answers "did this change help". This answers the two
 // questions a sweep exists for and a single run cannot touch:
@@ -150,6 +153,122 @@ func main() {
 	printEngineers(order, byMap)
 	printClasses(order, byMap)
 	printPerf(order, byMap)
+
+	if len(os.Args) > 2 {
+		baseOrder, baseByMap, err := loadDir(os.Args[2])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(1)
+		}
+
+		printComparison(order, byMap, baseOrder, baseByMap)
+	}
+}
+
+func loadDir(dir string) ([]string, map[string]*mapStats, error) {
+	files, err := filepath.Glob(filepath.Join(dir, "*.jsonl"))
+	if err != nil || len(files) == 0 {
+		return nil, nil, fmt.Errorf("no result files in %s", dir)
+	}
+
+	sort.Strings(files)
+
+	var order []string
+	byMap := map[string]*mapStats{}
+
+	for _, path := range files {
+		name := strings.TrimSuffix(filepath.Base(path), ".jsonl")
+
+		stats := newMapStats(name)
+		byMap[name] = stats
+		order = append(order, name)
+
+		if err := read(path, stats); err != nil {
+			fmt.Fprintf(os.Stderr, "%s: %v\n", name, err)
+		}
+	}
+
+	return order, byMap, nil
+}
+
+/* The first directory against the second, which is what an A/B run leaves behind.
+ *
+ * Damage per wave rather than damage, because the two arms do not play the same number of waves:
+ * an arm that clears faster plays more of them in the same timeout, and totals would then reward
+ * the arm that was slower.
+ *
+ * The waves line is the one to be careful with. Six waves an arm is a small sample and the bots
+ * are not deterministic, so a difference of one cleared wave is noise and only a large move in
+ * damage per wave is worth reading as anything. */
+func printComparison(order []string, byMap map[string]*mapStats, baseOrder []string, baseByMap map[string]*mapStats) {
+	fmt.Println("== A against B ==")
+
+	a, aWaves := totals(order, byMap)
+	b, bWaves := totals(baseOrder, baseByMap)
+
+	cleared, lost := 0, 0
+	for _, name := range order {
+		cleared += byMap[name].cleared
+		lost += byMap[name].lost
+	}
+
+	baseCleared, baseLost := 0, 0
+	for _, name := range baseOrder {
+		baseCleared += baseByMap[name].cleared
+		baseLost += baseByMap[name].lost
+	}
+
+	fmt.Printf("waves      A %d cleared, %d lost      B %d cleared, %d lost\n\n",
+		cleared, lost, baseCleared, baseLost)
+
+	fmt.Printf("%-12s %12s %12s %10s %9s\n", "class", "A dmg/wave", "B dmg/wave", "change", "percent")
+
+	sorted := append([]string{}, classes...)
+	sort.Slice(sorted, func(i, j int) bool { return a[sorted[i]] > a[sorted[j]] })
+
+	for _, c := range sorted {
+		if aWaves[c] == 0 && bWaves[c] == 0 {
+			continue
+		}
+
+		aPer, bPer := 0.0, 0.0
+
+		if aWaves[c] > 0 {
+			aPer = float64(a[c]) / float64(aWaves[c])
+		}
+
+		if bWaves[c] > 0 {
+			bPer = float64(b[c]) / float64(bWaves[c])
+		}
+
+		pct := 0.0
+		if bPer > 0 {
+			pct = 100 * (aPer - bPer) / bPer
+		}
+
+		fmt.Printf("%-12s %12.0f %12.0f %10.0f %8.0f%%\n", c, aPer, bPer, aPer-bPer, pct)
+	}
+
+	fmt.Println()
+}
+
+func totals(order []string, byMap map[string]*mapStats) (map[string]int, map[string]int) {
+	damage := map[string]int{}
+	waves := map[string]int{}
+
+	for _, name := range order {
+		s := byMap[name]
+
+		for _, c := range classes {
+			damage[c] += s.damageBy[c]
+
+			if s.damageBy[c] > 0 || s.killsBy[c] > 0 {
+				waves[c] += s.cleared + s.lost
+			}
+		}
+	}
+
+	return damage, waves
 }
 
 func read(path string, stats *mapStats) error {
