@@ -19,6 +19,33 @@ its weapon ID already gave, so this file only ever narrows behaviour that was pr
 //No opinion: the caller keeps the range its weapon ID produced.
 #define RANGE_TUNING_NONE 0.0
 
+/* How close a Demoman gets before he starts throwing pipes
+
+Six hundred was the number, and the reasoning written next to it was that the blast should not
+catch the bot. The blast is 146 units across, so six hundred is four times further out than that
+buys, and the cost of the extra distance is the whole difference between a pipe and a roller.
+
+A grenade leaves the launcher at about 1200 units a second and falls the whole way. At six hundred
+units that is more than half a second in the air, and a robot walking at two hundred and fifty has
+moved a hundred and forty by the time it lands: the bot has to lead it, leading is the one thing
+this bot is worst at, and what actually happens is the pipe bounces past and rolls. At three
+hundred and fifty it is a quarter of a second and sixty or seventy units of lead, which is inside
+the blast, so a shot aimed at where the robot is still hurts it.
+
+The wiki's Demoman page is written around direct hits for exactly this reason: two direct pipes
+kill every small robot short of a Heavy, and no number of rollers does. Three fifty is still more
+than twice the blast radius, so the bot does not blow itself up getting there.
+
+Reported from play before it was measured: the Demomen shoot from too far away. */
+#define DEMO_PIPE_RANGE_CLOSE	350.0
+#define DEMO_PIPE_RANGE_FAR		600.0
+
+//Which of the two, so the pair can be played against each other rather than argued about
+stock float DemoPipeRange()
+{
+	return Feature(FEATURE_DEMO_CLOSE_IN) ? DEMO_PIPE_RANGE_CLOSE : DEMO_PIPE_RANGE_FAR;
+}
+
 /* Ranges for one weapon. False when the table says nothing about it, and neither output is
 touched, so a caller can pass values it already computed */
 stock bool GetTunedWeaponRanges(int weapon, float &desired, float &maxRange)
@@ -77,7 +104,7 @@ stock bool GetTunedWeaponRanges(int weapon, float &desired, float &maxRange)
 		}
 		case 1151: //Iron Bomber
 		{
-			desired = 600.0;
+			desired = DemoPipeRange();
 			maxRange = 1400.0;
 		}
 		case 730: //Beggar's Bazooka
