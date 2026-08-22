@@ -1,6 +1,34 @@
 #define SENTRY_WATCH_BOMB_RANGE	400.0
 
 float m_ctSentrySafe[MAXPLAYERS + 1];
+
+/* How much closer to the bomb the new ground has to be before the sentry is worth carrying
+
+A sentry in a toolbox shoots nothing, and the walk there and back is most of a wave's opening. So
+the candidate has to be meaningfully further forward, not merely different: without a margin, two
+areas a few units apart trade places for ever and the engineer spends the wave carrying.
+
+The cooldown is the second half of the same guard. Having moved, he holds what he has long enough
+to have been worth moving. */
+#define NEST_ADVANCE_MARGIN		600.0
+#define NEST_ADVANCE_COOLDOWN	45.0
+#define NEST_ADVANCE_RECHECK	10.0
+
+static float m_ctAdvanceAgain[MAXPLAYERS + 1];
+
+static bool IsWorthAdvancingTo(CNavArea held, CNavArea candidate)
+{
+	if (candidate == NULL_AREA || candidate == held)
+		return false;
+
+	if (held == NULL_AREA)
+		return true;
+
+	//Travel distance to where the bomb is going, so "forward" means along the route and not through a wall
+	return GetTravelDistanceToBombTarget(view_as<CTFNavArea>(candidate))
+		< GetTravelDistanceToBombTarget(view_as<CTFNavArea>(held)) - NEST_ADVANCE_MARGIN;
+}
+
 float m_ctSentryCooldown[MAXPLAYERS + 1];
 
 float m_ctDispenserSafe[MAXPLAYERS + 1]; 
@@ -174,24 +202,47 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 	
 	if (bShouldAdvance && !g_bGoingToGrabBuilding[actor])
 	{
-		//DetonateObjectOfType(actor, TFObject_Sentry);
-		//DetonateObjectOfType(actor, TFObject_Dispenser);
-		
-		if (redbots_manager_debug_actions.BoolValue)
-			PrintToServer("CTFBotMvMEngineerIdle_Update: ADVANCE");
-		
-		//RIGHT NOW
-		CTFBotMvMEngineerIdle_ResetProperties(actor);
-		
-		m_aNestArea[actor] = PickBuildArea(actor);
-		
-		if (sentry != INVALID_ENT_REFERENCE && m_aNestArea[actor] != NULL_AREA)
+		/* Move, but only to ground that is actually further forward, and only once in a while
+
+		Reported from play on Coaltown: the engineer on the building at the right picks the sentry
+		up the moment the wave starts and keeps picking it up, and puts it down where it can see
+		nothing.
+
+		Both halves of that are this block. It re-scored the nest on every frame the advance
+		condition held and moved to whatever came back, and what came back is not required to be
+		any further forward than where he already was: PickBuildArea answers with the best area it
+		can find, and if that is the one he is standing on, or another one equally far behind the
+		front, the condition is still true next frame and he picks the sentry up again.
+
+		So the candidate has to beat the ground he holds by a clear margin before he commits to
+		carrying anything, and having moved, he leaves it alone for a while. A sentry in a toolbox
+		shoots nothing, so a move has to buy more than it costs. */
+		CNavArea candidate = PickBuildArea(actor);
+
+		if (m_ctAdvanceAgain[actor] > GetGameTime() || !IsWorthAdvancingTo(m_aNestArea[actor], candidate))
 		{
-			g_bGoingToGrabBuilding[actor] = true;
-			
-			m_hBuildingToGrab[actor] = EntIndexToEntRef(sentry);
-			
-			g_arrPluginBot[actor].SetPathGoalEntity(sentry);
+			//Nothing better within reach, so stop asking for a bit and hold what he has
+			m_ctAdvanceNestSpot[actor] = GetGameTime() + NEST_ADVANCE_RECHECK;
+		}
+		else
+		{
+			if (redbots_manager_debug_actions.BoolValue)
+				PrintToServer("CTFBotMvMEngineerIdle_Update: ADVANCE");
+
+			//RIGHT NOW
+			CTFBotMvMEngineerIdle_ResetProperties(actor);
+
+			m_aNestArea[actor] = candidate;
+			m_ctAdvanceAgain[actor] = GetGameTime() + NEST_ADVANCE_COOLDOWN;
+
+			if (sentry != INVALID_ENT_REFERENCE && m_aNestArea[actor] != NULL_AREA)
+			{
+				g_bGoingToGrabBuilding[actor] = true;
+
+				m_hBuildingToGrab[actor] = EntIndexToEntRef(sentry);
+
+				g_arrPluginBot[actor].SetPathGoalEntity(sentry);
+			}
 		}
 	}
 	
