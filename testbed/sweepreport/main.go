@@ -88,6 +88,13 @@ type mapStats struct {
 	engNoTele     int
 	engHalfTele   int
 
+	// How much of a wave the engineers actually had a nest, which is a
+	// different complaint from never having built one
+	samples       int
+	withSentry    int
+	withLevel3    int
+	withDispenser int
+
 	frames      int
 	framesSlow  int
 	framesStall int
@@ -206,6 +213,14 @@ func read(path string, stats *mapStats) error {
 			// The beginning of a wave is the question. What he has then is
 			// what the between-rounds time bought; what he has at the end is
 			// mostly a statement about the robots.
+			// The uptime is only counted once the wave is over
+			if r.When == "end" {
+				stats.samples += r.Samples
+				stats.withSentry += r.WithSentry
+				stats.withLevel3 += r.WithLevel3
+				stats.withDispenser += r.WithDispenser
+			}
+
 			if r.When != "begin" {
 				continue
 			}
@@ -275,6 +290,27 @@ func printEngineers(order []string, byMap map[string]*mapStats) {
 		fmt.Printf("%-18s %6d %9d %10d %10d %9d %7d %8d\n",
 			short(name), s.engWaves, s.engNoSentry, s.engLowSentry,
 			s.engNoDispense, s.engDispFar, s.engNoTele, s.engHalfTele)
+	}
+
+	fmt.Println()
+
+	// A nest he never built and a nest he could not keep look the same in the
+	// table above and are different complaints. This is the second one.
+	fmt.Println("== how much of each wave the engineers had a nest standing ==")
+	fmt.Printf("%-18s %9s %10s %10s %12s\n", "map", "samples", "sentry", "level 3", "dispenser")
+
+	for _, name := range order {
+		s := byMap[name]
+
+		if s.samples == 0 {
+			fmt.Printf("%-18s %9s\n", short(name), "-")
+			continue
+		}
+
+		pct := func(n int) float64 { return 100 * float64(n) / float64(s.samples) }
+
+		fmt.Printf("%-18s %9d %9.0f%% %9.0f%% %11.0f%%\n",
+			short(name), s.samples, pct(s.withSentry), pct(s.withLevel3), pct(s.withDispenser))
 	}
 
 	fmt.Println()
