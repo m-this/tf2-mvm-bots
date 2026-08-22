@@ -43,6 +43,8 @@ type wave struct {
 	Ubers        int `json:"ubers"`
 
 	// Per class, keyed by the class name the plugin writes
+	SelfDamageBy map[string]int `json:"-"`
+	SelfDeathsBy map[string]int `json:"-"`
 	DamageBy   map[string]int `json:"-"`
 	KillsBy    map[string]int `json:"-"`
 	GiantsBy   map[string]int `json:"-"`
@@ -65,7 +67,12 @@ func (w *wave) unpackClasses(raw map[string]int) {
 	w.GiantsBy = map[string]int{}
 	w.KilledByBy = map[string]int{}
 
+	w.SelfDamageBy = map[string]int{}
+	w.SelfDeathsBy = map[string]int{}
+
 	for _, c := range classes {
+		w.SelfDamageBy[c] = raw["selfdamage_"+c]
+		w.SelfDeathsBy[c] = raw["selfdeaths_"+c]
 		w.DamageBy[c] = raw["damage_"+c]
 		w.KillsBy[c] = raw["kills_"+c]
 		w.GiantsBy[c] = raw["giantkills_"+c]
@@ -130,6 +137,7 @@ type summary struct {
 	healing, ubers                        int
 	damageBy, killsBy, giantsBy, killedBy map[string]int
 	causeBy                               map[string]int
+	selfDamageBy, selfDeathsBy            map[string]int
 }
 
 func summarise(waves []wave) summary {
@@ -137,6 +145,7 @@ func summarise(waves []wave) summary {
 		damageBy: map[string]int{}, killsBy: map[string]int{},
 		giantsBy: map[string]int{}, killedBy: map[string]int{},
 		causeBy: map[string]int{},
+		selfDamageBy: map[string]int{}, selfDeathsBy: map[string]int{},
 	}
 
 	for _, w := range waves {
@@ -168,6 +177,12 @@ func summarise(waves []wave) summary {
 		}
 		for k, v := range w.KilledByBy {
 			s.killedBy[k] += v
+		}
+		for k, v := range w.SelfDamageBy {
+			s.selfDamageBy[k] += v
+		}
+		for k, v := range w.SelfDeathsBy {
+			s.selfDeathsBy[k] += v
 		}
 		for k, v := range w.CauseBy {
 			s.causeBy[k] += v
@@ -239,6 +254,16 @@ func print(name string, s summary) {
 	fmt.Printf("  giants by class   %s\n", ranked(s.giantsBy))
 	fmt.Printf("  killed us         %s\n", ranked(s.killedBy))
 	fmt.Printf("  died to           %s\n", ranked(s.causeBy))
+
+	// Printed only when it happened, because a zero here is the normal case and a
+	// line of zeroes in every report is a line nobody reads.
+	if self := ranked(s.selfDamageBy); self != "" {
+		fmt.Printf("  hurt themselves   %s\n", self)
+	}
+
+	if self := ranked(s.selfDeathsBy); self != "" {
+		fmt.Printf("  killed themselves %s\n", self)
+	}
 }
 
 func compare(now, then summary) {
@@ -273,6 +298,10 @@ func main() {
 
 	now := summarise(after)
 	print(args[0], now)
+
+	if bots, buildings, err := loadTelemetry(args[0]); err == nil {
+		printTelemetry(bots, buildings)
+	}
 
 	if len(args) == 1 {
 		return

@@ -16,6 +16,7 @@
 #include <tf2_stocks>
 #include <sdkhooks>
 #include <tf2utils>
+#include <actions>
 
 #pragma semicolon 1
 #pragma newdecls required
@@ -23,7 +24,7 @@
 #define PLUGIN_VERSION "1.0.0"
 
 //A wave is hundreds of deaths and a line is written per wave, so the file is small on purpose
-#define STATS_LINE_LENGTH	2048
+#define STATS_LINE_LENGTH	3072
 
 /* A frame the server did not finish inside its own tick
 
@@ -123,6 +124,17 @@ enum struct WaveCounters
 	int healingDone;
 	int ubersDeployed;
 	int damageByClass[view_as<int>(TFClass_Engineer) + 1];
+	/* What the defenders did to themselves, which nothing has ever counted
+
+	A soldier firing a rocket at a tank he is stood against takes the blast himself, and from the
+	scoreboard that is indistinguishable from a soldier who fought well and got shot: damage up,
+	kills up, deaths up. It was found by somebody watching it happen and saying so.
+
+	Self damage separates the two without an opinion in it. A class with a column here is a class
+	whose own weapon is one of the things killing it, and the number is comparable between two
+	builds, which is the whole point. */
+	int selfDamageByClass[view_as<int>(TFClass_Engineer) + 1];
+	int selfDeathsByClass[view_as<int>(TFClass_Engineer) + 1];
 	/* Who killed what, on both sides
 
 	"Five waves cleared" hides everything worth knowing. Which defender class does the killing
@@ -173,6 +185,8 @@ enum struct WaveCounters
 		for (int i = 0; i < sizeof(this.damageByClass); i++)
 		{
 			this.damageByClass[i] = 0;
+			this.selfDamageByClass[i] = 0;
+			this.selfDeathsByClass[i] = 0;
 			this.killsByClass[i] = 0;
 			this.giantKillsByClass[i] = 0;
 			this.deathsToClass[i] = 0;
@@ -330,6 +344,7 @@ public void OnGameFrame()
 	g_flLastFrame = now;
 
 	SampleEngineers();
+	SampleTelemetry();
 }
 
 static void ReportStall(float ms)
@@ -560,7 +575,13 @@ static void WriteWaveResult(const char[] result)
 		... "\"killedby_sentry\":%d,\"killedby_tank\":%d,"
 		... "\"cause_bullet\":%d,\"cause_explosion\":%d,\"cause_fire\":%d,"
 		... "\"cause_melee\":%d,\"cause_backstab\":%d,\"cause_headshot\":%d,"
-		... "\"cause_fall\":%d,\"cause_other\":%d}",
+		... "\"cause_fall\":%d,\"cause_other\":%d,"
+		... "\"selfdamage_scout\":%d,\"selfdamage_soldier\":%d,\"selfdamage_pyro\":%d,"
+		... "\"selfdamage_demoman\":%d,\"selfdamage_heavy\":%d,\"selfdamage_engineer\":%d,"
+		... "\"selfdamage_medic\":%d,\"selfdamage_sniper\":%d,\"selfdamage_spy\":%d,"
+		... "\"selfdeaths_scout\":%d,\"selfdeaths_soldier\":%d,\"selfdeaths_pyro\":%d,"
+		... "\"selfdeaths_demoman\":%d,\"selfdeaths_heavy\":%d,\"selfdeaths_engineer\":%d,"
+		... "\"selfdeaths_medic\":%d,\"selfdeaths_sniper\":%d,\"selfdeaths_spy\":%d}",
 		g_sMap, g_iWave, result, duration,
 		g_Wave.robotKills, g_Wave.giantKills, g_Wave.tankKills, g_Wave.sentryKills,
 		g_Wave.defenderDeaths, g_Wave.backstabs, g_Wave.busterDetonations,
@@ -612,7 +633,25 @@ static void WriteWaveResult(const char[] result)
 		g_Wave.deathsByCause[DEATH_CAUSE_BACKSTAB],
 		g_Wave.deathsByCause[DEATH_CAUSE_HEADSHOT],
 		g_Wave.deathsByCause[DEATH_CAUSE_FALL],
-		g_Wave.deathsByCause[DEATH_CAUSE_OTHER]);
+		g_Wave.deathsByCause[DEATH_CAUSE_OTHER],
+		g_Wave.selfDamageByClass[view_as<int>(TFClass_Scout)],
+		g_Wave.selfDamageByClass[view_as<int>(TFClass_Soldier)],
+		g_Wave.selfDamageByClass[view_as<int>(TFClass_Pyro)],
+		g_Wave.selfDamageByClass[view_as<int>(TFClass_DemoMan)],
+		g_Wave.selfDamageByClass[view_as<int>(TFClass_Heavy)],
+		g_Wave.selfDamageByClass[view_as<int>(TFClass_Engineer)],
+		g_Wave.selfDamageByClass[view_as<int>(TFClass_Medic)],
+		g_Wave.selfDamageByClass[view_as<int>(TFClass_Sniper)],
+		g_Wave.selfDamageByClass[view_as<int>(TFClass_Spy)],
+		g_Wave.selfDeathsByClass[view_as<int>(TFClass_Scout)],
+		g_Wave.selfDeathsByClass[view_as<int>(TFClass_Soldier)],
+		g_Wave.selfDeathsByClass[view_as<int>(TFClass_Pyro)],
+		g_Wave.selfDeathsByClass[view_as<int>(TFClass_DemoMan)],
+		g_Wave.selfDeathsByClass[view_as<int>(TFClass_Heavy)],
+		g_Wave.selfDeathsByClass[view_as<int>(TFClass_Engineer)],
+		g_Wave.selfDeathsByClass[view_as<int>(TFClass_Medic)],
+		g_Wave.selfDeathsByClass[view_as<int>(TFClass_Sniper)],
+		g_Wave.selfDeathsByClass[view_as<int>(TFClass_Spy)]);
 
 	WriteLine(line);
 
@@ -682,6 +721,15 @@ static void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 		return;
 	}
 
+	//A defender who is his own killer, which no scoreboard has ever told apart from being shot
+	if (attacker == victim && TF2_GetClientTeam(victim) == TFTeam_Red)
+	{
+		int selfClass = view_as<int>(TF2_GetPlayerClass(victim));
+		
+		if (selfClass >= 0 && selfClass < sizeof(g_Wave.selfDeathsByClass))
+			g_Wave.selfDeathsByClass[selfClass]++;
+	}
+
 	if (TF2_GetClientTeam(victim) != TFTeam_Red)
 		return;
 
@@ -744,11 +792,33 @@ static void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast
 	
 	SDKUnhook(client, SDKHook_OnTakeDamagePost, OnRobotDamagePost);
 	SDKHook(client, SDKHook_OnTakeDamagePost, OnRobotDamagePost);
+	
+	SDKUnhook(client, SDKHook_OnTakeDamagePost, OnDefenderDamagePost);
+	SDKHook(client, SDKHook_OnTakeDamagePost, OnDefenderDamagePost);
 }
 
 static void OnRobotDamagePost(int victim, int attacker, int inflictor, float damage, int damagetype)
 {
 	CountDefenderDamage(attacker, inflictor, damage, false);
+}
+
+/* A defender hurting himself, which is his own weapon and nobody else's fault
+ *
+ * Only when he is both ends of it: teammates cannot hurt each other in MvM, so anything a defender
+ * does to a defender is a man standing too close to his own explosion.
+ */
+static void OnDefenderDamagePost(int victim, int attacker, int inflictor, float damage, int damagetype)
+{
+	if (victim != attacker || victim < 1 || victim > MaxClients || !IsClientInGame(victim))
+		return;
+	
+	if (TF2_GetClientTeam(victim) != TFTeam_Red)
+		return;
+	
+	int class = view_as<int>(TF2_GetPlayerClass(victim));
+	
+	if (class >= 0 && class < sizeof(g_Wave.selfDamageByClass))
+		g_Wave.selfDamageByClass[class] += RoundToNearest(damage);
 }
 
 static void OnTankDamagePost(int victim, int attacker, int inflictor, float damage, int damagetype)
@@ -898,4 +968,256 @@ static void WriteLine(const char[] line)
 	file.WriteLine("%s", line);
 
 	delete file;
+}
+
+/* Where every bot was and what it was doing, written down instead of watched
+ *
+ * Five separate faults this week were found by somebody playing the game and noticing: an engineer
+ * stood in a house, a medic in the middle of the map, a dispenser beside a teleporter entrance. All
+ * five looked identical from outside, all five took a round of guessing to name, and two of those
+ * guesses were wrong. The reason is that nothing wrote down what the bots were doing, so the only
+ * instrument was a person watching one of six bots at a time.
+ *
+ * These lines are that instrument. Facts, not verdicts: where he is, what is in his hands, what his
+ * behaviour stack says, who his medigun is on. A verdict about whether that is good belongs in the
+ * report, where it can be changed without another run.
+ */
+#define TELEMETRY_SAMPLE_INTERVAL	5.0
+#define TELEMETRY_LINE_LENGTH		1024
+
+/* How far from a building somebody counts as being served by it
+ *
+ * A dispenser's own heal radius, and the range a level three sentry shoots at. The dispenser
+ * number is what answers "is it in a place that is any use to the team", which is the question a
+ * spot walked by hand is meant to settle and nothing has ever checked.
+ */
+#define DISPENSER_SERVE_RANGE	450.0
+#define SENTRY_SERVE_RANGE		1100.0
+
+static float g_flNextTelemetrySample;
+static char g_sTelemetryStack[512];
+
+static void CollectTelemetryActionName(BehaviorAction action)
+{
+	char name[64]; action.GetName(name, sizeof(name));
+
+	if (g_sTelemetryStack[0] != '\0')
+		StrCat(g_sTelemetryStack, sizeof(g_sTelemetryStack), " < ");
+
+	StrCat(g_sTelemetryStack, sizeof(g_sTelemetryStack), name);
+}
+
+/* Everything with a behaviour, and nothing without one
+ *
+ * ActionsManager.Iterator throws on a client that is not a NextBot, and a thrown native takes the
+ * whole callback with it: the seat-holder mvmbots_host puts on RED is an ordinary fake client, so
+ * the first sample of every frame died on it and not one telemetry line reached the file.
+ *
+ * The two plugins ship in the same directory and one exists to keep the other's server running, so
+ * asking it what it named its seat is cheaper than guessing at a property that tells NextBots apart
+ * from fake clients. */
+static bool HasBehaviour(int client)
+{
+	static ConVar hostName;
+
+	if (hostName == null)
+		hostName = FindConVar("mvmbots_host_name");
+
+	if (hostName == null)
+		return true;
+
+	char seat[MAX_NAME_LENGTH]; hostName.GetString(seat, sizeof(seat));
+	char name[MAX_NAME_LENGTH]; GetClientName(client, name, sizeof(name));
+
+	return !StrEqual(name, seat);
+}
+
+static void TelemetryActionStack(int client, char[] buffer, int maxlength)
+{
+	g_sTelemetryStack[0] = '\0';
+
+	if (HasBehaviour(client))
+		ActionsManager.Iterator(client, CollectTelemetryActionName);
+
+	strcopy(buffer, maxlength, g_sTelemetryStack);
+}
+
+//Live enemies within range of a point that it can actually see, which is what a sentry is worth
+static int EnemiesServedBy(int building, const float at[3], float range)
+{
+	int count = 0;
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || !IsPlayerAlive(i) || TF2_GetClientTeam(i) != TFTeam_Blue)
+			continue;
+
+		float theirs[3]; GetClientAbsOrigin(i, theirs);
+
+		if (GetVectorDistance(at, theirs) > range)
+			continue;
+
+		theirs[2] += 40.0;
+
+		TR_TraceRayFilter(at, theirs, MASK_SHOT, RayType_EndPoint, TraceIgnoreBuilding, building);
+
+		if (TR_DidHit())
+			continue;
+
+		count++;
+	}
+
+	return count;
+}
+
+public bool TraceIgnoreBuilding(int entity, int mask, any data)
+{
+	return entity != data && (entity < 1 || entity > MaxClients);
+}
+
+//Defenders within range of a point, which is what a dispenser is worth wherever somebody put it
+static int TeammatesServedBy(const float at[3], float range)
+{
+	int count = 0;
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || !IsPlayerAlive(i) || TF2_GetClientTeam(i) != TFTeam_Red)
+			continue;
+
+		float theirs[3]; GetClientAbsOrigin(i, theirs);
+
+		if (GetVectorDistance(at, theirs) <= range)
+			count++;
+	}
+
+	return count;
+}
+
+static void WriteBotTelemetry(int client, float when)
+{
+	float at[3]; GetClientAbsOrigin(client, at);
+
+	char name[MAX_NAME_LENGTH]; GetClientName(client, name, sizeof(name));
+	char stack[512]; TelemetryActionStack(client, stack, sizeof(stack));
+
+	int weapon = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
+	char weaponClass[64] = "none";
+	int slot = -1;
+
+	if (weapon != -1)
+	{
+		GetEntityClassname(weapon, weaponClass, sizeof(weaponClass));
+		slot = TF2Util_GetWeaponSlot(weapon);
+	}
+
+	//Who the medigun is actually on, which is the difference between a medic healing and a medic walking
+	char healing[MAX_NAME_LENGTH] = "";
+	int medigun = GetPlayerWeaponSlot(client, 1);
+
+	if (medigun != -1 && HasEntProp(medigun, Prop_Send, "m_hHealingTarget"))
+	{
+		int patient = GetEntPropEnt(medigun, Prop_Send, "m_hHealingTarget");
+
+		if (patient > 0 && patient <= MaxClients && IsClientInGame(patient))
+			GetClientName(patient, healing, sizeof(healing));
+	}
+
+	char line[TELEMETRY_LINE_LENGTH];
+	FormatEx(line, sizeof(line),
+		"{\"event\":\"bot\",\"map\":\"%s\",\"wave\":%d,\"t\":%.1f,\"who\":\"%s\",\"class\":\"%s\","
+		... "\"at\":[%.0f,%.0f,%.0f],\"hp\":%d,\"maxhp\":%d,\"weapon\":\"%s\",\"slot\":%d,"
+		... "\"healing\":\"%s\",\"action\":\"%s\"}",
+		g_sMap, g_iWave, when, name, ClassName(TF2_GetPlayerClass(client)),
+		at[0], at[1], at[2], GetClientHealth(client), TF2Util_GetEntityMaxHealth(client),
+		weaponClass, slot, healing, stack);
+
+	WriteLine(line);
+}
+
+static void WriteBuildingTelemetry(int owner, int building, float when)
+{
+	float at[3]; GetEntPropVector(building, Prop_Send, "m_vecOrigin", at);
+
+	char ownerName[MAX_NAME_LENGTH]; GetClientName(owner, ownerName, sizeof(ownerName));
+	char class[64]; GetEntityClassname(building, class, sizeof(class));
+
+	float eye[3]; eye = at;
+	eye[2] += 40.0;
+
+	bool disposable = HasEntProp(building, Prop_Send, "m_bDisposableBuilding")
+		&& GetEntProp(building, Prop_Send, "m_bDisposableBuilding") != 0;
+
+	int kills = HasEntProp(building, Prop_Send, "m_iKills")
+		? GetEntProp(building, Prop_Send, "m_iKills") : -1;
+
+	char line[TELEMETRY_LINE_LENGTH];
+	FormatEx(line, sizeof(line),
+		"{\"event\":\"building\",\"map\":\"%s\",\"wave\":%d,\"t\":%.1f,\"owner\":\"%s\","
+		... "\"type\":\"%s\",\"mode\":%d,\"level\":%d,\"hp\":%d,\"maxhp\":%d,\"at\":[%.0f,%.0f,%.0f],"
+		... "\"disposable\":%d,\"kills\":%d,\"enemies_seen\":%d,\"teammates_near\":%d,\"sapped\":%d}",
+		g_sMap, g_iWave, when, ownerName, class,
+		HasEntProp(building, Prop_Send, "m_iObjectMode") ? GetEntProp(building, Prop_Send, "m_iObjectMode") : 0,
+		GetEntProp(building, Prop_Send, "m_iUpgradeLevel"),
+		GetEntProp(building, Prop_Data, "m_iHealth"), GetEntProp(building, Prop_Send, "m_iMaxHealth"),
+		at[0], at[1], at[2], disposable ? 1 : 0, kills,
+		EnemiesServedBy(building, eye, SENTRY_SERVE_RANGE),
+		TeammatesServedBy(at, DISPENSER_SERVE_RANGE),
+		GetEntProp(building, Prop_Send, "m_bHasSapper") != 0 ? 1 : 0);
+
+	WriteLine(line);
+}
+
+/* Sampled in both round states, unlike the engineer uptime above
+ *
+ * Half of what has gone wrong went wrong between waves: the walk to the front, the shopping trip,
+ * the toolbox still set to the last building. Sampling only while a wave runs is sampling the half
+ * that was never the problem.
+ */
+static void SampleTelemetry()
+{
+	if (GetGameTime() < g_flNextTelemetrySample)
+		return;
+
+	g_flNextTelemetrySample = GetGameTime() + TELEMETRY_SAMPLE_INTERVAL;
+
+	float when = g_flWaveStart > 0.0 ? GetGameTime() - g_flWaveStart : 0.0;
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || !IsFakeClient(i) || TF2_GetClientTeam(i) != TFTeam_Red)
+			continue;
+
+		if (!IsPlayerAlive(i) || !HasBehaviour(i))
+			continue;
+
+		WriteBotTelemetry(i, when);
+
+		int objects = TF2Util_GetPlayerObjectCount(i);
+
+		for (int n = 0; n < objects; n++)
+			WriteBuildingTelemetry(i, TF2Util_GetPlayerObject(i, n), when);
+	}
+}
+
+//The name the rest of the file already writes into its keys, so the two agree without a lookup
+static char[] ClassName(TFClassType class)
+{
+	char name[16];
+
+	switch (class)
+	{
+		case TFClass_Scout:		name = "scout";
+		case TFClass_Sniper:	name = "sniper";
+		case TFClass_Soldier:	name = "soldier";
+		case TFClass_DemoMan:	name = "demoman";
+		case TFClass_Medic:		name = "medic";
+		case TFClass_Heavy:		name = "heavy";
+		case TFClass_Pyro:		name = "pyro";
+		case TFClass_Spy:		name = "spy";
+		case TFClass_Engineer:	name = "engineer";
+		default:				name = "unknown";
+	}
+
+	return name;
 }

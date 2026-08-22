@@ -751,6 +751,80 @@ static bool ShouldLeaveToBePatchedUp(int client, float healthRatio)
 	return healthRatio < tf_bot_health_critical_ratio.FloatValue;
 }
 
+/* A bot that is trying to walk somewhere and not getting anywhere
+
+Every one of this mod's reported faults arrives looking the same. A build spot computed in mid-air,
+a toolbox still set to the last building, two rules dragging a medic between two patients, a filter
+that excluded every coin on the floor: five different causes, and from inside the game all five are
+a bot standing still. Standing still is silent, so each of them was found by somebody playing and
+noticing, one at a time, and the first guess at the cause was wrong about as often as it was right.
+
+This does not fix any of them. It makes them loud. The one thing true of all of them is that the
+bot wanted to be somewhere and stopped getting closer to it, so that is what is measured: past the
+deadline his behaviour is thrown away and rebuilt, which is what the wave-start reset already does
+to every bot, and the fact is printed so a test-bed run counts them instead of a player noticing.
+
+Only while he is asking to go somewhere. An engineer stood at a finished nest and a sniper on his
+perch are both motionless on purpose and neither is stuck.
+
+Deferred by a frame, because throwing away the action stack from inside an action's own update is
+freeing the thing that is running. */
+#define STUCK_RADIUS	72.0
+#define STUCK_TIME		12.0
+
+static float m_vStuckOrigin[MAXPLAYERS + 1][3];
+static float m_ctStuckDeadline[MAXPLAYERS + 1];
+static int m_iStuckCount[MAXPLAYERS + 1];
+
+int StuckCountOf(int client)
+{
+	return m_iStuckCount[client];
+}
+
+static void Frame_UnstickDefender(any client)
+{
+	if (!IsClientInGame(client) || !g_bIsDefenderBot[client] || !IsPlayerAlive(client))
+		return;
+	
+	ResetIntentionInterface(client);
+}
+
+static void UpdateStuckWatchdog(int actor)
+{
+	INextBot myBot = CBaseNPC_GetNextBotOfEntity(actor);
+	ILocomotion myLoco = myBot.GetLocomotionInterface();
+	
+	bool wantsToBeElsewhere = g_arrPluginBot[actor].bPathing || myLoco.IsStuck();
+	
+	float here[3]; here = GetAbsOrigin(actor);
+	
+	if (!wantsToBeElsewhere || GetVectorDistance(here, m_vStuckOrigin[actor]) > STUCK_RADIUS)
+	{
+		m_vStuckOrigin[actor] = here;
+		m_ctStuckDeadline[actor] = GetGameTime() + STUCK_TIME;
+		
+		return;
+	}
+	
+	if (GetGameTime() < m_ctStuckDeadline[actor])
+		return;
+	
+	m_vStuckOrigin[actor] = here;
+	m_ctStuckDeadline[actor] = GetGameTime() + STUCK_TIME;
+	m_iStuckCount[actor]++;
+	
+	myLoco.ClearStuckStatus("Watchdog");
+	g_arrPluginBot[actor].bPathing = false;
+	
+	char stack[512]; ActionStackOf(actor, stack, sizeof(stack));
+	
+	PrintToServer("[defenderbots] stuck: %N (%s) at %.0f %.0f %.0f for %.0fs, %s",
+		actor, g_sRawPlayerClassNames[TF2_GetPlayerClass(actor)],
+		here[0], here[1], here[2], STUCK_TIME, stack);
+	
+	RequestFrame(Frame_UnstickDefender, actor);
+}
+
 public Action CTFBotTacticalMonitor_Update(BehaviorAction action, int actor, float interval, ActionResult result)
 {
 	if (g_bIsDefenderBot[actor] == false)
@@ -787,6 +861,7 @@ public Action CTFBotTacticalMonitor_Update(BehaviorAction action, int actor, flo
 	}
 	
 	UpdateDefenderReadiness(actor);
+	UpdateStuckWatchdog(actor);
 
 	if (GameRules_GetRoundState() == RoundState_RoundRunning)
 	{
@@ -989,6 +1064,12 @@ float HealthFraction(int client)
 	return float(GetClientHealth(client)) / float(TF2Util_GetEntityMaxHealth(client));
 }
 
+/* How much further the man already being beamed may drift before he stops counting as nearby
+
+Without it the two of them swap places every time the held patient crosses the line, which is a
+beam that changes target on a step. */
+#define MEDIC_PATIENT_HYSTERESIS	400.0
+
 /* The ranking, written once
 
 It decides both which patient is picked and whether the beam moves off the one it already has.
@@ -1020,6 +1101,38 @@ bool IsBetterPatient(int candidate, int incumbent)
 	return HealthFraction(candidate) < HealthFraction(incumbent) - MEDIC_PATIENT_MARGIN;
 }
 
+/* The same ranking, with the walk in it, which is the only one the beam is allowed to use
+
+There were two before: a nearby man was picked over a far one, and then IsBetterPatient decided
+whether to move off him without knowing where anybody was. So a Heavy at the far end of the map
+took the beam back off whoever was standing in front of the medic, every check, and the check
+before had taken it off the Heavy for being far away. The medic walked half way to one, turned
+round, walked half way back, and the fixed point of that is the middle of the map. Measured on
+Coaltown, where it put him in the middle house, reported four times.
+
+Nearby beats far outright, because what a medic delivers is heal rate times time in range. Within
+the same bucket the class and health ranking decides. One ordering, so there is nothing left to
+disagree with. */
+static bool IsCloserBetterPatient(int medic, const float from[3], int candidate, int incumbent)
+{
+	if (incumbent <= 0 || !IsClientInGame(incumbent) || !IsPlayerAlive(incumbent))
+		return true;
+
+	//The man already being beamed keeps his nearby standing a little past the line
+	float incumbentReach = MEDIC_PATIENT_NEARBY;
+
+	if (incumbent == m_iPreferredPatient[medic])
+		incumbentReach += MEDIC_PATIENT_HYSTERESIS;
+
+	bool candidateIsNearby = GetVectorDistance(from, GetAbsOrigin(candidate)) <= MEDIC_PATIENT_NEARBY;
+	bool incumbentIsNearby = GetVectorDistance(from, GetAbsOrigin(incumbent)) <= incumbentReach;
+
+	if (candidateIsNearby != incumbentIsNearby)
+		return candidateIsNearby;
+
+	return IsBetterPatient(candidate, incumbent);
+}
+
 /* Who the medigun should be on, held between asks
 
 The list is the whole team. It used to be the team within nine metres, and that is what left the
@@ -1044,8 +1157,7 @@ int PreferredPatient(int medic)
 
 	m_ctNextPatientCheck[medic] = GetGameTime() + MEDIC_PATIENT_INTERVAL;
 
-	int bestNearby = -1;
-	int bestAnywhere = -1;
+	int best = -1;
 	int bestUnreachable = -1;
 	bool heldIsStillOne = false;
 
@@ -1086,28 +1198,14 @@ int PreferredPatient(int medic)
 		if (i == held)
 			heldIsStillOne = true;
 
-		if (IsBetterPatient(i, bestAnywhere))
-			bestAnywhere = i;
-
-		if (GetVectorDistance(myOrigin, GetAbsOrigin(i)) <= MEDIC_PATIENT_NEARBY
-			&& IsBetterPatient(i, bestNearby))
-			bestNearby = i;
+		if (IsCloserBetterPatient(medic, myOrigin, i, best))
+			best = i;
 	}
-
-	int best = bestNearby > 0 ? bestNearby : bestAnywhere;
 
 	if (best <= 0)
 		best = bestUnreachable;
 
-	/* The beam stays where it is unless the man it is on has walked out of reach of it
-
-	The ranking on its own would keep a Heavy at the far end of the map, because he is still the
-	biggest body: the margin that stops the beam flapping between two men standing together also
-	stops it letting go of one who has left. Distance is what overrules it, and only when there is
-	somebody nearby to move to. */
-	bool heldIsNearby = held > 0 && GetVectorDistance(myOrigin, GetAbsOrigin(held)) <= MEDIC_PATIENT_NEARBY;
-
-	if (!heldIsStillOne || (bestNearby > 0 && !heldIsNearby) || (best > 0 && IsBetterPatient(best, held)))
+	if (!heldIsStillOne || (best > 0 && IsCloserBetterPatient(medic, myOrigin, best, held)))
 		held = best;
 
 	m_iPreferredPatient[medic] = held;

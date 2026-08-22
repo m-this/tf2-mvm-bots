@@ -17,8 +17,14 @@ TFBots that can play Mann vs Machine.
 # Testing
 `testbed/` runs a server with nobody on it and writes down what the bots did
 with every wave: cleared or lost, how long, how many robots and defenders died,
-how many backstabs, what the engineers lost. `testbed/run.sh` plays a mission,
-`testbed/report.py` compares two runs. See `testbed/README.md`.
+how many backstabs, what the engineers lost. It also samples every bot and every
+building every five seconds, so "the engineer was stood in a house" and "that
+dispenser fed nobody" are numbers rather than reports. `testbed/run.sh` plays a
+mission, `go run ./testbed/report` reads a run and compares two.
+
+See `testbed/README.md` for running it, `docs/testbed-metrics.md` for what the
+numbers mean, and `docs/how-bots-break.md` before debugging anything: the faults
+in this mod have one shape, and it is worth knowing it before guessing.
 
 # Notes
 - Initial AI code is a port over from [[TF2] MvM AFK Bot](https://github.com/Pelipoika/TF2_Idlebot) AI code.

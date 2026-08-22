@@ -156,7 +156,7 @@ public Action CTFBotMvMEngineerBuildTeleporter_Update(BehaviorAction action, int
 	//The toolbox comes out on the way in, so arriving is not another two seconds of standing about
 	if (range < 200.0)
 	{
-		if (!IsWeapon(actor, TF_WEAPON_BUILDER))
+		if (!IsBuilderSetTo(actor, TFObject_Teleporter, m_nTeleporterMode[actor]))
 			FakeClientCommandThrottled(actor, m_nTeleporterMode[actor] == TFObjectMode_Entrance ? "build 1 0" : "build 1 1");
 
 		//It goes where he looks, so he looks at the spot

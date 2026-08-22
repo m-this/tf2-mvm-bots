@@ -2,6 +2,13 @@
 #define TANK_ATTACK_RANGE_SPLASH	400.0
 #define TANK_ATTACK_RANGE_DEFAULT	100.0
 
+/* How close a man carrying a blast weapon may get to the side of a tank
+
+A rocket's own blast radius is a hundred and forty six units and it goes off on whatever it hits,
+which against a tank is the hull rather than the point the range was measured to. Two hundred and
+fifty leaves a rocket's worth of margin on top of that for a tank that is still driving at him. */
+#define TANK_BLAST_SAFE_RANGE	250.0
+
 int m_iTankTarget[MAXPLAYERS + 1];
 
 BehaviorAction CTFBotAttackTank()
@@ -55,6 +62,34 @@ public Action CTFBotAttackTank_Update(BehaviorAction action, int actor, float in
 	INextBot myBot = CBaseNPC_GetNextBotOfEntity(actor);
 	
 	float attackRange = GetIdealTankAttackRange(actor);
+	
+	/* Backing off a tank he is already inside the blast radius of
+	
+	Every range here is measured to the middle of the tank, and a tank is a large box: the hull he
+	actually detonates a rocket against is half a tank nearer than that. So a standoff that reads
+	as safe from the centre is not one from the front, and what that produced is soldiers killing
+	themselves on tanks, reported from play.
+	
+	Measured off the collision box rather than by making the centre distance bigger, because the
+	box is the thing the rocket hits and it is the same answer whichever end of the tank he is
+	standing at. */
+	if (IsBlastWeapon(BaseCombatCharacter_GetActiveWeapon(actor))
+		&& RangeToTankHull(myEyePos, m_iTankTarget[actor]) < TANK_BLAST_SAFE_RANGE)
+	{
+		float away[3]; SubtractVectors(myEyePos, targetOrigin, away);
+		
+		away[2] = 0.0;
+		
+		if (NormalizeVector(away, away) > 0.0)
+		{
+			ScaleVector(away, TANK_BLAST_SAFE_RANGE);
+			AddVectors(myEyePos, away, away);
+			
+			myBot.GetLocomotionInterface().Approach(away, 1.0);
+		}
+		
+		return action.Continue();
+	}
 	
 	if (dist_to_tank > attackRange || !IsLineOfFireClearEntity(actor, myEyePos, m_iTankTarget[actor]))
 	{
@@ -206,6 +241,45 @@ float GetIdealTankAttackRange(int client)
 	}
 	
 	return TANK_ATTACK_RANGE_DEFAULT;
+}
+
+//Whether firing this at something touching the man would hurt him as well as it
+stock bool IsBlastWeapon(int weapon)
+{
+	if (weapon < 1)
+		return false;
+	
+	switch (TF2Util_GetWeaponID(weapon))
+	{
+		case TF_WEAPON_ROCKETLAUNCHER, TF_WEAPON_GRENADELAUNCHER, TF_WEAPON_DIRECTHIT,
+			TF_WEAPON_PARTICLE_CANNON, TF_WEAPON_CANNON:
+			return true;
+	}
+	
+	return false;
+}
+
+/* How far the nearest corner of the tank is, rather than how far its middle is
+
+The collision box is what a rocket goes off against. Yaw is ignored: the box is axis aligned and a
+tank driving a diagonal is a few units of error in something that already carries a rocket of
+margin. */
+stock float RangeToTankHull(const float from[3], int tank)
+{
+	float origin[3]; origin = GetAbsOrigin(tank);
+	
+	if (!HasEntProp(tank, Prop_Send, "m_vecMins") || !HasEntProp(tank, Prop_Send, "m_vecMaxs"))
+		return GetVectorDistance(from, WorldSpaceCenter(tank));
+	
+	float mins[3]; GetEntPropVector(tank, Prop_Send, "m_vecMins", mins);
+	float maxs[3]; GetEntPropVector(tank, Prop_Send, "m_vecMaxs", maxs);
+	
+	float close[3];
+	
+	for (int axis = 0; axis < 3; axis++)
+		close[axis] = ClampFloat(from[axis], origin[axis] + mins[axis], origin[axis] + maxs[axis]);
+	
+	return GetVectorDistance(from, close);
 }
 
 int EvalTankWeapon_Scout(int slot, int weapon)

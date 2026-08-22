@@ -89,7 +89,7 @@ public Action CTFBotMvMEngineerBuildDisposable_Update(BehaviorAction action, int
 	//The toolbox comes out on the way in, so arriving is not another wait
 	if (range < 200.0)
 	{
-		if (!IsWeapon(actor, TF_WEAPON_BUILDER))
+		if (!IsBuilderSetTo(actor, TFObject_Sentry))
 			FakeClientCommandThrottled(actor, "build 2");
 
 		//It goes where he looks, so he looks at the spot rather than at his own feet

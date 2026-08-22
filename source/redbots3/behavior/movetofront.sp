@@ -212,12 +212,13 @@ public Action Command_DumpFront(int client, int args)
 		else if (ActionsManager.LookupEntityActionByName(i, "DefenderUpgrade") != INVALID_ACTION)
 			Format(action, sizeof(action), "shopping");
 		
-		ReplyToCommand(client, "%N (%s): %s, %.0f from his goal, %.0f from the bomb, %s, %s",
+		ReplyToCommand(client, "%N (%s): %s, %.0f from his goal, %.0f from the bomb, %s, %s, stuck %d times",
 			i, g_sRawPlayerClassNames[TF2_GetPlayerClass(i)], action,
 			IsZeroVector(m_vecGoalArea[i]) ? -1.0 : GetVectorDistance(mine, m_vecGoalArea[i]),
 			haveBomb ? GetVectorDistance(mine, bomb.vPosition) : -1.0,
 			g_bShoppedThisBreak[i] ? "has shopped" : "has not shopped",
-			IsPlayerReady(i) ? "ready" : "not ready");
+			IsPlayerReady(i) ? "ready" : "not ready",
+			StuckCountOf(i));
 	}
 	
 	return Plugin_Handled;
