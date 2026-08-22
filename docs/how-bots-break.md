@@ -22,6 +22,9 @@ Worked examples, all real, all found the hard way:
 | `flLowestTime = 30.0` | money about to vanish is the money worth taking | freshly dropped cash has its whole lifetime left, so a heap at the end of a wave was never a candidate at all |
 | `IsBetterPatient` + a separate distance rule | two orderings agree | they disagreed every two seconds; the medic walked half way to one patient, turned round, and parked at the fixed point of the oscillation |
 | `GetObjectOfType` inside `DetonateObjectOfType` | an engineer owns one dispenser | he owned two; the teardown removed one and the other outlived every wave |
+| `m_pPath.ComputeToTarget(...)` with the result discarded | a path was built | it returns `bool`; a refusal left an empty path, `Update` walked the bot along nothing, and the behaviour above believed it was travelling |
+| `IsPathToVectorPossible` as a filter on authored spots | reachable now means reachable | the same refusal silently deleted a hand-walked coordinate, so the engineer built somewhere else and nothing said why |
+| the dispenser repair branch placed before the sentry's | either order works | the branch returns, so an engineer polished a dispenser while his sentry was destroyed |
 
 Note what they share. The world can refuse anything: the nav mesh has no ground
 there, the entity list has two of something, a weapon holds state you did not
@@ -61,6 +64,31 @@ theory does not predict something in that file, it is not yet a theory.
   "has finished preparing". The moment a human on RED started forcing bots
   ready, all four silently answered yes, and the bots stopped shopping from
   wave two onward. If a flag means two things, one of them is wrong.
+
+## Authored data is not a suggestion
+
+`configs/defenderbots/map/*.cfg` holds coordinates somebody walked the map to
+find. Four separate rules have now quietly discarded them — a distance bound, an
+ownership rule, a height test, and a reachability query — and in every case the
+only symptom was a player noticing a building in the wrong place weeks later.
+
+The rule that came out of it: **an authored spot may be refused only by
+something permanent.** Another engineer's building standing on it is permanent.
+A path query that answered no once, from wherever the engineer happened to be
+standing this second, is not. Unreachable is a last resort, not a disqualifier.
+
+The report checks this now. `printSpotUse` measures every sampled building
+against the map's own coordinates, per wave, by median:
+
+```
+how close the buildings got to the spots mvm_coaltown names
+  Bob dispenser    wave 1: 114  wave 2: 61  wave 3: 780!!
+```
+
+Per wave and median rather than best-ever, because wave one is the wave the
+engineer starts beside his nest with a whole break to build in. Taking the
+closest a building ever got reported every map as perfect and hid the thing
+actually being complained about, which was every wave after the first.
 
 ## The failsafe
 

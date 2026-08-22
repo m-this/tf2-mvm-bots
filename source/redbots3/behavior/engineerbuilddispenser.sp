@@ -294,14 +294,30 @@ bool ConfiguredDispenserSpot(int actor, float spot[3])
 	condition covering both left it with nothing at all. */
 	ArrayList free = new ArrayList(3);
 	
-	CollectDispenserSpots(actor, myZone, free);
+	/* A spot the path query refused is the last resort, not a spot that stopped existing
+	
+	The query is the same ComputeToPos that was measured returning nothing at all for a medic with
+	a live patient in front of him, and it is asked here from wherever the engineer happens to be
+	standing. Before the first wave that is his nest, and it answers; between later waves it is the
+	upgrade station at the other end of the map, and when it refuses, the coordinate somebody
+	walked the map to find is silently dropped and he builds wherever the fallback puts him.
+	
+	Reported exactly that way: right before wave one, wrong from then on. So an unreachable
+	authored spot is still an authored spot, and it is used when nothing better is offered. */
+	ArrayList refused = new ArrayList(3);
+	
+	CollectDispenserSpots(actor, myZone, free, refused);
 	
 	if (free.Length == 0 && myZone[0] != '\0')
-		CollectDispenserSpots(actor, "", free);
+		CollectDispenserSpots(actor, "", free, refused);
 	
 	bool found = NearestConfiguredSpot(free, nest, spot);
 	
+	if (!found)
+		found = NearestConfiguredSpot(refused, nest, spot);
+	
 	delete free;
+	delete refused;
 	
 	if (redbots_manager_debug.BoolValue)
 	{
@@ -314,8 +330,8 @@ bool ConfiguredDispenserSpot(int actor, float spot[3])
 	return found;
 }
 
-//Every named spot in one zone the engineer can still get to and nobody has taken
-static void CollectDispenserSpots(int actor, const char[] wanted, ArrayList free)
+//Every named spot in one zone nobody has taken, split by whether the mesh will admit a path today
+static void CollectDispenserSpots(int actor, const char[] wanted, ArrayList free, ArrayList refused)
 {
 	ArrayList spots = g_arrMapConfig.adtDispenserLocation;
 	ArrayList zones = g_arrMapConfig.adtDispenserZone;
@@ -332,11 +348,14 @@ static void CollectDispenserSpots(int actor, const char[] wanted, ArrayList free
 		
 		float candidate[3]; spots.GetArray(i, candidate);
 		
-		//A spot the engineer cannot walk to is not a spot. Rottenburg has a rock in front of one
-		if (IsDispenserSpotTaken(actor, candidate) || !IsPathToVectorPossible(actor, candidate))
+		//Somebody else's dispenser standing on it is the one thing that does rule a spot out
+		if (IsDispenserSpotTaken(actor, candidate))
 			continue;
 		
-		free.PushArray(candidate);
+		if (IsPathToVectorPossible(actor, candidate))
+			free.PushArray(candidate);
+		else
+			refused.PushArray(candidate);
 	}
 }
 

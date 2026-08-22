@@ -37,6 +37,7 @@ type botSample struct {
 
 type buildingSample struct {
 	Event      string    `json:"event"`
+	Map        string    `json:"map"`
 	Wave       int       `json:"wave"`
 	T          float64   `json:"t"`
 	Owner      string    `json:"owner"`
@@ -317,6 +318,8 @@ func printTelemetry(bots []botSample, buildings []buildingSample) {
 
 		fmt.Println()
 	}
+
+	printSpotUse(buildings)
 }
 
 // The three actions a bot spent most of its samples in, which is the shape of
