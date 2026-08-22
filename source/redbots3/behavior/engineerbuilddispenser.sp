@@ -282,8 +282,18 @@ bool ConfiguredDispenserSpot(int actor, float spot[3])
 	if (spots.Length == 0)
 		return false;
 	
-	//The authored point rather than the area centre, so the ownership test compares like with like
+	//The authored point rather than the area centre, so the comparison is like with like
 	float nest[3]; NestBuildPosition(m_aNestArea[actor], nest);
+	
+	/* The zone this nest belongs to, when the map names one, decides before distance does
+	
+	Coaltown is why. The ground behind the wall on the right is eight hundred units from the nest
+	it serves and two hundred from a different one, so nearest is simply the wrong answer there and
+	no distance rule was ever going to fix it: the map has to be able to say which spot goes with
+	which nest, and a zone is how it already says that about nests. */
+	char myZone[NEST_ZONE_LENGTH]; NestZoneOf(m_aNestArea[actor], myZone, sizeof(myZone));
+	
+	ArrayList zones = g_arrMapConfig.adtDispenserZone;
 	
 	ArrayList free = new ArrayList(3);
 	
@@ -291,9 +301,26 @@ bool ConfiguredDispenserSpot(int actor, float spot[3])
 	{
 		float candidate[3]; spots.GetArray(i, candidate);
 		
-		//Somebody else's nest named this one, or it is on another floor of this one
-		if (!SpotBelongsToNest(candidate, nest) || FloatAbs(candidate[2] - nest[2]) > DISPENSER_NEST_HEIGHT)
+		char zone[NEST_ZONE_LENGTH];
+		
+		if (i < zones.Length)
+			zones.GetString(i, zone, sizeof(zone));
+		
+		/* A zoned spot is that zone's and nobody else's, both ways round
+		
+		A nest in a zone will not take a spot from another one, and a spot in a zone is not offered
+		to a nest that is in none. Everything unzoned falls through to the rules below, which is
+		every map that has never needed this. */
+		if (myZone[0] != '\0' || zone[0] != '\0')
+		{
+			if (!StrEqual(myZone, zone))
+				continue;
+		}
+		else if (FloatAbs(candidate[2] - nest[2]) > DISPENSER_NEST_HEIGHT)
+		{
+			//Two floors are close in plan and a staircase apart in fact
 			continue;
+		}
 		
 		//A spot the engineer cannot walk to is not a spot. Rottenburg has a rock in front of one
 		if (IsDispenserSpotTaken(actor, candidate) || !IsPathToVectorPossible(actor, candidate))
@@ -315,33 +342,6 @@ bool ConfiguredDispenserSpot(int actor, float spot[3])
 	}
 	
 	return found;
-}
-
-/* Whether this nest is the one that spot was authored for, which is the nest nearest to it
-
-Every nest but this one gets a vote, and a nest closer to the spot than this one is takes it. The
-engineer's own nest is skipped by position rather than by index, because what he holds is a nav
-area centre and what the map names is a point somebody stood on, and those are close without being
-equal. */
-static bool SpotBelongsToNest(const float spot[3], const float nest[3])
-{
-	float mine = GetVectorDistance(spot, nest);
-	
-	ArrayList nests = g_arrMapConfig.adtEngineerNestLocation;
-	
-	for (int i = 0; i < nests.Length; i++)
-	{
-		float other[3]; nests.GetArray(i, other);
-		
-		//This nest, near enough
-		if (GetVectorDistance(other, nest) < NEST_SPOT_MATCH_RANGE)
-			continue;
-		
-		if (GetVectorDistance(spot, other) < mine)
-			return false;
-	}
-	
-	return true;
 }
 
 //Spreads several engineers over the spots the map names instead of stacking them on the nearest one

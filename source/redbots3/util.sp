@@ -600,6 +600,40 @@ int SpawnRoutePoints(int actor, const float spawn[3], float first, float step, f
 	return found;
 }
 
+/* The zone the map gave the nest this engineer is holding, empty when it named none
+
+A zone is what lets a map say "this dispenser belongs to that nest" instead of leaving it to
+whichever happens to be nearest. Coaltown needed it: the ground behind the wall on the right is
+eight hundred units from the nest it serves and two hundred from a different one, so nearest is
+the wrong answer and no distance rule fixes that. */
+void NestZoneOf(CNavArea area, char[] zone, int maxlength)
+{
+	zone[0] = '\0';
+
+	if (area == NULL_AREA)
+		return;
+
+	ArrayList spots = g_arrMapConfig.adtEngineerNestLocation;
+	ArrayList zones = g_arrMapConfig.adtEngineerNestZone;
+
+	float centre[3]; area.GetCenter(centre);
+
+	float best = NEST_SPOT_MATCH_RANGE;
+
+	for (int i = 0; i < spots.Length && i < zones.Length; i++)
+	{
+		float spot[3]; spots.GetArray(i, spot);
+
+		float distance = GetVectorDistance(centre, spot);
+
+		if (distance < best)
+		{
+			best = distance;
+			zones.GetString(i, zone, maxlength);
+		}
+	}
+}
+
 //The authored spot nearest the centre we already have, when one is close enough to be this nest
 static void NestSpotFromList(ArrayList spots, float inout[3], float &best)
 {
