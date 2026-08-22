@@ -492,8 +492,8 @@ reach short of the spot with the spot in front of him. Attempt zero is the side 
 from, which costs him no walking at all; each one after it is a step round the spot, so a spot
 with a wall on one side is reached from another.
 
-Shared because both the dispenser and the teleporter need it, and the sentry will when somebody
-gives it the same treatment. */
+Shared because the dispenser, the teleporter and the sentry all need it, and they all learned it
+separately before anybody wrote it down once. */
 void BuildStandPoint(const float spot[3], const float from[3], int attempt, int attempts, float reach, float stand[3])
 {
 	float away[3]; SubtractVectors(from, spot, away);

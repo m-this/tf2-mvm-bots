@@ -58,6 +58,10 @@ type record struct {
 	Exit          int     `json:"exit"`
 	DispenserFrom float64 `json:"dispenser_from_sentry"`
 	ExitFrom      float64 `json:"exit_from_sentry"`
+	Samples       int     `json:"samples"`
+	WithSentry    int     `json:"with_sentry"`
+	WithLevel3    int     `json:"with_level3"`
+	WithDispenser int     `json:"with_dispenser"`
 }
 
 // A dispenser is meant to be beside the sentry it feeds. This is generous: it

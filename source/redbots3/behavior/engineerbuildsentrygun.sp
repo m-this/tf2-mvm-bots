@@ -1,3 +1,45 @@
+/* The sentry, which is the whole of the engineer's job and was the last building still guessing
+
+The dispenser and the teleporter both learned the same lesson and this had not: a building goes
+down in front of the man and never under him, so walking onto the spot and pressing fire aims the
+sentry at whatever is a build's reach beyond it. The old code walked to the nest point, stood on
+it, and aimed at its own feet. Between rounds that mostly worked, because the engineer is
+teleported onto the point and the ground under a nest hint is usually clear; in the middle of a
+wave, having walked there, it did not.
+
+There was also no clock on any of it. No reach deadline, no give-up: an engineer who could not
+place a sentry stayed in this action for the rest of the wave, which is what a test-bed run of
+Bigrock's first wave looked like from outside. Eight minutes, no sentry, and nothing in the logs
+saying why. Everything here has a limit now, and running out of one hands the engineer back to the
+idle action, which tries again three seconds later with a freshly scored nest. */
+
+//A build's reach short of the spot, with the spot in front of him, same as the other two
+#define SENTRY_BUILD_REACH	90.0
+
+/* Eight looks at the spot, one from each side, before the spot itself is the thing in question
+
+A sentry refused from one side is usually a sentry with a wall behind it rather than a sentry on
+bad ground, and the answer to that is to stand somewhere else. Re-scoring the nest on the first
+refusal, which is what this did, threw away a good spot for a bad reason and cost a full pass over
+the nav mesh every time it happened. */
+#define SENTRY_TRY_POINTS	8
+#define SENTRY_TRY_TIME		1.5
+
+/* How long the walk and the whole business may take
+
+The walk is inside the nest, so twelve seconds is generous. Past the build time he goes back to
+the idle action rather than settling for where he stands: a sentry is not a dispenser, and one
+pointed at a wall is worse than three more seconds spent finding somewhere it can see from. */
+#define SENTRY_REACH_TIME	12.0
+#define SENTRY_BUILD_TIME	30.0
+
+static float m_ctSentryReachDeadline[MAXPLAYERS + 1];
+static float m_ctSentryGiveUpTime[MAXPLAYERS + 1];
+static float m_ctSentryTryDeadline[MAXPLAYERS + 1];
+static int m_iSentryTry[MAXPLAYERS + 1];
+static float m_vSentrySpot[MAXPLAYERS + 1][3];
+static float m_vSentryStand[MAXPLAYERS + 1][3];
+
 BehaviorAction CTFBotMvMEngineerBuildSentrygun()
 {
 	BehaviorAction action = ActionsManager.Create("DefenderBuildSentrygun");
@@ -13,6 +55,11 @@ public Action CTFBotMvMEngineerBuildSentrygun_OnStart(BehaviorAction action, int
 {
 	UpdateLookAroundForEnemies(actor, true);
 	
+	m_ctSentryReachDeadline[actor] = GetGameTime() + SENTRY_REACH_TIME;
+	m_ctSentryGiveUpTime[actor] = GetGameTime() + SENTRY_BUILD_TIME;
+	m_ctSentryTryDeadline[actor] = GetGameTime() + SENTRY_TRY_TIME;
+	m_iSentryTry[actor] = 0;
+	
 	if (GameRules_GetRoundState() == RoundState_BetweenRounds)
 	{
 		if (m_aNestArea[actor])
@@ -23,6 +70,8 @@ public Action CTFBotMvMEngineerBuildSentrygun_OnStart(BehaviorAction action, int
 			CBaseEntity(actor).SetAbsOrigin(vNestPosition);
 		}
 	}
+	
+	SentryStandPoint(actor);
 	
 	return action.Continue();
 }
@@ -41,16 +90,26 @@ public Action CTFBotMvMEngineerBuildSentrygun_Update(BehaviorAction action, int 
 		return action.Done("No sentry");
 	}
 	
-	float areaCenter[3];
-	NestBuildPosition(m_aNestArea[actor], areaCenter);
+	//Every side of this spot refused him and the walk is not getting shorter. The idle action retries
+	if (GetGameTime() > m_ctSentryGiveUpTime[actor])
+		return action.Done("Nowhere here will take a sentry");
 	
-	float range_to_hint = GetVectorDistance(GetAbsOrigin(actor), areaCenter);
+	float spot[3]; spot = m_vSentrySpot[actor];
+	float stand[3]; stand = m_vSentryStand[actor];
+	
+	//The walk ran out, so he tries from where he got to rather than walking into whatever stopped him
+	bool outOfTime = GetGameTime() > m_ctSentryReachDeadline[actor];
+	
+	if (outOfTime)
+		stand = GetAbsOrigin(actor);
+	
+	float range_to_stand = GetVectorDistance(GetAbsOrigin(actor), stand);
 	int myWeapon = BaseCombatCharacter_GetActiveWeapon(actor);
 	INextBot myNextbot = CBaseNPC_GetNextBotOfEntity(actor);
 	IBody myBody = myNextbot.GetBodyInterface();
 	ILocomotion myLoco = myNextbot.GetLocomotionInterface();
 	
-	if (range_to_hint < 200.0) 
+	if (range_to_stand < 200.0) 
 	{
 		//Start building a sentry
 		if (myWeapon != -1 && TF2Util_GetWeaponID(myWeapon) != TF_WEAPON_BUILDER)
@@ -63,17 +122,19 @@ public Action CTFBotMvMEngineerBuildSentrygun_Update(BehaviorAction action, int 
 			g_arrExtraButtons[actor].PressButtons(IN_DUCK, 0.1);
 		}
 		
-		AimHeadTowards(myBody, areaCenter, MANDATORY, 0.1, _, "Placing sentry");
+		//It goes where he looks, so he looks at the spot rather than at the ground under himself
+		AimHeadTowards(myBody, spot, MANDATORY, 0.1, _, "Placing sentry");
 	}
 	
-	if (range_to_hint > 70.0)
+	if (range_to_stand > 70.0)
 	{
-		//PrintToServer("%f %f %f", areaCenter[0], areaCenter[1], areaCenter[2]);
-	
-		g_arrPluginBot[actor].SetPathGoalVector(areaCenter);
+		//The clock on this attempt starts when he arrives: the walk to it is not a look at it
+		m_ctSentryTryDeadline[actor] = GetGameTime() + SENTRY_TRY_TIME;
+		
+		g_arrPluginBot[actor].SetPathGoalVector(stand);
 		g_arrPluginBot[actor].bPathing = true;
 		
-		if (range_to_hint > 300.0)
+		if (range_to_stand > 300.0)
 		{
 			//Fuck em up.
 			EquipWeaponSlot(actor, TFWeaponSlot_Primary);
@@ -93,15 +154,31 @@ public Action CTFBotMvMEngineerBuildSentrygun_Update(BehaviorAction action, int 
 		if (objBeingBuilt == -1)
 			return action.Continue();
 		
-		bool m_bPlacementOK = IsPlacementOK(objBeingBuilt);
-		
 		VS_PressFireButton(actor);
 		
-		if (!m_bPlacementOK && myBody.IsHeadAimingOnTarget() && myBody.GetHeadSteadyDuration() > 0.6)
+		/* The game says no from here, so try looking at it from the next side round
+		
+		Only once he is actually looking at it: the answer while his head is still coming round is
+		the answer for wherever it was pointing, which is not this spot. */
+		if (!IsPlacementOK(objBeingBuilt) && myBody.IsHeadAimingOnTarget()
+			&& GetGameTime() > m_ctSentryTryDeadline[actor])
 		{
-			//That spot was no good.
-			//Time to pick a new spot.
-			m_aNestArea[actor] = PickBuildArea(actor);
+			m_iSentryTry[actor]++;
+			
+			/* Every side refused him, so now the spot itself is the thing in question
+			
+			This is where the nest gets re-scored, and not before: a pass over the nav mesh is the
+			expensive answer and it was being given to a wall behind the man. */
+			if (m_iSentryTry[actor] >= SENTRY_TRY_POINTS)
+			{
+				m_aNestArea[actor] = PickBuildArea(actor);
+				m_iSentryTry[actor] = 0;
+			}
+			
+			SentryStandPoint(actor);
+			
+			m_ctSentryTryDeadline[actor] = GetGameTime() + SENTRY_TRY_TIME;
+			m_ctSentryReachDeadline[actor] = GetGameTime() + SENTRY_REACH_TIME;
 			
 			return action.Continue();
 		}
@@ -117,7 +194,18 @@ public Action CTFBotMvMEngineerBuildSentrygun_Update(BehaviorAction action, int 
 	return action.Done("Built a sentry");
 }
 
+//Where the sentry goes and where he stands to put it there, on the side this attempt asks for
+static void SentryStandPoint(int actor)
+{
+	NestBuildPosition(m_aNestArea[actor], m_vSentrySpot[actor]);
+	
+	BuildStandPoint(m_vSentrySpot[actor], GetAbsOrigin(actor), m_iSentryTry[actor],
+		SENTRY_TRY_POINTS, SENTRY_BUILD_REACH, m_vSentryStand[actor]);
+}
+
 public void CTFBotMvMEngineerBuildSentrygun_OnEnd(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
 {
+	g_arrPluginBot[actor].bPathing = false;
+	
 	UpdateLookAroundForEnemies(actor, true);
 }
