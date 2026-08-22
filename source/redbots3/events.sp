@@ -185,6 +185,7 @@ static void Event_MvmWaveBegin(Event event, const char[] name, bool dontBroadcas
 	
 	//A new wave is a new chance at a spot that refused him last time
 	EngineerTeleporter_ForgetGivingUp();
+	EngineerDisposable_ForgetGivingUp();
 	
 	//One a tick, because the frame this runs on is the one the server dies on
 	QueueBehaviourReset();
