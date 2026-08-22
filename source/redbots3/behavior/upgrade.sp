@@ -496,6 +496,44 @@ static bool IsUpgradeWasted(int client, const char[] attribute)
 		return TF2Attrib_GetByName(primary, "airblast disabled") != Address_Null;
 	}
 
+	/* Destroy Projectiles is an airblast on a Pyro and a spun-up minigun on a Heavy
+
+	Same attribute, two different things behind it, and the guides rate it for both because a
+	person carrying a Phlogistinator knows they have given up the airblast. The upgrade menu does
+	not, and this table did not either: the Pyro's own line ranked it at 250 while the loadout
+	handed him the one flamethrower that cannot do it. */
+	if (StrEqual(attribute, "attack projectiles") && TF2_GetPlayerClass(client) == TFClass_Pyro)
+	{
+		int primary = GetPlayerWeaponSlot(client, TFWeaponSlot_Primary);
+
+		if (primary == -1)
+			return true;
+
+		return TF2Attrib_GetByName(primary, "airblast disabled") != Address_Null;
+	}
+
+	/* The Projectile Shield, which nothing in this mod presses
+
+	Every guide puts one tick of it first for a Medic and they are right about a person: it is the
+	strongest thing a Medic can do to a wave. It is deployed with the special attack key, and no
+	behaviour here has ever pressed one, so what the rage meter fills is a button nobody uses.
+
+	Three hundred credits for that, ranked at the top of the Medic's list, every wave. It goes back
+	the moment something deploys it, and that is the TODO rather than this. */
+	if (StrEqual(attribute, "generate rage on heal"))
+		return true;
+
+	/* Afterburn, which the wiki calls useless and a bot has even less use for
+
+	It does not scale the way direct damage does, a small robot dies before it finishes ticking,
+	and a giant outlives it. */
+	if (StrEqual(attribute, "weapon burn dmg increased") || StrEqual(attribute, "weapon burn time increased"))
+		return true;
+
+	//A second sentry is only worth its metal where the first one has to move: see the Engineer table
+	if (StrEqual(attribute, "engy disposable sentries"))
+		return !g_arrMapConfig.bMovingNests;
+
 	return false;
 }
 
@@ -668,11 +706,10 @@ static int ClassUpgradePriority(TFClassType pclass, int slot, const char[] attri
 
 			Every guide says never, and every guide is describing an engineer who picks one spot
 			and holds it. On a map whose front moves the sentry spends part of each wave in a
-			toolbox, and a disposable one covers the ground while it does. So it is ranked third
-			where the map says its nests move, and refused everywhere else: a hundred and fifty
-			credits for a second sentry nobody moves is the mistake the guides are warning about. */
-			if (StrEqual(attribute, "engy disposable sentries"))
-				return g_arrMapConfig.bMovingNests ? 310 : -10;
+			toolbox, and a disposable one covers the ground while it does. Refusing it everywhere
+			else is IsUpgradeWasted's job, because a negative returned from here is thrown away:
+			the caller only keeps a positive. */
+			if (StrEqual(attribute, "engy disposable sentries")) return 310;
 			
 			if (StrEqual(attribute, "engy building health bonus")) return 260;
 			if (StrEqual(attribute, "metal regen")) return 220;
@@ -728,8 +765,7 @@ static int ClassUpgradePriority(TFClassType pclass, int slot, const char[] attri
 			It does not scale with the upgrade the way direct damage does, a robot dies before it
 			finishes ticking, and a giant outlives it. That holds for the Phlogistinator too: its
 			taunt fills from damage dealt, and direct flame damage is most of what it deals */
-			if (StrEqual(attribute, "weapon burn dmg increased")) return -10;
-			if (StrEqual(attribute, "weapon burn time increased")) return -10;
+			//Afterburn is refused outright in IsUpgradeWasted
 		}
 		case TFClass_Soldier:
 		{
@@ -777,12 +813,14 @@ static int ClassUpgradePriority(TFClassType pclass, int slot, const char[] attri
 		{
 			//Milk marks a wave for the whole team, which is worth more than what one Scout shoots
 			if (StrEqual(attribute, "applies snare effect")) return 250;
-			/* Two ticks of jump height, early, and the general table had it last of everything
+			/* Jump height is a person's tool and it stays at the bottom of the general table
 
-			"On maps like Mannhattan and Decoy, it's usually recommended to get 2 ticks of jump
-			height right away." It is what reaches the credits on a ledge before they expire,
-			which is the job. Two and no more, capped in UpgradeTierCap. */
-			if (StrEqual(attribute, "increased jump height")) return 240;
+			The guides want two ticks of it early on Mannhattan and Decoy, for reaching credits on
+			a ledge before they expire. A person reads a ledge and jumps at it. A bot walks where
+			the nav mesh says it can walk, and buying it more jump does not add a route to the
+			mesh, so what the credits buy is a bot that jumps higher along the same path.
+
+			Worth revisiting if anything here ever aims a jump at a specific piece of ground. */
 			if (StrEqual(attribute, "mad milk syringes")) return 200;
 			//Money is the Scout's job here and it needs the legs to do it
 			if (StrEqual(attribute, "move speed bonus")) return 190;

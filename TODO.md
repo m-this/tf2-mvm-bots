@@ -218,6 +218,28 @@ both arms: a Medic is always worth the switch to the launcher, and detonation is
 counted across the whole cluster rather than answered by the first bomb that
 qualifies.
 
+## 6b. Nothing deploys the Medic's Projectile Shield. Open
+
+Every guide puts one tick of it first for a Medic and they are right about a
+person: it is the strongest single thing a Medic does to a wave. It is deployed
+with the special attack key, and no behaviour in this mod has ever pressed one.
+
+So `generate rage on heal` was three hundred credits at the top of the Medic's
+list buying a meter that fills a button nobody uses. It is refused in
+`IsUpgradeWasted` until something presses it, and the moment something does it
+goes straight back to the top.
+
+The wider point is worth keeping: the wiki is written for people, and a
+recommendation is only worth copying where this mod's bots can do the thing it
+assumes. Three of them failed that test in one pass. The Pyro's Destroy
+Projectiles is an airblast the Phlogistinator has not got. Jump height reaches
+credits a person can see on a ledge, and a bot walks where the nav mesh says.
+And this one.
+
+The two that passed are worth naming too, because the test is not "distrust the
+guide": the Sniper really does aim at the head bone, so Explosive Headshot earns
+its place at the top, and the Engineer's own play-tested ordering beat the page.
+
 ## 6. The sticky launchers that want playing differently. Open
 
 `behavior/stickytrap.sp` handles the stock launcher. A Quickiebomb wants its
