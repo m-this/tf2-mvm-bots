@@ -97,11 +97,21 @@ public Action CTFBotMvMEngineerBuildSentrygun_Update(BehaviorAction action, int 
 	float spot[3]; spot = m_vSentrySpot[actor];
 	float stand[3]; stand = m_vSentryStand[actor];
 	
-	//The walk ran out, so he tries from where he got to rather than walking into whatever stopped him
+	/* The walk ran out, so he builds from where he got to rather than into whatever stopped him
+	
+	And he puts it beside himself rather than pointing it at the nest he could not reach. Aiming at
+	the nest from three metres short of it is the same thing; aiming at it from twenty metres short
+	puts the sentry twenty metres from where anybody wanted it, facing a direction chosen by where
+	he happened to get stuck. Decoy produced one 625 units from its own nest that way. */
 	bool outOfTime = GetGameTime() > m_ctSentryReachDeadline[actor];
 	
 	if (outOfTime)
+	{
 		stand = GetAbsOrigin(actor);
+		
+		BuildStandPoint(stand, m_vSentrySpot[actor], m_iSentryTry[actor],
+			SENTRY_TRY_POINTS, SENTRY_BUILD_REACH, spot);
+	}
 	
 	float range_to_stand = GetVectorDistance(GetAbsOrigin(actor), stand);
 	int myWeapon = BaseCombatCharacter_GetActiveWeapon(actor);
