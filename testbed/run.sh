@@ -147,6 +147,33 @@ if [ -n "$mission" ]; then
 	sleep 15
 fi
 
+# Let the server finish standing up before telling it to restart the round.
+#
+# rcon answers early. The map is loaded by then and very little else is: the
+# statistics plugin measured a 1541ms frame two seconds into a map, which is the
+# server spawning entities and settling. Sending mp_tournament_restart into that
+# put the spawning of every robot on top of it, and the watchdog killed the
+# server there: the console shows the restart, then "NextBot tickrate changed
+# from 0 to 7", then the fatal line, with RED still holding nobody but the host.
+#
+# So wait for RED to have somebody on it, which is the mod having done its own
+# start-up work, and then a little longer. Bounded, because a server that never
+# fills RED should still be told to start rather than hang here for ever.
+say "waiting for the server to settle before restarting the round"
+
+settled=0
+
+while [ "$settled" -lt 60 ]; do
+	players=$(eval "$rcon status" 2>/dev/null | sed -n 's/^players *: *\([0-9]*\) humans, \([0-9]*\) bots.*/\2/p')
+
+	[ "${players:-0}" -gt 1 ] && break
+
+	settled=$((settled + 5))
+	sleep 5
+done
+
+sleep 5
+
 # The bots ready themselves up once they have bought their upgrades, so this is
 # a nudge rather than the thing that starts the wave. It matters on the first
 # wave of a fresh server, where the mod has not filled RED yet.
