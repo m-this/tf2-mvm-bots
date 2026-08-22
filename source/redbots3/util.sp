@@ -952,27 +952,6 @@ int GetNearestReviveMarker(int client, const float max_distance)
 	SetEntProp(bottle, Prop_Send, "m_bActive", false);
 } */
 
-//CTFPowerupBottle::GetPowerupType
-int PowerupBottle_GetType(int bottle)
-{
-	if (TF2Attrib_HookValueInt(0, "critboost", bottle))
-		return POWERUP_BOTTLE_CRITBOOST;
-	
-	if (TF2Attrib_HookValueInt(0, "ubercharge", bottle))
-		return POWERUP_BOTTLE_UBERCHARGE;
-	
-	if (TF2Attrib_HookValueInt(0, "recall", bottle))
-		return POWERUP_BOTTLE_RECALL;
-	
-	if (TF2Attrib_HookValueInt(0, "refill_ammo", bottle))
-		return POWERUP_BOTTLE_REFILL_AMMO;
-	
-	if (TF2Attrib_HookValueInt(0, "building_instant_upgrade", bottle))
-		return POWERUP_BOTTLE_BUILDINGS_INSTANT_UPGRADE;
-	
-	return POWERUP_BOTTLE_NONE;
-}
-
 /* void PowerupBottle_SetNumCharges(int bottle, int numCharges)
 {
 	SetEntProp(bottle, Prop_Send, "m_usNumCharges", numCharges);
@@ -983,12 +962,6 @@ int PowerupBottle_GetType(int bottle)
 int PowerupBottle_GetNumCharges(int bottle)
 {
 	return GetEntProp(bottle, Prop_Send, "m_usNumCharges");
-}
-
-//CTFPowerupBottle::GetMaxNumCharges
-int PowerupBottle_GetMaxNumCharges(int bottle)
-{
-	return TF2Attrib_HookValueInt(0, "powerup_max_charges", bottle);
 }
 
 /* int GetCostOfCanteenType(PowerupBottleType_t type)
