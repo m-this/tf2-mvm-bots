@@ -119,6 +119,10 @@ static Action CTFBotDefenderAttack_Update(BehaviorAction action, int actor, floa
 		
 		m_pPath[actor].Update(myBot);
 	}
+	else if (Feature(FEATURE_ATTACK_STRAFE))
+	{
+		StrafeWhileFighting(actor, myBot, targetOrigin);
+	}
 	
 	IVision myVision = myBot.GetVisionInterface();
 	CKnownEntity threat = myVision.GetPrimaryKnownThreat(false);
@@ -130,6 +134,78 @@ static Action CTFBotDefenderAttack_Update(BehaviorAction action, int actor, floa
 	}
 	
 	return action.Continue();
+}
+
+/* Sidestepping while it shoots, because a bot that has arrived stops moving entirely
+
+The path above runs while the target is too far off or behind cover, and nothing runs once it is
+neither. So the bot walks up, plants its feet, and stands still for the rest of the fight, which is
+the one thing every guide about this game tells a person not to do. A stationary target is what a
+robot's aim was written for, and the projectile classes among them do not miss one.
+
+Sidestepping costs nothing in accuracy here. Projectiles do not inherit the shooter's velocity, and
+the head is aimed by different code from the code that moves the feet, so a bot that strafes shoots
+exactly as well as one that stands.
+
+Approach and not a path: this is a step to one side, not a journey, and computing a path for every
+flip of it would be a nav mesh search several times a second per bot, for a distance the bot covers
+in a quarter of one.
+
+The step is tested before it is taken. Locomotion stops itself walking into a wall; it will happily
+walk off a ledge, and a Demoman who sidesteps into the pit on Rottenburg has solved the wrong
+problem. */
+#define ATTACK_STRAFE_REACH		130.0
+#define ATTACK_STRAFE_FLIP_MIN	0.5
+#define ATTACK_STRAFE_FLIP_MAX	1.1
+
+static float m_ctAttackStrafeFlip[MAXPLAYERS + 1];
+static bool m_bAttackStrafeRight[MAXPLAYERS + 1];
+
+static void StrafeWhileFighting(int actor, INextBot myBot, const float targetOrigin[3])
+{
+	//A Sniper is aiming down a scope and wants his feet exactly where they are
+	if (TF2_GetPlayerClass(actor) == TFClass_Sniper)
+		return;
+	
+	ILocomotion myLoco = myBot.GetLocomotionInterface();
+	
+	if (!myLoco.IsOnGround() || myLoco.IsClimbingOrJumping())
+		return;
+	
+	if (m_ctAttackStrafeFlip[actor] < GetGameTime())
+	{
+		m_ctAttackStrafeFlip[actor] = GetGameTime() + GetRandomFloat(ATTACK_STRAFE_FLIP_MIN, ATTACK_STRAFE_FLIP_MAX);
+		m_bAttackStrafeRight[actor] = !m_bAttackStrafeRight[actor];
+	}
+	
+	float myOrigin[3]; myOrigin = GetAbsOrigin(actor);
+	float toTarget[3]; SubtractVectors(targetOrigin, myOrigin, toTarget);
+	
+	toTarget[2] = 0.0;
+	
+	if (NormalizeVector(toTarget, toTarget) < 1.0)
+		return;
+	
+	//Square to the way it is facing, in the plane it walks on
+	float side[3];
+	side[0] = m_bAttackStrafeRight[actor] ? -toTarget[1] : toTarget[1];
+	side[1] = m_bAttackStrafeRight[actor] ? toTarget[0] : -toTarget[0];
+	side[2] = 0.0;
+	
+	float step[3];
+	
+	for (int axis = 0; axis < 3; axis++)
+		step[axis] = myOrigin[axis] + side[axis] * ATTACK_STRAFE_REACH;
+	
+	//Turn round early rather than walk into whatever is there, or off it
+	if (!myLoco.IsPotentiallyTraversable(myOrigin, step, IMMEDIATELY) || myLoco.HasPotentialGap(myOrigin, step))
+	{
+		m_ctAttackStrafeFlip[actor] = GetGameTime();
+		
+		return;
+	}
+	
+	myLoco.Approach(step);
 }
 
 bool CTFBotDefenderAttack_SelectTarget(int actor, bool bBombCarrierOnly = false)

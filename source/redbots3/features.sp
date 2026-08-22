@@ -28,6 +28,7 @@ enum
 	FEATURE_READY_WHEN_PREPARED,
 	FEATURE_WAVE_RESISTANCES,
 	FEATURE_DEMO_HOLD_FIRE,
+	FEATURE_ATTACK_STRAFE,
 	FEATURE_COUNT
 }
 
@@ -41,7 +42,8 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"nest_zones",
 	"ready_when_prepared",
 	"wave_resistances",
-	"demo_hold_fire"
+	"demo_hold_fire",
+	"attack_strafe"
 };
 
 static ConVar g_arrFeatureConVars[FEATURE_COUNT];
@@ -80,6 +82,9 @@ void LoadFeatures()
 
 	g_arrFeatureConVars[FEATURE_DEMO_HOLD_FIRE] = MakeFeature(FEATURE_DEMO_HOLD_FIRE,
 		"The Demoman holds his pipes until the target is near enough for one to arrive.");
+
+	g_arrFeatureConVars[FEATURE_ATTACK_STRAFE] = MakeFeature(FEATURE_ATTACK_STRAFE,
+		"A bot that has arrived at its firing position keeps sidestepping instead of standing still.");
 
 	/* What is on, as one string, for whoever reads the results later
 
