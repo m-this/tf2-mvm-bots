@@ -729,6 +729,28 @@ static void UpdateDefenderReadiness(int actor)
 	SetPlayerReady(actor, false);
 }
 
+/* Whether leaving the fight to find a pack is worth what the walk costs the team
+
+For everybody it is. For a medic it almost never is: he heals himself, three health a second and
+six once he has been out of it a while, so the pack buys him what standing still would have bought
+him anyway. What it costs is the medigun, for the length of a trip that the search range prices at
+up to two thousand units.
+
+Coaltown is why this is written down. The health pack there is in the house in the middle of the
+map, so a medic who took eighty percent of a rocket left the front line and walked to the exact
+spot he has now been reported standing in three times. Ammo goes with it: the medigun does not use
+any and the syringe gun is what he holds when there is nobody to heal.
+
+Below the critical ratio he goes anyway. A medic who dies takes the medigun with him for the rest
+of the wave, which is worse than any trip. */
+static bool ShouldLeaveToBePatchedUp(int client, float healthRatio)
+{
+	if (TF2_GetPlayerClass(client) != TFClass_Medic)
+		return true;
+
+	return healthRatio < tf_bot_health_critical_ratio.FloatValue;
+}
+
 public Action CTFBotTacticalMonitor_Update(BehaviorAction action, int actor, float interval, ActionResult result)
 {
 	if (g_bIsDefenderBot[actor] == false)
@@ -798,7 +820,7 @@ public Action CTFBotTacticalMonitor_Update(BehaviorAction action, int actor, flo
 		else if (health_ratio < tf_bot_health_ok_ratio.FloatValue)
 			low_health = true;
 		
-		if (low_health && CTFBotGetHealth_IsPossible(actor))
+		if (low_health && ShouldLeaveToBePatchedUp(actor, health_ratio) && CTFBotGetHealth_IsPossible(actor))
 			return action.SuspendFor(CTFBotGetHealth(), "Getting health");
 		else
 		{
@@ -810,7 +832,7 @@ public Action CTFBotTacticalMonitor_Update(BehaviorAction action, int actor, flo
 				if (!HasAmmo(primary) && CTFBotGetAmmo_IsPossible(actor))
 					return action.SuspendFor(CTFBotGetAmmo(), "Get ammo for crit");
 			}
-			else if (IsAmmoLow(actor) && CTFBotGetAmmo_IsPossible(actor))
+			else if (IsAmmoLow(actor) && ShouldLeaveToBePatchedUp(actor, health_ratio) && CTFBotGetAmmo_IsPossible(actor))
 			{
 				//Go for ammo when we're low and nearby packs are available
 				return action.SuspendFor(CTFBotGetAmmo(), "Getting ammo");

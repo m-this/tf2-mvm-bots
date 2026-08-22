@@ -494,7 +494,21 @@ with a wall on one side is reached from another.
 
 Shared because the dispenser, the teleporter and the sentry all need it, and they all learned it
 separately before anybody wrote it down once. */
-void BuildStandPoint(const float spot[3], const float from[3], int attempt, int attempts, float reach, float stand[3])
+/* How far off the ring point the nav mesh may be, and how much height still counts as beside it
+
+A spot on raised ground has ninety units of thin air around it, and the height of the ring point
+used to be the height of the spot whatever was underneath. Coaltown's right-hand building is where
+that showed: the engineer paths at a coordinate hanging over the floor below, the nav mesh walks
+him to the ground in front of the building instead, and the arrival test never comes true. He
+stands there holding the toolbox until the give-up clock runs out. Reported from play.
+
+So the point is put wherever the nav mesh says the ground is, and refused when that ground is a
+storey off the spot: standing under a ledge is not standing beside it, and the next side round is
+a better answer than a building placed from down there. */
+#define BUILD_STAND_SEARCH	120.0
+#define BUILD_STAND_STOREY	100.0
+
+bool BuildStandPoint(const float spot[3], const float from[3], int attempt, int attempts, float reach, float stand[3])
 {
 	float away[3]; SubtractVectors(from, spot, away);
 	
@@ -512,6 +526,20 @@ void BuildStandPoint(const float spot[3], const float from[3], int attempt, int 
 	stand[0] = spot[0] + Cosine(yaw) * reach;
 	stand[1] = spot[1] + Sine(yaw) * reach;
 	stand[2] = spot[2];
+	
+	CNavArea area = TheNavMesh.GetNearestNavArea(stand, false, BUILD_STAND_SEARCH, false, true, TEAM_ANY);
+	
+	if (area == NULL_AREA)
+		return false;
+	
+	float ground[3]; area.GetClosestPointOnArea(stand, ground);
+	
+	if (FloatAbs(ground[2] - spot[2]) > BUILD_STAND_STOREY)
+		return false;
+	
+	stand = ground;
+	
+	return true;
 }
 
 /* The RED spawn nearest the engineer, for a map that names no teleporter entrance
@@ -2873,6 +2901,31 @@ stock bool IsMeleeWeapon(int entity)
 stock bool IsZeroVector(float origin[3])
 {
 	return origin[0] == NULL_VECTOR[0] && origin[1] == NULL_VECTOR[1] && origin[2] == NULL_VECTOR[2];
+}
+
+/* Every action the bot is running, innermost first, for the dump commands
+
+Reasoning about which behaviour has a bot from the outside is guesswork, and this session spent two
+rounds of it on one medic. The stack says it outright. */
+static char m_sActionStack[512];
+
+static void CollectActionName(BehaviorAction action)
+{
+	char name[ACTION_NAME_LENGTH]; action.GetName(name, sizeof(name));
+	
+	if (m_sActionStack[0] != '\0')
+		StrCat(m_sActionStack, sizeof(m_sActionStack), " < ");
+	
+	StrCat(m_sActionStack, sizeof(m_sActionStack), name);
+}
+
+stock void ActionStackOf(int client, char[] buffer, int maxlength)
+{
+	m_sActionStack[0] = '\0';
+	
+	ActionsManager.Iterator(client, CollectActionName);
+	
+	strcopy(buffer, maxlength, m_sActionStack);
 }
 
 /* How long an engineer's walk to a build spot is allowed to take

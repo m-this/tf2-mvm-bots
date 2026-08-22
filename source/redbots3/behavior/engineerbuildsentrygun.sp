@@ -216,13 +216,23 @@ public Action CTFBotMvMEngineerBuildSentrygun_Update(BehaviorAction action, int 
 	return action.Done("Built a sentry");
 }
 
-//Where the sentry goes and where he stands to put it there, on the side this attempt asks for
+/* Where the sentry goes and where he stands to put it there, on a side he can stand on
+
+Sides with nothing walkable under them are skipped rather than walked at: a nest on raised ground
+has thin air around it, and pathing at a coordinate in mid-air puts the engineer on the floor below
+holding the toolbox until a clock saves him. Bounded by the number of sides there are. */
 static void SentryStandPoint(int actor)
 {
 	NestBuildPosition(m_aNestArea[actor], m_vSentrySpot[actor]);
 	
-	BuildStandPoint(m_vSentrySpot[actor], GetAbsOrigin(actor), m_iSentryTry[actor],
-		SENTRY_TRY_POINTS, SENTRY_BUILD_REACH, m_vSentryStand[actor]);
+	for (int skipped = 0; skipped < SENTRY_TRY_POINTS; skipped++)
+	{
+		if (BuildStandPoint(m_vSentrySpot[actor], GetAbsOrigin(actor), m_iSentryTry[actor],
+			SENTRY_TRY_POINTS, SENTRY_BUILD_REACH, m_vSentryStand[actor]))
+			return;
+		
+		m_iSentryTry[actor] = (m_iSentryTry[actor] + 1) % SENTRY_TRY_POINTS;
+	}
 }
 
 public void CTFBotMvMEngineerBuildSentrygun_OnEnd(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
