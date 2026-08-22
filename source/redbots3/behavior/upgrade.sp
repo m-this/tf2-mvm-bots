@@ -399,6 +399,19 @@ void CollectUpgrades(int client)
 		/////
 		
 		int index = FindPriorityIndex(CTFPlayerUpgrades[client], "priority", minimum);
+		
+		/* The only way out of this loop, so it is worth saying what happens when it is not there
+		
+		The priority came out of an element of this list, so it is found. If it ever is not,
+		Remove(-1) throws out of the callback and the loop that was supposed to be draining the
+		list has not removed anything: the shopping list is left half sorted and the next call
+		starts again on it. Better to stop with the list intact and say so. */
+		if (index < 0)
+		{
+			LogError("SortPlayerUpgrades: priority %d is in the list and then is not, for %L", minimum, client);
+			break;
+		}
+		
 		CTFPlayerUpgrades[client].Remove(index);
 	}
     
