@@ -759,15 +759,29 @@ bool CTFBotMvMEngineerIdle_ShouldAdvanceNestSpot(int actor)
 	if (m_aNestArea[actor] == NULL_AREA)
 		return false;
 	
+	int obj = GetObjectOfType(actor, TFObject_Sentry);
+	
+	/* Nothing to advance, and saying otherwise stopped him building at all
+	
+	The idle action asks this first and returns without doing anything when the answer is yes,
+	because advancing is the thing it is about to do. An engineer whose sentry has just been
+	destroyed has nothing to move, so the answer has to be no: it was yes, and he stood in the
+	middle of Bigrock for the rest of the wave with no sentry, no dispenser, and every branch that
+	would have built one behind that return.
+	
+	It was expensive as well as wrong. Two frames of that is two calls to PickBuildArea, and
+	PickBuildArea calls GetBombInfo, which walks every nav area on the map. Sixty-six times a
+	second, twice, per engineer, for as long as he had no sentry. */
+	if (obj == INVALID_ENT_REFERENCE)
+		return false;
+	
 	if (m_ctAdvanceNestSpot[actor] <= 0.0)
 	{
 		m_ctAdvanceNestSpot[actor] = GetGameTime() + 5.0;
 		return false;
 	}
 	
-	int obj = GetObjectOfType(actor, TFObject_Sentry);
-	
-	if (obj != INVALID_ENT_REFERENCE && BaseEntity_GetHealth(obj) < TF2Util_GetEntityMaxHealth(obj))
+	if (BaseEntity_GetHealth(obj) < TF2Util_GetEntityMaxHealth(obj))
 	{
 		m_ctAdvanceNestSpot[actor] = GetGameTime() + 5.0;
 		return false;
