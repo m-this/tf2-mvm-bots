@@ -123,6 +123,38 @@ now, `attack_strafe` was doing the work. The cap is gone.
 The lesson generalises past this file: a pair that wins together says nothing
 about either half, and `testbed/ab.sh` says so in its own header. Split it.
 
+## What worked: letting the pipes go while he is still turning
+
+Explosives carry a second fire gate that no hitscan weapon does. `IsHeadSteady`
+requires the aim to have stopped moving, and it is invalidated by any eye
+movement above a small per-frame rate, so a bot following a walking robot rarely
+qualifies.
+
+Lifting it, twelve waves on two maps:
+
+```
+                       demoman dmg (shots, acc)    soldier dmg (shots, acc)
+ON  (fire tracking)      19754 (409, 46%)            9602 (296, 34%)
+OFF (wait for steady)    17905 (384, 43%)           14023 (313, 48%)
+```
+
+**The two weapons want opposite answers.** The Demoman gained on both maps
+independently and his hit rate went *up*. The Soldier lost a third of his
+damage with his hit rate falling 48% to 34%.
+
+A pipe arcs, bursts wide and is usually thrown at a group, so one released
+mid-turn still lands somewhere worth landing. A rocket is fast and flat:
+released mid-turn it arrives where the head was pointing and hits nothing.
+
+So the gate is lifted for the grenade and sticky launchers and kept for
+rockets. Not a feature switch — the weapon decides.
+
+One hypothesis died here and is worth recording: this was expected to raise
+their *rate* of fire, and it did not. Shots went 384 to 409 for the Demoman and
+313 to 296 for the Soldier. `IsHeadSteady` was never the throttle. A Demoman
+firing forty five pipes in a wave from a launcher that reloads in six tenths of
+a second is still unexplained.
+
 ## Still open
 
 The Soldier's rocket launcher has no entry in `weapon_tuning.sp` and falls
