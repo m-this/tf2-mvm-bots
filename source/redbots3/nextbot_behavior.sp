@@ -2700,8 +2700,33 @@ gate on looking at all, which is where the cost is */
 //Far enough up the path that the walk back to the entrance is bought back by the ride
 #define TELEPORTER_WORTH_RIDING	1500.0
 
+/* How far from his nest an engineer with nothing standing is worth teleporting rather than walking
+ *
+ * Measured on Coaltown over six waves: the team had no sentry for 58 percent of the samples, and
+ * of that time a third was the engineer being dead and more than half was him alive and walking
+ * back. The nests are three and a half thousand units from the spawn and he had built a level
+ * three teleporter to cover exactly that, which the gate below never offered him because it asks
+ * only about the bomb.
+ */
+#define ENGINEER_RIDE_HOME_RANGE	1500.0
+
 static bool ShouldUseTeleporter(int client)
 {
+	/* An engineer with no nest has somewhere to be and it is not the bomb
+	
+	Everything below decides whether a fighter is behind the fight. His question is different: the
+	sentry is not standing, the ground it stands on is at the other end of the map, and his own
+	teleporter goes there. */
+	if (Feature(FEATURE_ENGINEER_RIDES_HOME) && TF2_GetPlayerClass(client) == TFClass_Engineer
+		&& GetObjectOfType(client, TFObject_Sentry) == INVALID_ENT_REFERENCE)
+	{
+		float nest[3];
+		
+		if (EngineerNestPosition(client, nest)
+			&& GetVectorDistance(GetAbsOrigin(client), nest) > ENGINEER_RIDE_HOME_RANGE)
+			return true;
+	}
+	
 	BombInfo_t bombinfo;
 
 	//No bomb in play, so there is no fight to be late for and no reason to leave the ground

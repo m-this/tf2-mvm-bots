@@ -184,16 +184,38 @@ func innermost(stack string) string {
 		return "none"
 	}
 
+	// Ranked rather than positional. The iterator's order is not a dependable
+	// nesting order: DefenderGotoUpgrade has been seen listed before its own
+	// parent ScenarioMonitor, so both "first Defender" and "last Defender" pick
+	// the wrong one some of the time. That misread an engineer sat inside a
+	// build action as sitting in the idle action that suspended for it, which
+	// is the difference between "he never tried" and "he tried and it never
+	// finished".
 	parts := strings.Split(stack, " < ")
 	answer := ""
+	rank := 0
 
 	for _, p := range parts {
-		if strings.HasPrefix(p, "Defender") {
+		r := 0
+
+		switch {
+		case scaffolding[p]:
+			r = 0
+		case p == "DefenderEngineerIdle" || p == "DefenderSpyLurkMvM":
+			r = 1 // a holding pattern that suspends for the real work
+		case strings.HasPrefix(p, "Defender"):
+			r = 2
+		default:
+			r = 1
+		}
+
+		if r >= rank {
+			rank = r
 			answer = p
 		}
 	}
 
-	if answer != "" {
+	if answer != "" && rank > 0 {
 		return answer
 	}
 
