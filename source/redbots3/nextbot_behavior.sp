@@ -1934,8 +1934,17 @@ float GetDesiredAttackRange(int client)
 	if (WeaponID_IsSniperRifle(weaponID))
 		return FLT_MAX;
 	
+	/* How far out a rocket is worth firing, which is not as far as it will travel
+	
+	Twelve hundred and fifty units is over a second of flight, and everything a defender shoots at
+	is walking. The blast covers a hundred and forty six of them, so a robot at that range has left
+	the splash before the rocket arrives unless it is walking straight at him.
+	
+	The Demoman fights the same shape of weapon at six hundred and out-damages the Soldier by half
+	again, on a weapon with a slower projectile and an arc on top. That is the comparison this is
+	drawn from. */
 	if (weaponID == TF_WEAPON_ROCKETLAUNCHER)
-		return 1250.0;
+		return Feature(FEATURE_SOLDIER_CLOSES_IN) ? SOLDIER_ROCKET_SETTLE : 1250.0;
 	
 	//The same answer as the Iron Bomber, which is the launcher this loadout actually hands out
 	if (weaponID == TF_WEAPON_GRENADELAUNCHER)

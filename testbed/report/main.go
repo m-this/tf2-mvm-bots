@@ -36,6 +36,17 @@ type wave struct {
 	SentriesLost      int `json:"sentries_lost"`
 	BusterDetonations int `json:"buster_detonations"`
 
+	SoldierRocket int `json:"soldier_rocket_damage"`
+	SoldierOther  int `json:"soldier_other_damage"`
+	FiredSoldier  int `json:"fired_soldier"`
+	HitSoldier    int `json:"hit_soldier"`
+	FiredDemoman  int `json:"fired_demoman"`
+	HitDemoman    int `json:"hit_demoman"`
+
+	DemoPipe   int `json:"demo_pipe_damage"`
+	DemoSticky int `json:"demo_sticky_damage"`
+	DemoMelee  int `json:"demo_melee_damage"`
+
 	Damage       int `json:"damage"`
 	TankDamage   int `json:"tank_damage"`
 	SentryDamage int `json:"sentry_damage"`
@@ -134,6 +145,9 @@ type summary struct {
 	kills, giants, deaths, stabs          int
 	sentriesLost, busters                 int
 	damage, tankDamage, sentryDamage      int
+	demoPipe, demoSticky, demoMelee       int
+	solRocket, solOther                   int
+	firedSol, hitSol, firedDemo, hitDemo  int
 	healing, ubers                        int
 	damageBy, killsBy, giantsBy, killedBy map[string]int
 	causeBy                               map[string]int
@@ -161,6 +175,15 @@ func summarise(waves []wave) summary {
 		s.sentriesLost += w.SentriesLost
 		s.busters += w.BusterDetonations
 		s.damage += w.Damage
+		s.demoPipe += w.DemoPipe
+		s.demoSticky += w.DemoSticky
+		s.demoMelee += w.DemoMelee
+		s.solRocket += w.SoldierRocket
+		s.solOther += w.SoldierOther
+		s.firedSol += w.FiredSoldier
+		s.hitSol += w.HitSoldier
+		s.firedDemo += w.FiredDemoman
+		s.hitDemo += w.HitDemoman
 		s.tankDamage += w.TankDamage
 		s.sentryDamage += w.SentryDamage
 		s.healing += w.Healing
@@ -254,6 +277,25 @@ func print(name string, s summary) {
 	fmt.Printf("  giants by class   %s\n", ranked(s.giantsBy))
 	fmt.Printf("  killed us         %s\n", ranked(s.killedBy))
 	fmt.Printf("  died to           %s\n", ranked(s.causeBy))
+
+	// The demoman's two weapons apart, because "he is the weakest class" does
+	// not say whether the pipes miss or the stickies are never detonated.
+	if s.demoPipe+s.demoSticky+s.demoMelee > 0 {
+		fmt.Printf("  demoman damage    pipes %d, stickies %d, bottle %d\n",
+			s.demoPipe, s.demoSticky, s.demoMelee)
+	}
+
+	if s.solRocket+s.solOther > 0 {
+		fmt.Printf("  soldier damage    rockets %d, everything else %d\n", s.solRocket, s.solOther)
+	}
+
+	// The question a damage total cannot answer: is he not shooting, or is he
+	// shooting and missing?
+	if s.firedSol+s.firedDemo > 0 {
+		fmt.Printf("  projectiles       soldier %d fired, %d hit (%d%%);  demoman %d fired, %d hit (%d%%)\n",
+			s.firedSol, s.hitSol, pct(s.hitSol, s.firedSol),
+			s.firedDemo, s.hitDemo, pct(s.hitDemo, s.firedDemo))
+	}
 
 	// Printed only when it happened, because a zero here is the normal case and a
 	// line of zeroes in every report is a line nobody reads.

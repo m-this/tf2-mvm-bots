@@ -239,30 +239,49 @@ static bool WearHat(int client)
  * The equip cannot be tested in advance, so the leak is swept instead of prevented. Anything of
  * ours whose owner is not a player in the game is nobody's hat.
  */
+//As many as one pass will look at, and as many as it will take away
 #define ORPHAN_WEARABLE_SWEEP	64
 
+/* Collected first and removed afterwards, and the scan itself is what is bounded
+ *
+ * The first version of this removed as it walked and counted removals against the bound. Both
+ * halves were wrong. FindEntityByClassname takes the previous entity as its cursor, and the
+ * previous entity had just been deleted, so the walk restarted from the beginning; and a bound on
+ * removals is not a bound on iterations, so a wearable somebody was wearing sent it round for
+ * ever. The server's watchdog killed a run inside a minute.
+ *
+ * This file's own rule, from the top of the repository: every loop gets a fixed upper bound.
+ */
 void RemoveOrphanedWearables()
 {
-	int hat = -1;
-	int removed = 0;
+	int found[ORPHAN_WEARABLE_SWEEP];
+	int count = 0;
+	int seen = 0;
 	
-	while ((hat = FindEntityByClassname(hat, "tf_wearable")) != -1 && removed < ORPHAN_WEARABLE_SWEEP)
+	int hat = -1;
+	
+	while ((hat = FindEntityByClassname(hat, "tf_wearable")) != -1 && ++seen <= ORPHAN_WEARABLE_SWEEP)
 	{
 		int owner = GetEntPropEnt(hat, Prop_Send, "m_hOwnerEntity");
 		
-		if (owner > 0 && owner <= MaxClients && IsClientInGame(owner))
-			continue;
-		
-		//A wearable still being handed out this frame is not an orphan yet
+		//Somebody is wearing it, or it is still being handed out this frame
 		if (owner > 0)
 			continue;
 		
-		RemoveEntity(hat);
-		removed++;
+		if (count < ORPHAN_WEARABLE_SWEEP)
+			found[count++] = EntIndexToEntRef(hat);
 	}
 	
-	if (removed > 0 && redbots_manager_debug.BoolValue)
-		LogMessage("[cosmetics] swept %d wearable(s) nobody was wearing", removed);
+	for (int i = 0; i < count; i++)
+	{
+		int orphan = EntRefToEntIndex(found[i]);
+		
+		if (orphan != INVALID_ENT_REFERENCE && IsValidEntity(orphan))
+			RemoveEntity(orphan);
+	}
+	
+	if (count > 0 && redbots_manager_debug.BoolValue)
+		LogMessage("[cosmetics] swept %d wearable(s) nobody was wearing", count);
 }
 
 /* Take the hat off the way the game does it

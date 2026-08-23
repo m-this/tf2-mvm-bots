@@ -76,6 +76,9 @@ public Plugin myinfo =
 	url = "https://github.com/m-this/tf2-mvm-bots"
 };
 
+//The projectile whose hit was counted last, so one blast into a crowd is one hit
+static int g_iLastCountedProjectile = -1;
+
 ConVar g_cvPath;
 
 char g_sMap[PLATFORM_MAX_PATH];
@@ -133,6 +136,23 @@ enum struct WaveCounters
 	Self damage separates the two without an opinion in it. A class with a column here is a class
 	whose own weapon is one of the things killing it, and the number is comparable between two
 	builds, which is the whole point. */
+	/* The Demoman's two weapons, counted apart
+	
+	He is the weakest seat on the team by damage and has two entirely different ways of dealing it,
+	and "demoman 1608 a wave" cannot say whether the pipes are missing or the stickies are never
+	detonated. The inflictor is already in hand here, so the split costs nothing. */
+	int demoPipeDamage;
+	int demoStickyDamage;
+	int demoMeleeDamage;
+	int soldierRocketDamage;
+	int soldierOtherDamage;
+	/* Explosive projectiles thrown, against the ones that hurt something
+	
+	The Soldier and the Demoman are the two seats that fight with an arcing projectile and they are
+	the two lowest scoring seats on the team. "He does a thousand a wave" cannot tell a bot that
+	never shoots from a bot whose every shot goes past the robot, and those want opposite fixes. */
+	int projectilesFired[view_as<int>(TFClass_Engineer) + 1];
+	int projectilesHit[view_as<int>(TFClass_Engineer) + 1];
 	int selfDamageByClass[view_as<int>(TFClass_Engineer) + 1];
 	int selfDeathsByClass[view_as<int>(TFClass_Engineer) + 1];
 	/* Who killed what, on both sides
@@ -176,6 +196,17 @@ enum struct WaveCounters
 		this.healingDone = 0;
 		this.ubersDeployed = 0;
 		
+		this.demoPipeDamage = 0;
+		this.demoStickyDamage = 0;
+		this.demoMeleeDamage = 0;
+		this.soldierRocketDamage = 0;
+		this.soldierOtherDamage = 0;
+		
+		for (int i = 0; i < sizeof(this.projectilesFired); i++)
+		{
+			this.projectilesFired[i] = 0;
+			this.projectilesHit[i] = 0;
+		}
 		this.deathsToSentry = 0;
 		this.deathsToTank = 0;
 		
@@ -581,7 +612,10 @@ static void WriteWaveResult(const char[] result)
 		... "\"selfdamage_medic\":%d,\"selfdamage_sniper\":%d,\"selfdamage_spy\":%d,"
 		... "\"selfdeaths_scout\":%d,\"selfdeaths_soldier\":%d,\"selfdeaths_pyro\":%d,"
 		... "\"selfdeaths_demoman\":%d,\"selfdeaths_heavy\":%d,\"selfdeaths_engineer\":%d,"
-		... "\"selfdeaths_medic\":%d,\"selfdeaths_sniper\":%d,\"selfdeaths_spy\":%d}",
+		... "\"selfdeaths_medic\":%d,\"selfdeaths_sniper\":%d,\"selfdeaths_spy\":%d,"
+		... "\"demo_pipe_damage\":%d,\"demo_sticky_damage\":%d,\"demo_melee_damage\":%d,"
+		... "\"soldier_rocket_damage\":%d,\"soldier_other_damage\":%d,"
+		... "\"fired_soldier\":%d,\"hit_soldier\":%d,\"fired_demoman\":%d,\"hit_demoman\":%d}",
 		g_sMap, g_iWave, result, duration,
 		g_Wave.robotKills, g_Wave.giantKills, g_Wave.tankKills, g_Wave.sentryKills,
 		g_Wave.defenderDeaths, g_Wave.backstabs, g_Wave.busterDetonations,
@@ -651,7 +685,13 @@ static void WriteWaveResult(const char[] result)
 		g_Wave.selfDeathsByClass[view_as<int>(TFClass_Engineer)],
 		g_Wave.selfDeathsByClass[view_as<int>(TFClass_Medic)],
 		g_Wave.selfDeathsByClass[view_as<int>(TFClass_Sniper)],
-		g_Wave.selfDeathsByClass[view_as<int>(TFClass_Spy)]);
+		g_Wave.selfDeathsByClass[view_as<int>(TFClass_Spy)],
+		g_Wave.demoPipeDamage, g_Wave.demoStickyDamage, g_Wave.demoMeleeDamage,
+		g_Wave.soldierRocketDamage, g_Wave.soldierOtherDamage,
+		g_Wave.projectilesFired[view_as<int>(TFClass_Soldier)],
+		g_Wave.projectilesHit[view_as<int>(TFClass_Soldier)],
+		g_Wave.projectilesFired[view_as<int>(TFClass_DemoMan)],
+		g_Wave.projectilesHit[view_as<int>(TFClass_DemoMan)]);
 
 	WriteLine(line);
 
@@ -777,6 +817,43 @@ public void OnEntityCreated(int entity, const char[] classname)
 	//Tanks are not players, so nothing else here would ever see damage done to one
 	if (StrEqual(classname, "tank_boss"))
 		SDKHook(entity, SDKHook_OnTakeDamagePost, OnTankDamagePost);
+	
+	if (IsCountedProjectile(classname))
+		RequestFrame(Frame_CountProjectile, EntIndexToEntRef(entity));
+}
+
+//Whether this is one of the arcing projectiles whose hit rate is worth knowing
+static bool IsCountedProjectile(const char[] classname)
+{
+	return StrEqual(classname, "tf_projectile_rocket")
+		|| StrEqual(classname, "tf_projectile_pipe")
+		|| StrEqual(classname, "tf_projectile_pipe_remote");
+}
+
+/* Counted a frame later, because the owner is not set when the entity is created
+ *
+ * OnEntityCreated fires before the game attaches the projectile to whoever fired it, so asking for
+ * the owner here answers nobody for every shot in the mission.
+ */
+static void Frame_CountProjectile(any ref)
+{
+	int projectile = EntRefToEntIndex(ref);
+	
+	if (projectile == INVALID_ENT_REFERENCE || !IsValidEntity(projectile))
+		return;
+	
+	int owner = GetEntPropEnt(projectile, Prop_Send, "m_hOwnerEntity");
+	
+	if (owner < 1 || owner > MaxClients || !IsClientInGame(owner))
+		return;
+	
+	if (TF2_GetClientTeam(owner) != TFTeam_Red)
+		return;
+	
+	int class = view_as<int>(TF2_GetPlayerClass(owner));
+	
+	if (class >= 0 && class < sizeof(g_Wave.projectilesFired))
+		g_Wave.projectilesFired[class]++;
 }
 
 static void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
@@ -786,15 +863,25 @@ static void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast
 	if (client < 1 || !IsClientInGame(client))
 		return;
 	
-	//Only the robots need hooking: what we are counting is damage the defenders put into them
-	if (TF2_GetClientTeam(client) != TFTeam_Blue)
-		return;
+	/* Both teams, for two different counts
 	
-	SDKUnhook(client, SDKHook_OnTakeDamagePost, OnRobotDamagePost);
-	SDKHook(client, SDKHook_OnTakeDamagePost, OnRobotDamagePost);
+	The robots are hooked for the damage the defenders put into them. The defenders are hooked for
+	the damage they put into themselves, and that hook used to sit behind the return below: it was
+	attached to robots only, so it could never once fire, and the results file reported that nobody
+	had ever hurt themselves while the same file counted Demomen killing themselves. A measurement
+	that cannot produce a number looks exactly like a number of zero. */
+	TFTeam team = TF2_GetClientTeam(client);
 	
-	SDKUnhook(client, SDKHook_OnTakeDamagePost, OnDefenderDamagePost);
-	SDKHook(client, SDKHook_OnTakeDamagePost, OnDefenderDamagePost);
+	if (team == TFTeam_Blue)
+	{
+		SDKUnhook(client, SDKHook_OnTakeDamagePost, OnRobotDamagePost);
+		SDKHook(client, SDKHook_OnTakeDamagePost, OnRobotDamagePost);
+	}
+	else if (team == TFTeam_Red)
+	{
+		SDKUnhook(client, SDKHook_OnTakeDamagePost, OnDefenderDamagePost);
+		SDKHook(client, SDKHook_OnTakeDamagePost, OnDefenderDamagePost);
+	}
 }
 
 static void OnRobotDamagePost(int victim, int attacker, int inflictor, float damage, int damagetype)
@@ -852,6 +939,37 @@ static void CountDefenderDamage(int attacker, int inflictor, float damage, bool 
 		
 		if (StrEqual(classname, "obj_sentrygun"))
 			g_Wave.sentryDamage += amount;
+		
+		if (class == view_as<int>(TFClass_DemoMan))
+		{
+			if (StrEqual(classname, "tf_projectile_pipe_remote"))
+				g_Wave.demoStickyDamage += amount;
+			else if (StrEqual(classname, "tf_projectile_pipe"))
+				g_Wave.demoPipeDamage += amount;
+		}
+		else if (class == view_as<int>(TFClass_Soldier) && StrEqual(classname, "tf_projectile_rocket"))
+		{
+			g_Wave.soldierRocketDamage += amount;
+		}
+		
+		/* One projectile counts as one hit however many robots it catches
+		
+		Otherwise a rocket into a crowd reads as five hits and the rate goes over a hundred. */
+		if (IsCountedProjectile(classname) && inflictor != g_iLastCountedProjectile)
+		{
+			g_iLastCountedProjectile = inflictor;
+			
+			if (class >= 0 && class < sizeof(g_Wave.projectilesHit))
+				g_Wave.projectilesHit[class]++;
+		}
+	}
+	else if (inflictor == attacker)
+	{
+		//The inflictor is the man himself, which means a hitscan weapon or a swing
+		if (class == view_as<int>(TFClass_DemoMan))
+			g_Wave.demoMeleeDamage += amount;
+		else if (class == view_as<int>(TFClass_Soldier))
+			g_Wave.soldierOtherDamage += amount;
 	}
 }
 
@@ -1094,6 +1212,33 @@ static int TeammatesServedBy(const float at[3], float range)
 	return count;
 }
 
+/* How close the nearest robot is, which is the whole of "is he standing too far forward"
+ *
+ * A Soldier and a Demoman fight with a projectile that arcs and splashes. Too far and it lands
+ * behind a moving robot; too close and the splash is on the man who fired it. Neither is visible
+ * from a damage total, and both have been guessed at.
+ */
+static float RangeToNearestEnemy(int client)
+{
+	float mine[3]; GetClientAbsOrigin(client, mine);
+	float best = -1.0;
+	
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || !IsPlayerAlive(i) || TF2_GetClientTeam(i) != TFTeam_Blue)
+			continue;
+		
+		float theirs[3]; GetClientAbsOrigin(i, theirs);
+		
+		float range = GetVectorDistance(mine, theirs);
+		
+		if (best < 0.0 || range < best)
+			best = range;
+	}
+	
+	return best;
+}
+
 static void WriteBotTelemetry(int client, float when, float clock)
 {
 	float at[3]; GetClientAbsOrigin(client, at);
@@ -1127,10 +1272,10 @@ static void WriteBotTelemetry(int client, float when, float clock)
 	FormatEx(line, sizeof(line),
 		"{\"event\":\"bot\",\"map\":\"%s\",\"wave\":%d,\"t\":%.1f,\"clock\":%.1f,\"who\":\"%s\",\"class\":\"%s\","
 		... "\"at\":[%.0f,%.0f,%.0f],\"hp\":%d,\"maxhp\":%d,\"weapon\":\"%s\",\"slot\":%d,"
-		... "\"healing\":\"%s\",\"action\":\"%s\"}",
+		... "\"nearest_enemy\":%.0f,\"healing\":\"%s\",\"action\":\"%s\"}",
 		g_sMap, g_iWave, when, clock, name, ClassName(TF2_GetPlayerClass(client)),
 		at[0], at[1], at[2], GetClientHealth(client), TF2Util_GetEntityMaxHealth(client),
-		weaponClass, slot, healing, stack);
+		weaponClass, slot, RangeToNearestEnemy(client), healing, stack);
 
 	WriteLine(line);
 }
