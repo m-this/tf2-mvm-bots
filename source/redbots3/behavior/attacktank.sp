@@ -251,8 +251,16 @@ stock bool IsBlastWeapon(int weapon)
 	
 	switch (TF2Util_GetWeaponID(weapon))
 	{
+		/* The stickybomb launcher is the one this list was missing, and it is the one that mattered
+		
+		Its only caller is the tank standoff, which exists because soldiers were killing themselves
+		on hulls. The Demoman was never covered by it: he scored the sticky launcher highest of
+		anything for a tank, walked to the hull because a weapon that is not a blast weapon needs no
+		standoff, laid eight bombs on it and pressed the button. He is the worst self-harmer on the
+		team by an order of magnitude and this is half of why. Not a switch: a bomb that does splash
+		damage is a blast weapon, and saying otherwise was simply wrong. */
 		case TF_WEAPON_ROCKETLAUNCHER, TF_WEAPON_GRENADELAUNCHER, TF_WEAPON_DIRECTHIT,
-			TF_WEAPON_PARTICLE_CANNON, TF_WEAPON_CANNON:
+			TF_WEAPON_PARTICLE_CANNON, TF_WEAPON_CANNON, TF_WEAPON_PIPEBOMBLAUNCHER:
 			return true;
 	}
 	
@@ -388,13 +396,19 @@ int EvalTankWeapon_Demo(int slot, int weapon)
 		{
 			return 100;
 		}
-		/* A tank is the one target a bot cannot miss, so the clip is worth more than the aim
-		Eight stickies on the hull and one press is the most damage a Demoman does to anything in
-		this mode. This scored zero, below the melee, which is how a bot with a stickybomb
-		launcher ended up hitting a tank with a bottle */
+		/* Eight stickies on a hull is the most damage a Demoman can do, and he pays for it
+		
+		A tank is the one target a bot cannot miss, so the clip was scored above the aim: 110,
+		ahead of the grenade launcher. Laying stickies on a hull means standing on the hull, and
+		detonating them there means standing in the blast. He is the worst self-harmer on the team
+		by an order of magnitude, 2571 points and four suicides across six waves against 187 for
+		the next worst, and it was a person watching him do it who said so first.
+		
+		The pipes reach the same tank from outside his own splash. Switched rather than deleted
+		because the clip argument above is not obviously wrong, only unmeasured. */
 		case TF_WEAPON_PIPEBOMBLAUNCHER:
 		{
-			return 110;
+			return Feature(FEATURE_DEMO_TANK_PIPES) ? 0 : 110;
 		}
 		case TF_WEAPON_BOTTLE, TF_WEAPON_SHOVEL, TF_WEAPON_SWORD, TF_WEAPON_STICKBOMB:
 		{

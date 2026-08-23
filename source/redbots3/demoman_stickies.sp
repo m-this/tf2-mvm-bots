@@ -89,8 +89,23 @@ bool ShouldDetonateStickies(int client)
 
 		float stickyOrigin[3]; stickyOrigin = GetAbsOrigin(sticky);
 
+		/* One bomb of his own on top of him and the button is not worth pressing at all
+		
+		This used to skip the bomb and carry on, which reads as a safety rule and is not one. The
+		detonator is one button for every bomb he owns: skipping a close one only stops it counting
+		towards whether to press, it does not stop it going off when he does. So a Demoman with six
+		on a tank hull and two down the corridor scored the two, pressed, and took all eight.
+		
+		He is the worst self-harmer on the team by an order of magnitude and this is the mechanism.
+		Vetoing outright rather than pricing it: the cluster he gives up is one press, the health he
+		gives up is the rest of the wave. */
 		if (GetVectorDistance(myOrigin, stickyOrigin) < STICKY_SELF_SAFE_RANGE)
+		{
+			if (Feature(FEATURE_DEMO_STICKY_SELF_VETO))
+				return false;
+			
 			continue;
+		}
 
 		int caught = 0;
 
