@@ -27,7 +27,6 @@ enum
 	FEATURE_NEST_ZONES,
 	FEATURE_READY_WHEN_PREPARED,
 	FEATURE_WAVE_RESISTANCES,
-	FEATURE_DEMO_HOLD_FIRE,
 	FEATURE_ATTACK_STRAFE,
 	FEATURE_SOLDIER_CLOSES_IN,
 	FEATURE_EXPLOSIVE_FIRE_TRACKING,
@@ -44,7 +43,6 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"nest_zones",
 	"ready_when_prepared",
 	"wave_resistances",
-	"demo_hold_fire",
 	"attack_strafe",
 	"soldier_closes_in",
 	"explosive_fire_tracking"
@@ -83,9 +81,6 @@ void LoadFeatures()
 
 	g_arrFeatureConVars[FEATURE_WAVE_RESISTANCES] = MakeFeature(FEATURE_WAVE_RESISTANCES,
 		"Buy the resistance the coming wave's robots call for, rather than ranking resistances last.");
-
-	g_arrFeatureConVars[FEATURE_DEMO_HOLD_FIRE] = MakeFeature(FEATURE_DEMO_HOLD_FIRE,
-		"The Demoman holds his pipes until the target is near enough for one to arrive.");
 
 	g_arrFeatureConVars[FEATURE_EXPLOSIVE_FIRE_TRACKING] = MakeFeature(FEATURE_EXPLOSIVE_FIRE_TRACKING,
 		"An explosive fires while the aim is still following the target, rather than only once the head has stopped.");

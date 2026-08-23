@@ -50,19 +50,23 @@ closing without firing at a rumour. */
 #define SOLDIER_ROCKET_SETTLE	750.0
 
 #define DEMO_PIPE_SETTLE		600.0
-#define DEMO_PIPE_HOLD_FIRE		900.0
+/* How far out a pipe is worth throwing
+ *
+ * Nine hundred was the other half of a pair that won its A/B years of commits ago, bundled with
+ * attack_strafe, and the pair was never split. Split now, over twelve waves on two maps: holding
+ * fire past nine hundred cost 20073 damage against 22285, a hundred and forty six team deaths
+ * against a hundred and three, and a wave.
+ *
+ * His hit rate is better with the cap, 43 percent against 40, and it does not matter. The shots he
+ * is not allowed to take are worth more than the ones he lands, because a pipe that misses still
+ * lands somewhere and the ones he was holding were never thrown at all. attack_strafe was doing
+ * the work in that pair.
+ */
 #define DEMO_PIPE_FIRE_ANYWAY	1400.0
 
-/* Which of the two, so the pair get played against each other rather than argued about
- *
- * Worth re-reading now there are numbers for where he actually fights. The telemetry puts his
- * median distance to the nearest robot between 1044 and 1258 units on the two maps measured, so
- * holding fire past 900 is holding fire for most of a wave. The pair last played each other before
- * anything counted the range.
- */
 stock float DemoPipeMaxRange()
 {
-	return Feature(FEATURE_DEMO_HOLD_FIRE) ? DEMO_PIPE_HOLD_FIRE : DEMO_PIPE_FIRE_ANYWAY;
+	return DEMO_PIPE_FIRE_ANYWAY;
 }
 
 /* Ranges for one weapon. False when the table says nothing about it, and neither output is
