@@ -209,6 +209,7 @@ does not say whether the bots look right, and somebody still has to watch them.
 | `entrypoint.sh`         | installs into the game volume, writes `server.cfg`     |
 | `stats/mvmbots_stats.sp`| the plugin that counts                                 |
 | `stats/mvmbots_host.sp` | the fake client that holds a seat and readies up       |
+| `loadouts/`             | a loadout to run instead of the shipped one, via `TESTBED_LOADOUT` |
 | `rcon.py`               | Source RCON client, from tf2-archipelago               |
 | `versions.env`          | every pinned version                                   |
 
