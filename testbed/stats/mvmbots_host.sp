@@ -170,10 +170,26 @@ static void ConnectHost()
 
 	g_iHost = client;
 
-	/* Scout, because the class has to be something and this one is the cheapest
-	thing to have standing in a spawn room doing nothing */
+	/* Medic, because that is the one class the mod's own medic refuses to heal
+	
+	The seat holder was a Scout, and a full health Scout standing in the RED
+	spawn is the best patient the mod's medic can see: PreferredPatient ranks a
+	teammate within twelve hundred units above one anywhere else, and the medic
+	spawns in the same room. So he latched onto the statue on the first frame of
+	every wave and never left, and the trace says so plainly, "beam on
+	testbed-host" for twenty five samples running.
+	
+	That is not a small measurement error. Four medic experiments were run
+	against it and all four lost: medic_nearest, medic_leaves_spawn twice, and
+	taking away the walk. Each of them was really being asked whether it could
+	beat pocketing an immobile fake client, which is a question with no useful
+	answer. They were deleted on the strength of it.
+	
+	PreferredPatient skips medics outright, so a medic in the seat is invisible
+	to the thing under test. He still holds the seat, still readies up, and
+	still does nothing, which is the whole of the job. */
 	ChangeClientTeam(client, view_as<int>(TFTeam_Red));
-	FakeClientCommand(client, "joinclass scout");
+	FakeClientCommand(client, "joinclass medic");
 
 	//The ready is what the mod's listener is waiting for, and what starts the wave
 	PressReady();
