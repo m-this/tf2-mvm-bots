@@ -46,6 +46,7 @@ type standRollup struct {
 	travelled     float64
 	wrenchOut     int
 	wrenchStuck   int
+	repairStalls  int
 	firing        int
 	firingAtWorld int
 	aimedAt       map[string]int
@@ -133,6 +134,12 @@ func rollupStanding(bots []botSample, buildings []buildingSample) map[string]*st
 		}
 
 		r.samples++
+
+		// A counter, so the last sample of the run holds the whole total however
+		// rarely the thing happened.
+		if s.RepairStalls > r.repairStalls {
+			r.repairStalls = s.RepairStalls
+		}
 
 		if s.Aim != "" {
 			r.aimedAt[s.Aim]++
@@ -307,6 +314,11 @@ func printStanding(bots []botSample, buildings []buildingSample) {
 			fmt.Printf("    %-16s %-9s trigger held in %d%% of samples, %d%% of those into the world%s\n",
 				"", "", pct(r.firing, r.steps), pct(r.firingAtWorld, r.firing),
 				topAim(r.aimedAt, r.samples))
+		}
+
+		if r.repairStalls > 0 {
+			fmt.Printf("    %-16s %-9s %d times he fired at his sentry for three seconds and it gained nothing\n",
+				"", "", r.repairStalls)
 		}
 
 		if r.wrenchOut > 0 {

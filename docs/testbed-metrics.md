@@ -111,6 +111,29 @@ differences and nothing cleverer. An engineer who never swings and one who
 repairs perfectly produce identical uptime and identical `sentries lost`. This
 is the column that separates them.
 
+## Count the event, do not sample the state
+
+`CanRepairFromRange` can only run when a sentry is damaged *and* its engineer is
+standing two hundred units or more away. A four wave reproduction with a Rescue
+Ranger in his hands hit that state **zero times in 137 samples**: the sentry was
+below full health twice, and never while he was far enough back. On a test bed a
+sentry is healthy or it is dead.
+
+That is not bad luck, it is arithmetic. A five second sampler cannot see a state
+that lasts three seconds and happens twice an hour.
+
+So the mod counts the event instead and exports the counter
+(`Defenderbots_RangeRepairStalls`). A counter accumulates, and **sampling a
+counter loses nothing however rare the thing is** — one stall in an hour still
+reads as a one at the end of the run.
+
+```
+Bob  engineer  3 times he fired at his sentry for three seconds and it gained nothing
+```
+
+Use this shape for anything rare: a stall, a refusal, a retry, a fallback taken.
+Sample states that persist; count events that do not.
+
 ## Self-damage
 
 `hurt themselves` and `killed themselves` on the wave line, per class. A soldier

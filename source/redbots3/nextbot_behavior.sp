@@ -1141,6 +1141,93 @@ action stops its update running and these two are not the part worth reimplement
 
 The charge is pressed rather than set: the deploy belongs to the game, and this only ever asks
 for it sooner than the game's own dying-patient rule would have. */
+/* Which teammate a medigun is worth the most on
+ *
+ * A medigun is worth what the body in front of it is worth, so it belongs on the biggest one: the
+ * Heavy, and failing that whoever has the most health to work with. Maximum health rather than a
+ * class table, because that follows the health upgrades the team buys without anybody keeping a
+ * list up to date.
+ *
+ * Where anybody is standing is deliberately not in this. The last version of this ranking had a
+ * "nearby wins outright" bucket and that bucket was a fixed point: the medic stood next to whoever
+ * he had, so whoever he had stayed the nearest, so he never moved. The walking is the game's job
+ * again and the game is good at it. This only has to answer who.
+ */
+static int BiggestBody(int medic)
+{
+	int best = -1;
+	int bestHealth = 0;
+	bool bestIsHeavy = false;
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (i == medic || !IsClientInGame(i) || !IsPlayerAlive(i))
+			continue;
+
+		if (GetClientTeam(i) != GetClientTeam(medic))
+			continue;
+
+		//A medic healing a medic is two classes doing nothing
+		if (TF2_GetPlayerClass(i) == TFClass_Medic)
+			continue;
+
+		bool isHeavy = TF2_GetPlayerClass(i) == TFClass_Heavy;
+		int health = TF2Util_GetEntityMaxHealth(i);
+
+		/* Said as a class rather than left to the arithmetic
+		
+		Maximum health picks the Heavy out most of the time, and most of the time is the problem: a
+		Soldier who has bought health and a Heavy who has not are a coin toss, and the beam moving
+		off the Heavy for that is the beam on the wrong man. */
+		if (best <= 0 || (isHeavy && !bestIsHeavy) || (isHeavy == bestIsHeavy && health > bestHealth))
+		{
+			best = i;
+			bestHealth = health;
+			bestIsHeavy = isHeavy;
+		}
+	}
+
+	return best;
+}
+
+/* How often the game is told who its patient should be
+ *
+ * Every frame would be arguing with the action rather than nudging it, and the beam does not need
+ * an answer more often than the team changes shape.
+ */
+#define MEDIC_PATIENT_INTERVAL	2.0
+
+static float m_ctNextPatientNudge[MAXPLAYERS + 1];
+
+/* Point the game's own heal action at the biggest body, from inside the action's own callback
+ *
+ * The mod used to answer this by replacing the whole action, which cost the medic his walking and
+ * most of his output. The action is left alone now and only its patient is written.
+ *
+ * An earlier attempt at writing this field segfaulted the server, and this is deliberately narrower
+ * than that one. It runs only from CTFBotMedicHeal_UpdatePost, so the action being written is the
+ * action the game is running and not one looked up from somewhere else; the same offset is read in
+ * the same callback every frame and has never faulted. The value is a checked, living, same team,
+ * non medic client, and it is only written when it differs from what is already there.
+ */
+static void PointMedicAtBiggestBody(BehaviorAction action, int actor)
+{
+	if (m_ctNextPatientNudge[actor] > GetGameTime())
+		return;
+
+	m_ctNextPatientNudge[actor] = GetGameTime() + MEDIC_PATIENT_INTERVAL;
+
+	int want = BiggestBody(actor);
+
+	if (want <= 0)
+		return;
+
+	if (action.GetHandleEntity(ACTION_HEAL_PATIENT_OFFSET) == want)
+		return;
+
+	action.SetHandleEntity(ACTION_HEAL_PATIENT_OFFSET, want);
+}
+
 void MedicUberAndResist(int actor, int medigun, int patient)
 {
 	if (ShouldDeployUber(actor, medigun, patient))
@@ -1205,6 +1292,9 @@ public Action CTFBotMedicHeal_UpdatePost(BehaviorAction action, int actor, float
 	team starts the wave with the overheal it spent the break earning. */
 	if (GameRules_GetRoundState() == RoundState_BetweenRounds && !g_bShoppedThisBreak[actor])
 		return Plugin_Continue;
+
+	if (Feature(FEATURE_MEDIC_POCKETS_BIGGEST))
+		PointMedicAtBiggestBody(action, actor);
 
 	int myWeapon = BaseCombatCharacter_GetActiveWeapon(actor);
 
