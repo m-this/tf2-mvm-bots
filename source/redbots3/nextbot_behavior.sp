@@ -88,6 +88,100 @@ enum struct esPluginBot
 esPluginBot g_arrPluginBot[MAXPLAYERS + 1];
 #endif
 
+/* What to do when the nav mesh will not give a path to somewhere the bot has to be
+
+Every behaviour in this mod that walks anywhere sets a goal, sets bPathing, and trusts that this
+function gets the bot there. Nothing ever checked whether a path came back. ComputeToTarget returns
+a bool and it was discarded, so a failed computation left an empty path, Update walked the bot
+along nothing, and the behaviour above went on believing it was travelling.
+
+Measured on Coaltown: a medic with a live patient two thousand units away, "walking", path 0 long,
+in the same spot for thirty five seconds while a demoman on half health fought without him. That is
+the medic stuck in the middle of the map, reported four times and blamed on four different things,
+this one included.
+
+The mesh usually refuses from one particular piece of ground rather than for the whole journey, so
+the answer is to get off that ground. A step in the goal's direction, guarded the same way the
+attack strafe guards one, and the next computation is made from somewhere else. Counted, because a
+bot doing this often is a bot the map's nav mesh has a hole in. */
+#define PATH_NUDGE_STEP		120.0
+#define PATH_RETRY_INTERVAL	0.5
+
+static bool m_bPathFailed[MAXPLAYERS + 1];
+static int m_iPathFailures[MAXPLAYERS + 1];
+
+int PathFailuresOf(int client)
+{
+	return m_iPathFailures[client];
+}
+
+static void NudgeTowardsGoal(int client, INextBot myBot, const float goal[3])
+{
+	ILocomotion myLoco = myBot.GetLocomotionInterface();
+	
+	if (!myLoco.IsOnGround())
+		return;
+	
+	float myOrigin[3]; myOrigin = GetAbsOrigin(client);
+	float towards[3]; SubtractVectors(goal, myOrigin, towards);
+	
+	towards[2] = 0.0;
+	
+	if (NormalizeVector(towards, towards) < 1.0)
+		return;
+	
+	float step[3];
+	step[0] = myOrigin[0] + towards[0] * PATH_NUDGE_STEP;
+	step[1] = myOrigin[1] + towards[1] * PATH_NUDGE_STEP;
+	step[2] = myOrigin[2];
+	
+	if (!myLoco.IsPotentiallyTraversable(myOrigin, step, IMMEDIATELY) || myLoco.HasPotentialGap(myOrigin, step))
+		return;
+	
+	myLoco.Approach(step);
+}
+
+
+/* Computing a path and walking it, with the refusal noticed
+ *
+ * Every behaviour in this mod computes into m_pPath and then calls Update on it, and every one of
+ * them discarded the bool the computation returns. An empty path walks the bot nowhere while the
+ * behaviour above believes it is travelling.
+ *
+ * It was fixed in PluginBot_SimulateFrame and nowhere else, which left twenty other call sites
+ * with it, including the one every fighting class uses. Measured on Coaltown: the Demoman's median
+ * distance to the nearest robot is 1044 units while his attack action is trying to close him to
+ * 600, and he is the second lowest scoring seat on the team.
+ */
+void RepathToTarget(int actor, INextBot myBot, int target)
+{
+	NotePathResult(actor, m_pPath[actor].ComputeToTarget(myBot, target));
+}
+
+void RepathToPos(int actor, INextBot myBot, const float goal[3])
+{
+	NotePathResult(actor, m_pPath[actor].ComputeToPos(myBot, goal));
+}
+
+static void NotePathResult(int actor, bool built)
+{
+	bool failed = !built || m_pPath[actor].GetLength() <= 0.0;
+	
+	if (failed && !m_bPathFailed[actor])
+		m_iPathFailures[actor]++;
+	
+	m_bPathFailed[actor] = failed;
+}
+
+//Walk the path, or step toward the goal when the mesh would not give one
+void FollowPathOrNudge(int actor, INextBot myBot, const float goal[3])
+{
+	if (Feature(FEATURE_ATTACK_PATH_NUDGE) && m_bPathFailed[actor])
+		NudgeTowardsGoal(actor, myBot, goal);
+	else
+		m_pPath[actor].Update(myBot);
+}
+
 #include "behavior/attack.sp"
 #include "behavior/markgiant.sp"
 #include "behavior/collectmoney.sp"
@@ -160,59 +254,6 @@ void ResetNextBot(int client)
 #if defined EXTRA_PLUGINBOT
 	g_arrPluginBot[client].Reset();
 #endif
-}
-
-/* What to do when the nav mesh will not give a path to somewhere the bot has to be
-
-Every behaviour in this mod that walks anywhere sets a goal, sets bPathing, and trusts that this
-function gets the bot there. Nothing ever checked whether a path came back. ComputeToTarget returns
-a bool and it was discarded, so a failed computation left an empty path, Update walked the bot
-along nothing, and the behaviour above went on believing it was travelling.
-
-Measured on Coaltown: a medic with a live patient two thousand units away, "walking", path 0 long,
-in the same spot for thirty five seconds while a demoman on half health fought without him. That is
-the medic stuck in the middle of the map, reported four times and blamed on four different things,
-this one included.
-
-The mesh usually refuses from one particular piece of ground rather than for the whole journey, so
-the answer is to get off that ground. A step in the goal's direction, guarded the same way the
-attack strafe guards one, and the next computation is made from somewhere else. Counted, because a
-bot doing this often is a bot the map's nav mesh has a hole in. */
-#define PATH_NUDGE_STEP		120.0
-#define PATH_RETRY_INTERVAL	0.5
-
-static bool m_bPathFailed[MAXPLAYERS + 1];
-static int m_iPathFailures[MAXPLAYERS + 1];
-
-int PathFailuresOf(int client)
-{
-	return m_iPathFailures[client];
-}
-
-static void NudgeTowardsGoal(int client, INextBot myBot, const float goal[3])
-{
-	ILocomotion myLoco = myBot.GetLocomotionInterface();
-	
-	if (!myLoco.IsOnGround())
-		return;
-	
-	float myOrigin[3]; myOrigin = GetAbsOrigin(client);
-	float towards[3]; SubtractVectors(goal, myOrigin, towards);
-	
-	towards[2] = 0.0;
-	
-	if (NormalizeVector(towards, towards) < 1.0)
-		return;
-	
-	float step[3];
-	step[0] = myOrigin[0] + towards[0] * PATH_NUDGE_STEP;
-	step[1] = myOrigin[1] + towards[1] * PATH_NUDGE_STEP;
-	step[2] = myOrigin[2];
-	
-	if (!myLoco.IsPotentiallyTraversable(myOrigin, step, IMMEDIATELY) || myLoco.HasPotentialGap(myOrigin, step))
-		return;
-	
-	myLoco.Approach(step);
 }
 
 #if defined EXTRA_PLUGINBOT

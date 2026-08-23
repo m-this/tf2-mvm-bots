@@ -114,10 +114,10 @@ static Action CTFBotDefenderAttack_Update(BehaviorAction action, int actor, floa
 		if (m_flRepathTime[actor] <= GetGameTime())
 		{
 			m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(0.3, 0.4);
-			m_pPath[actor].ComputeToTarget(myBot, m_iAttackTarget[actor]);
+			RepathToTarget(actor, myBot, m_iAttackTarget[actor]);
 		}
 		
-		m_pPath[actor].Update(myBot);
+		FollowPathOrNudge(actor, myBot, targetOrigin);
 	}
 	else if (Feature(FEATURE_ATTACK_STRAFE))
 	{
