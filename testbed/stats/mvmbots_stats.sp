@@ -141,6 +141,14 @@ enum struct WaveCounters
 	int damageToTanks;
 	int sentryDamage;
 	int healingDone;
+	/* Healing split by who did it, and the scoreboard's own answer beside it
+	
+	One total cannot say whether a wave was held by a medic or by a dispenser, and the engineer's
+	dispenser is in there: player_healed names the engineer as the healer for it. The scoreboard
+	number is read separately, from the player manager the Tab screen reads, because two
+	instruments that should agree are how three broken counters were caught in one day. */
+	int healingByClass[view_as<int>(TFClass_Engineer) + 1];
+	int healingScoreboard;
 	int ubersDeployed;
 	int damageByClass[view_as<int>(TFClass_Engineer) + 1];
 	/* What the defenders did to themselves, which nothing has ever counted
@@ -213,6 +221,10 @@ enum struct WaveCounters
 		this.damageToTanks = 0;
 		this.sentryDamage = 0;
 		this.healingDone = 0;
+		this.healingScoreboard = 0;
+
+		for (int c = 0; c <= view_as<int>(TFClass_Engineer); c++)
+			this.healingByClass[c] = 0;
 		this.ubersDeployed = 0;
 		
 		this.demoPipeDamage = 0;
@@ -580,6 +592,7 @@ static void Event_WaveBegin(Event event, const char[] name, bool dontBroadcast)
 
 	ResetEngineerSamples();
 	ResetRepairSamples();
+	SnapshotScoreboardHealing();
 
 	/* The features that are on go in the file with the numbers they produced
 
@@ -743,6 +756,8 @@ static void WriteWaveResult(const char[] result)
 		return;
 	}
 
+	CollectScoreboardHealing();
+
 	float duration = GetGameTime() - g_flWaveStart;
 
 	char line[STATS_LINE_LENGTH];
@@ -778,7 +793,9 @@ static void WriteWaveResult(const char[] result)
 		... "\"demo_pipe_damage\":%d,\"demo_sticky_damage\":%d,\"demo_melee_damage\":%d,"
 		... "\"soldier_rocket_damage\":%d,\"soldier_other_damage\":%d,"
 		... "\"fired_soldier\":%d,\"hit_soldier\":%d,\"fired_demoman\":%d,\"hit_demoman\":%d,"
-		... "\"jars_thrown\":%d,\"building_repaired\":%d,\"building_damage\":%d}",
+		... "\"jars_thrown\":%d,\"building_repaired\":%d,\"building_damage\":%d,"
+		... "\"healing_scoreboard\":%d,\"healing_medic\":%d,\"healing_engineer\":%d,"
+		... "\"healing_soldier\":%d,\"healing_sniper\":%d}",
 		g_sMap, g_iWave, result, duration,
 		g_Wave.robotKills, g_Wave.giantKills, g_Wave.tankKills, g_Wave.sentryKills,
 		g_Wave.defenderDeaths, g_Wave.backstabs, g_Wave.busterDetonations,
@@ -855,7 +872,12 @@ static void WriteWaveResult(const char[] result)
 		g_Wave.projectilesHit[view_as<int>(TFClass_Soldier)],
 		g_Wave.projectilesFired[view_as<int>(TFClass_DemoMan)],
 		g_Wave.projectilesHit[view_as<int>(TFClass_DemoMan)],
-		g_Wave.jarsThrown, g_Wave.buildingRepaired, g_Wave.buildingDamageTaken);
+		g_Wave.jarsThrown, g_Wave.buildingRepaired, g_Wave.buildingDamageTaken,
+		g_Wave.healingScoreboard,
+		g_Wave.healingByClass[view_as<int>(TFClass_Medic)],
+		g_Wave.healingByClass[view_as<int>(TFClass_Engineer)],
+		g_Wave.healingByClass[view_as<int>(TFClass_Soldier)],
+		g_Wave.healingByClass[view_as<int>(TFClass_Sniper)]);
 
 	WriteLine(line);
 
@@ -1214,7 +1236,59 @@ static void Event_PlayerHealed(Event event, const char[] name, bool dontBroadcas
 	if (healer < 1 || !IsClientInGame(healer) || TF2_GetClientTeam(healer) != TFTeam_Red)
 		return;
 	
-	g_Wave.healingDone += event.GetInt("amount");
+	int amount = event.GetInt("amount");
+
+	g_Wave.healingDone += amount;
+	g_Wave.healingByClass[view_as<int>(TF2_GetPlayerClass(healer))] += amount;
+}
+
+/* The number the Tab screen shows, which is not the number the event adds up
+ *
+ * The scoreboard reads m_iHealing off tf_player_manager and it counts for the whole match, so a
+ * wave's worth of it is the difference across the wave. Kept beside the event sum rather than
+ * instead of it: they measure the same thing by different routes, and the day they disagree is
+ * the day one of them is broken and worth knowing about.
+ */
+static int g_iHealingAtWaveStart[MAXPLAYERS + 1];
+
+static int PlayerManager()
+{
+	return FindEntityByClassname(-1, "tf_player_manager");
+}
+
+static int ScoreboardHealing(int client)
+{
+	int manager = PlayerManager();
+
+	if (manager == -1 || !HasEntProp(manager, Prop_Send, "m_iHealing"))
+		return -1;
+
+	return GetEntProp(manager, Prop_Send, "m_iHealing", 4, client);
+}
+
+static void SnapshotScoreboardHealing()
+{
+	for (int i = 1; i <= MaxClients; i++)
+		g_iHealingAtWaveStart[i] = IsClientInGame(i) ? ScoreboardHealing(i) : 0;
+}
+
+static void CollectScoreboardHealing()
+{
+	g_Wave.healingScoreboard = 0;
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || TF2_GetClientTeam(i) != TFTeam_Red)
+			continue;
+
+		int now = ScoreboardHealing(i);
+
+		//A player who joined mid-wave has no start to subtract, and neither has a missing manager
+		if (now < 0 || g_iHealingAtWaveStart[i] < 0)
+			continue;
+
+		g_Wave.healingScoreboard += now - g_iHealingAtWaveStart[i];
+	}
 }
 
 static void Event_ChargeDeployed(Event event, const char[] name, bool dontBroadcast)
