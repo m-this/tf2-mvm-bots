@@ -41,6 +41,7 @@ type wave struct {
 	FiredSoldier  int `json:"fired_soldier"`
 	HitSoldier    int `json:"hit_soldier"`
 	FiredDemoman  int `json:"fired_demoman"`
+	JarsThrown    int `json:"jars_thrown"`
 	HitDemoman    int `json:"hit_demoman"`
 
 	DemoPipe   int `json:"demo_pipe_damage"`
@@ -148,6 +149,7 @@ type summary struct {
 	demoPipe, demoSticky, demoMelee       int
 	solRocket, solOther                   int
 	firedSol, hitSol, firedDemo, hitDemo  int
+	jars                                  int
 	healing, ubers                        int
 	damageBy, killsBy, giantsBy, killedBy map[string]int
 	causeBy                               map[string]int
@@ -184,6 +186,7 @@ func summarise(waves []wave) summary {
 		s.hitSol += w.HitSoldier
 		s.firedDemo += w.FiredDemoman
 		s.hitDemo += w.HitDemoman
+		s.jars += w.JarsThrown
 		s.tankDamage += w.TankDamage
 		s.sentryDamage += w.SentryDamage
 		s.healing += w.Healing
@@ -291,6 +294,11 @@ func print(name string, s summary) {
 
 	// The question a damage total cannot answer: is he not shooting, or is he
 	// shooting and missing?
+	// A jar held is not a jar thrown, and the weapon share cannot tell them apart
+	if s.jars > 0 {
+		fmt.Printf("  jars thrown       %d\n", s.jars)
+	}
+
 	if s.firedSol+s.firedDemo > 0 {
 		fmt.Printf("  projectiles       soldier %d fired, %d hit (%d%%);  demoman %d fired, %d hit (%d%%)\n",
 			s.firedSol, s.hitSol, pct(s.hitSol, s.firedSol),
