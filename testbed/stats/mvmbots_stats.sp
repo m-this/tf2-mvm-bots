@@ -861,6 +861,21 @@ public void Frame_CountProjectile(any ref)
 	if (projectile == INVALID_ENT_REFERENCE || !IsValidEntity(projectile))
 		return;
 	
+	char classname[64]; GetEntityClassname(projectile, classname, sizeof(classname));
+	
+	/* A jar is counted before the owner is resolved, and on purpose
+	
+	Everything below needs to know whose shot it was, and a jar does not: the question is only
+	whether one ever leaves anybody's hand. Counting it after the owner checks would mean a jar
+	whose owner handle is not set yet reads exactly like a jar that was never thrown, and this
+	file has already produced three counters that could not return anything but zero. */
+	if (IsThrownJar(classname))
+	{
+		g_Wave.jarsThrown++;
+		
+		return;
+	}
+	
 	int owner = GetEntPropEnt(projectile, Prop_Send, "m_hOwnerEntity");
 	
 	//A pipe belongs to its thrower; the owner handle is not always the one that is set
@@ -873,14 +888,6 @@ public void Frame_CountProjectile(any ref)
 	if (TF2_GetClientTeam(owner) != TFTeam_Red)
 		return;
 	
-	char classname[64]; GetEntityClassname(projectile, classname, sizeof(classname));
-	
-	if (IsThrownJar(classname))
-	{
-		g_Wave.jarsThrown++;
-		
-		return;
-	}
 	
 	int class = view_as<int>(TF2_GetPlayerClass(owner));
 	
