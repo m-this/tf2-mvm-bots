@@ -798,8 +798,10 @@ static void WriteWaveResult(const char[] result)
 		... "\"soldier_rocket_damage\":%d,\"soldier_other_damage\":%d,"
 		... "\"fired_soldier\":%d,\"hit_soldier\":%d,\"fired_demoman\":%d,\"hit_demoman\":%d,"
 		... "\"jars_thrown\":%d,\"building_repaired\":%d,\"building_damage\":%d,"
-		... "\"healing_scoreboard\":%d,\"healing_medic\":%d,\"healing_engineer\":%d,"
-		... "\"healing_soldier\":%d,\"healing_sniper\":%d}",
+		... "\"healing_scoreboard\":%d,\"healing_scout\":%d,\"healing_sniper\":%d,"
+		... "\"healing_soldier\":%d,\"healing_demoman\":%d,\"healing_medic\":%d,"
+		... "\"healing_heavy\":%d,\"healing_pyro\":%d,\"healing_spy\":%d,"
+		... "\"healing_engineer\":%d}",
 		g_sMap, g_iWave, result, duration,
 		g_Wave.robotKills, g_Wave.giantKills, g_Wave.tankKills, g_Wave.sentryKills,
 		g_Wave.defenderDeaths, g_Wave.backstabs, g_Wave.busterDetonations,
@@ -878,10 +880,15 @@ static void WriteWaveResult(const char[] result)
 		g_Wave.projectilesHit[view_as<int>(TFClass_DemoMan)],
 		g_Wave.jarsThrown, g_Wave.buildingRepaired, g_Wave.buildingDamageTaken,
 		g_Wave.healingScoreboard,
-		g_Wave.healingByClass[view_as<int>(TFClass_Medic)],
-		g_Wave.healingByClass[view_as<int>(TFClass_Engineer)],
+		g_Wave.healingByClass[view_as<int>(TFClass_Scout)],
+		g_Wave.healingByClass[view_as<int>(TFClass_Sniper)],
 		g_Wave.healingByClass[view_as<int>(TFClass_Soldier)],
-		g_Wave.healingByClass[view_as<int>(TFClass_Sniper)]);
+		g_Wave.healingByClass[view_as<int>(TFClass_DemoMan)],
+		g_Wave.healingByClass[view_as<int>(TFClass_Medic)],
+		g_Wave.healingByClass[view_as<int>(TFClass_Heavy)],
+		g_Wave.healingByClass[view_as<int>(TFClass_Pyro)],
+		g_Wave.healingByClass[view_as<int>(TFClass_Spy)],
+		g_Wave.healingByClass[view_as<int>(TFClass_Engineer)]);
 
 	WriteLine(line);
 

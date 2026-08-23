@@ -742,72 +742,15 @@ bool SentryNeedsMetal(int sentry)
 	return GetEntProp(sentry, Prop_Send, "m_iAmmoShells") < 100;
 }
 
-/* How long a bolt gets to put health into the sentry before the engineer stops believing in it
- *
- * The Rescue Ranger fires about twice a second and heals 75 a bolt, so three seconds without the
- * health moving is not a slow repair, it is no repair. */
-#define RANGE_REPAIR_PATIENCE	3.0
-
-static int m_iRangeRepairHealth[MAXPLAYERS + 1];
-static float m_ctRangeRepairProgress[MAXPLAYERS + 1];
-
-/* Whether the bolts are landing, asked of the sentry's health rather than of the line of fire
- *
- * Reported from play: an engineer stood firing the Rescue Ranger into a wall with the sentry behind
- * it, for long enough that somebody watched him do it. The precondition said the shot was clear, and
- * whatever it was wrong about, nothing downstream ever checked. The branch it guards sets
- * bPathing to false, so a bot that believes it is repairing stands still and repairs nothing, and
- * that is a fault with no way out of itself.
- *
- * Deciding it on the health closes the loop on the outcome instead of the precondition, which is
- * the only version of this that does not need to be right about why the bolt missed: the eye is
- * not the muzzle, a ray is not a projectile, and a line of fire that was clear when it was asked is
- * not clear now. Every one of those ends with the health not moving.
- *
- * He is not punished for a sentry at full health: SentryNeedsMetal has already said it wants metal
- * before this is reached, so health that is not climbing is a bolt that is not arriving. */
-static bool RangeRepairIsWorking(int actor, int sentry)
-{
-	int health = BaseEntity_GetHealth(sentry);
-	float now = GetGameTime();
-
-	//A new sentry, or one that has just started being repaired, starts the clock again
-	if (health > m_iRangeRepairHealth[actor] || m_ctRangeRepairProgress[actor] <= 0.0)
-	{
-		m_iRangeRepairHealth[actor] = health;
-		m_ctRangeRepairProgress[actor] = now;
-
-		return true;
-	}
-
-	m_iRangeRepairHealth[actor] = health;
-
-	return now - m_ctRangeRepairProgress[actor] < RANGE_REPAIR_PATIENCE;
-}
-
-void ForgetRangeRepair(int actor)
-{
-	m_iRangeRepairHealth[actor] = 0;
-	m_ctRangeRepairProgress[actor] = 0.0;
-}
-
 //A Rescue Ranger bolt repairs at range, so its engineer does not walk into the open to hold a nest
 bool CanRepairFromRange(int actor, int sentry, float dist)
 {
 	if (!TF2_IsRescueRangerEquipped(actor))
 		return false;
 	
-	/* Close enough to swing at, and the wrench repairs faster
-	
-	Also where the giving-up clock is forgotten. Without that, one failed standoff disqualifies
-	range repair on this sentry for the rest of its life: he walks in, wrenches it, backs off to a
-	spot with a clear shot, and is still holding the verdict he reached from the bad one. */
+	//Close enough to swing at, and the wrench repairs faster
 	if (dist < 200.0)
-	{
-		ForgetRangeRepair(actor);
-		
 		return false;
-	}
 	
 	if (dist > SENTRY_MAX_RANGE)
 		return false;
@@ -815,21 +758,7 @@ bool CanRepairFromRange(int actor, int sentry, float dist)
 	if (GetEntProp(actor, Prop_Data, "m_iAmmo", _, 3) < 30)
 		return false;
 	
-	if (!IsLineOfFireClearEntity(actor, GetEyePosition(actor), sentry))
-	{
-		ForgetRangeRepair(actor);
-		
-		return false;
-	}
-	
-	if (Feature(FEATURE_RANGE_REPAIR_GIVES_UP) && !RangeRepairIsWorking(actor, sentry))
-	{
-		LogBuildFailure(actor, "repairing at range", "the bolts are not landing; walking to it");
-		
-		return false;
-	}
-	
-	return true;
+	return IsLineOfFireClearEntity(actor, GetEyePosition(actor), sentry);
 }
 
 static void CTFBotMvMEngineerIdle_OnEnd(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
@@ -848,8 +777,6 @@ static Action CTFBotMvMEngineerIdle_OnMoveToSuccess(BehaviorAction action, int a
 
 static void CTFBotMvMEngineerIdle_ResetProperties(int actor)
 {
-	ForgetRangeRepair(actor);
-
 	m_hBuildingToGrab[actor] = INVALID_ENT_REFERENCE;
 	g_bGoingToGrabBuilding[actor] = false;
 	

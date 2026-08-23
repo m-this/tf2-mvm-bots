@@ -57,12 +57,9 @@ type wave struct {
 
 	// The same quantity by two routes: the player_healed event summed per
 	// healer, and the number tf_player_manager shows on the Tab screen.
-	HealingScoreboard int `json:"healing_scoreboard"`
-	HealingMedic      int `json:"healing_medic"`
-	HealingEngineer   int `json:"healing_engineer"`
-	HealingSoldier    int `json:"healing_soldier"`
-	HealingSniper     int `json:"healing_sniper"`
-	Ubers             int `json:"ubers"`
+	HealingScoreboard int            `json:"healing_scoreboard"`
+	HealingBy         map[string]int `json:"-"`
+	Ubers             int            `json:"ubers"`
 
 	// Per class, keyed by the class name the plugin writes
 	SelfDamageBy map[string]int `json:"-"`
@@ -91,8 +88,10 @@ func (w *wave) unpackClasses(raw map[string]int) {
 
 	w.SelfDamageBy = map[string]int{}
 	w.SelfDeathsBy = map[string]int{}
+	w.HealingBy = map[string]int{}
 
 	for _, c := range classes {
+		w.HealingBy[c] = raw["healing_"+c]
 		w.SelfDamageBy[c] = raw["selfdamage_"+c]
 		w.SelfDeathsBy[c] = raw["selfdeaths_"+c]
 		w.DamageBy[c] = raw["damage_"+c]
@@ -157,8 +156,7 @@ type summary struct {
 	sentriesLost, busters                 int
 	repaired, buildingDamage              int
 	healScoreboard                        int
-	healMedic, healEngineer               int
-	healSoldier, healSniper               int
+	healingBy                             map[string]int
 	damage, tankDamage, sentryDamage      int
 	demoPipe, demoSticky, demoMelee       int
 	solRocket, solOther                   int
@@ -175,6 +173,7 @@ func summarise(waves []wave) summary {
 		damageBy: map[string]int{}, killsBy: map[string]int{},
 		giantsBy: map[string]int{}, killedBy: map[string]int{},
 		causeBy:      map[string]int{},
+		healingBy:    map[string]int{},
 		selfDamageBy: map[string]int{}, selfDeathsBy: map[string]int{},
 	}
 
@@ -207,10 +206,10 @@ func summarise(waves []wave) summary {
 		s.sentryDamage += w.SentryDamage
 		s.healing += w.Healing
 		s.healScoreboard += w.HealingScoreboard
-		s.healMedic += w.HealingMedic
-		s.healEngineer += w.HealingEngineer
-		s.healSoldier += w.HealingSoldier
-		s.healSniper += w.HealingSniper
+
+		for k, v := range w.HealingBy {
+			s.healingBy[k] += v
+		}
 		s.ubers += w.Ubers
 
 		for k, v := range w.DamageBy {
@@ -307,18 +306,22 @@ func print(name string, s summary) {
 	// Who did the healing, and whether the two ways of counting it agree. The
 	// engineer's share is his dispenser: player_healed names him as the healer
 	// for it, so it has always been inside the total and never visible.
-	if s.healMedic > 0 || s.healEngineer > 0 || s.healScoreboard > 0 {
-		fmt.Printf("  healing by class  medic %d  engineer %d", s.healMedic, s.healEngineer)
+	if len(s.healingBy) > 0 || s.healScoreboard > 0 {
+		fmt.Printf("  healing by class  %s\n", ranked(s.healingBy))
 
-		if s.healSoldier > 0 {
-			fmt.Printf("  soldier %d", s.healSoldier)
+		// Every class, so the parts add up to the whole. The first cut printed
+		// only the medic and the engineer and they came to 1757 of a total of
+		// 7246: five and a half thousand points of healing done by classes the
+		// report did not think could heal.
+		counted := 0
+
+		for _, v := range s.healingBy {
+			counted += v
 		}
 
-		if s.healSniper > 0 {
-			fmt.Printf("  sniper %d", s.healSniper)
+		if gap := s.healing - counted; gap != 0 {
+			fmt.Printf("  unattributed      %d\n", gap)
 		}
-
-		fmt.Println()
 
 		fmt.Printf("  scoreboard says   %d", s.healScoreboard)
 
@@ -379,8 +382,8 @@ func compare(now, then summary) {
 	fmt.Printf("  damage dealt      %d -> %d\n", then.damage, now.damage)
 	fmt.Printf("  sentry damage     %d -> %d\n", then.sentryDamage, now.sentryDamage)
 	fmt.Printf("  healing done      %d -> %d\n", then.healing, now.healing)
-	fmt.Printf("  of it, the medic  %d -> %d\n", then.healMedic, now.healMedic)
-	fmt.Printf("  of it, dispensers %d -> %d\n", then.healEngineer, now.healEngineer)
+	fmt.Printf("  of it, the medic  %d -> %d\n", then.healingBy["medic"], now.healingBy["medic"])
+	fmt.Printf("  of it, dispensers %d -> %d\n", then.healingBy["engineer"], now.healingBy["engineer"])
 	fmt.Printf("  sentries lost     %d -> %d\n", then.sentriesLost, now.sentriesLost)
 	fmt.Printf("  repaired          %d -> %d\n", then.repaired, now.repaired)
 	fmt.Printf("  backstabbed       %d -> %d\n", then.causeBy["backstab"], now.causeBy["backstab"])
