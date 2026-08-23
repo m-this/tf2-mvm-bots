@@ -113,6 +113,35 @@ them. `soldier_closes_in` (750) is written and not yet measured.
 Whether it matters depends on the item below, because a desired range only
 means something if he can act on it.
 
+## What did work, and what it cost
+
+`attack_path_nudge`: when the mesh refuses a path, step toward the target
+instead of standing still. Twelve waves across two maps, each way:
+
+```
+                  ON      OFF
+demoman damage   20592   16778    +23%
+team damage     221807  222822    flat
+defender deaths    130      95    +37%
+waves cleared        7       8
+```
+
+Both effects replicated on both maps, so this is a trade rather than noise. It
+is the only change measured that raised the two classes' damage, and it did not
+raise the team's.
+
+**A fighter is not a medic.** The identical fix inside
+`PluginBot_SimulateFrame` took the medic from 4% of a wave with his beam
+connected to 30%, because a path that fails on the way to a teammate is a bot
+standing still for nothing. Arriving next to a robot is not the same as
+arriving next to a friend, and ground the mesh will not path is often ground
+worth not standing on.
+
+So the nudge stays where it wins and is gone from `attack.sp` and
+`campbomb.sp`. The failure *counting* stays everywhere: `sm_dump_front` reports
+dead-end paths per bot, which is how the 1044-versus-600 gap was found in the
+first place.
+
 ## The path bug reaches both of them
 
 `ComputeToTarget` returns a bool and every one of the mod's twenty-one call

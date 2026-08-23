@@ -117,7 +117,17 @@ static Action CTFBotDefenderAttack_Update(BehaviorAction action, int actor, floa
 			RepathToTarget(actor, myBot, m_iAttackTarget[actor]);
 		}
 		
-		FollowPathOrNudge(actor, myBot, targetOrigin);
+		/* Walked, and not stepped toward when the mesh refuses: measured, and a fighter is not a medic
+		
+		The same nudge in PluginBot_SimulateFrame took the medic from four percent of a wave with
+		his beam connected to thirty, because a path that fails on the way to a teammate is a bot
+		standing still for nothing. Here it was worth twenty three percent more damage out of the
+		Soldier and the Demoman over twelve waves, and cost the team thirty seven percent more
+		deaths, flat total damage and a wave.
+		
+		Reaching a friend is safe and reaching a robot is not, and where the mesh will not path is
+		often ground worth not standing on. */
+		m_pPath[actor].Update(myBot);
 	}
 	else if (Feature(FEATURE_ATTACK_STRAFE))
 	{

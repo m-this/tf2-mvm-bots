@@ -61,7 +61,7 @@ public Action CTFBotCampBomb_Update(BehaviorAction action, int actor, float inte
 				RepathToTarget(actor, myBot, nearest);
 			}
 			
-			FollowPathOrNudge(actor, myBot, GetAbsOrigin(nearest));
+			m_pPath[actor].Update(myBot);
 			
 			return action.Continue();
 		}
@@ -89,7 +89,7 @@ public Action CTFBotCampBomb_Update(BehaviorAction action, int actor, float inte
 			RepathToPos(actor, myBot, guardPosition);
 		}
 		
-		FollowPathOrNudge(actor, myBot, guardPosition);
+		m_pPath[actor].Update(myBot);
 	}
 	
 	CKnownEntity threat = myBot.GetVisionInterface().GetPrimaryKnownThreat(false);

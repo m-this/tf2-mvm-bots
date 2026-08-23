@@ -173,15 +173,6 @@ static void NotePathResult(int actor, bool built)
 	m_bPathFailed[actor] = failed;
 }
 
-//Walk the path, or step toward the goal when the mesh would not give one
-void FollowPathOrNudge(int actor, INextBot myBot, const float goal[3])
-{
-	if (Feature(FEATURE_ATTACK_PATH_NUDGE) && m_bPathFailed[actor])
-		NudgeTowardsGoal(actor, myBot, goal);
-	else
-		m_pPath[actor].Update(myBot);
-}
-
 #include "behavior/attack.sp"
 #include "behavior/markgiant.sp"
 #include "behavior/collectmoney.sp"
