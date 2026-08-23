@@ -155,6 +155,36 @@ their *rate* of fire, and it did not. Shots went 384 to 409 for the Demoman and
 firing forty five pipes in a wave from a launcher that reloads in six tenths of
 a second is still unexplained.
 
+## What worked for the soldier: the stock launcher
+
+The loadout handed him the Beggar's Bazooka. Ten waves across Decoy and
+Bigrock, against the stock rocket launcher:
+
+```
+                    stock          Beggar's
+Decoy  damage       17071            11411
+Bigrock damage      15211            14977
+combined            32282            26388     +22%
+
+hit rate              61%              46%
+damage per rocket   62 / 68          43 / 50
+self-damage        1171/1517        2698/1909
+```
+
+**A bot cannot aim off a spread.** A person loads three, releases, and walks
+the spread onto the target; a bot aims at a point and eats every deviation.
+Damage per rocket is 36% higher with stock on both maps and the hit-rate gap is
+the same on both, which is what a mechanical cause looks like as opposed to map
+luck.
+
+Note Bigrock's totals nearly tie, because the Beggar's burst fires more rockets
+there (302 against 225) and volume almost covers for accuracy. Decoy's +50% on
+its own would have overstated this; the two maps together give +22%.
+
+The general lesson for `configs/defenderbots/loadout.cfg`: **a weapon chosen
+from a human guide can be actively wrong for a bot.** The comment on that entry
+said exactly why it was picked, and the reasoning was sound for a person.
+
 ## Still open
 
 The Soldier's rocket launcher has no entry in `weapon_tuning.sp` and falls
