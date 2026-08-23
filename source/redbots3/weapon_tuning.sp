@@ -49,18 +49,17 @@ closing without firing at a rumour. */
  */
 #define SOLDIER_ROCKET_SETTLE	750.0
 
-/* Nearer than this and the ground under the robot is the ground under the man shooting at it
- *
- * Wider than the blast itself, because a rocket aimed at the floor lands short of the body and the
- * robot is still walking in while it flies.
- */
-#define FEET_AIM_MIN_RANGE	350.0
-
 #define DEMO_PIPE_SETTLE		600.0
 #define DEMO_PIPE_HOLD_FIRE		900.0
 #define DEMO_PIPE_FIRE_ANYWAY	1400.0
 
-//Which of the two, so the pair get played against each other rather than argued about
+/* Which of the two, so the pair get played against each other rather than argued about
+ *
+ * Worth re-reading now there are numbers for where he actually fights. The telemetry puts his
+ * median distance to the nearest robot between 1044 and 1258 units on the two maps measured, so
+ * holding fire past 900 is holding fire for most of a wave. The pair last played each other before
+ * anything counted the range.
+ */
 stock float DemoPipeMaxRange()
 {
 	return Feature(FEATURE_DEMO_HOLD_FIRE) ? DEMO_PIPE_HOLD_FIRE : DEMO_PIPE_FIRE_ANYWAY;
