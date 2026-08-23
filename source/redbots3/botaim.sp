@@ -881,6 +881,20 @@ bool ShouldAimRocketsAtFeet(int client, int target, int weaponID)
 	if (weaponID == TF_WEAPON_DIRECTHIT)
 		return false;
 	
+	/* Not at the feet of something standing on him, whatever the reasons below say
+	
+	Aiming at the ground is what makes the shot unreflectable and what catches a crowd, and both
+	are worth having at a distance. Up close the ground under the robot is the ground under the
+	Soldier, so it turns every one of those shots into splash on himself, and the rule below fires
+	on every robot Pyro there is, which is the class that walks into his face.
+	
+	Measured on Decoy: 3988 self damage against 16721 dealt, and four deaths to his own rockets.
+	At this range the robot's chest is a bigger target than the floor and the blast is a body
+	further away. */
+	if (Feature(FEATURE_EXPLOSIVE_MIN_RANGE)
+		&& GetVectorDistance(GetAbsOrigin(client), GetAbsOrigin(target)) < FEET_AIM_MIN_RANGE)
+		return false;
+	
 	/* A rocket fired into a Pyro's face comes back
 
 	Robot Pyros airblast, and a reflected rocket is the Soldier's own damage aimed at his team.
