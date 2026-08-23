@@ -36,6 +36,53 @@ The build cycle log is what found it. `started` with no exit reason, then
 `started` again ninety-eight seconds later — nothing else produces a missing
 exit, because dying tears an action down without its update ever running.
 
+## The medic, settled
+
+**The mod's heal action is gone and the game does the healing again.** Everything
+below this heading is the history of how that was got wrong, kept because the
+reasoning in it is the reasoning a future attempt will have.
+
+The short version: the mod's action took the walking, the aim and the button away
+from the game's medic so it could pick the patient itself. Picking the patient
+was the point and the walking was the price, and the price was the whole medic.
+The mod walked through `esPluginBot`, whose path computation fails silently and
+leaves a stale path behind (see
+[how-bots-break.md](how-bots-break.md)), so the medic was nudged 120 units at a
+time and never arrived anywhere.
+
+Measured on Coaltown, one build, both arms back to back:
+
+```
+                            game's own    mod's action
+beam connected                    61%           5-17%
+movement between samples    337 units       0-70 units
+path computations failed            0            most
+ubers (waves 1-3)                   3               1
+healing (waves 1-3)              3221            2121
+wave 4                    cleared 1 of 3    cleared 0 of 3
+```
+
+Deaths, damage and wave duration were level on waves 1 to 3. The wins are the
+healing, the ubers, and the hard wave.
+
+What was kept is everything in `CTFBotMedicHeal_UpdatePost` that does not touch
+locomotion: uber and resistance handling, the revive, the shopping gate, and
+holding the hatch instead of fetching the bomb when there is nobody to heal.
+
+**What was lost, and is worth getting back:** the patient ranking. The game picks
+whoever it likes; the mod picked the biggest body, which is where health is worth
+most. Doing that properly means changing the game's mind about its patient rather
+than replacing the action that holds it, and the one attempt at that wrote into
+the action's own field and segfaulted the server.
+
+One loose end, recorded rather than tidied away. `medic_biggest_body` — ranking
+patients by class and max health with no distance bucket — was measured on
+identical content on two maps and won on both: deaths 10 to 7 and 12 to 6,
+damage up 16% on each. No explanation was ever found for how choosing a better
+patient helps when the walking underneath is broken, and the change is now gone
+with the rest of the ranking. If the ranking comes back, that result is a reason
+to try this shape of it first.
+
 ## What was wrong with the medic
 
 Three distinct causes, all producing "the medic is somewhere useless", found in
