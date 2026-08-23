@@ -69,7 +69,29 @@ What was kept is everything in `CTFBotMedicHeal_UpdatePost` that does not touch
 locomotion: uber and resistance handling, the revive, the shopping gate, and
 holding the hatch instead of fetching the bomb when there is nobody to heal.
 
-**What was lost, and is worth getting back:** the patient ranking. The game picks
+**The patient ranking came back, from the other side.** Instead of replacing the
+action that holds the patient, the mod now writes that action's own patient field
+and leaves everything else alone: `PointMedicAtBiggestBody`, called from
+`CTFBotMedicHeal_UpdatePost`, throttled to once every two seconds.
+
+```
+beam connected        75% of samples   (61% with the game's own pick, 5-17% with the mod's action)
+beam target           heavy 72%, pyro 17%, the rest 11%
+waves                 4 of 4 cleared, no fault
+```
+
+An earlier attempt at writing that field segfaulted the server, and this is
+deliberately narrower. It runs only from inside the action's own callback, so
+the action being written is the one the game is running rather than one looked up
+from elsewhere. The same offset is read in the same callback every frame and has
+never faulted, which is what says the offset and the object are right. The value
+is a checked, living, same-team, non-medic client, and it is only written when it
+differs from what is there.
+
+What is measured is the mechanism: the beam is on the Heavy. Whether that beats
+the game's own choice on wave outcomes has not been A/B'd.
+
+**The older loss, kept for the record:** the patient ranking as it was. The game picks
 whoever it likes; the mod picked the biggest body, which is where health is worth
 most. Doing that properly means changing the game's mind about its patient rather
 than replacing the action that holds it, and the one attempt at that wrote into

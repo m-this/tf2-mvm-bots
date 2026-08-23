@@ -742,6 +742,63 @@ bool SentryNeedsMetal(int sentry)
 	return GetEntProp(sentry, Prop_Send, "m_iAmmoShells") < 100;
 }
 
+/* How often a bolt was fired at a sentry that then failed to gain any health
+ *
+ * A player reported an engineer stood firing Rescue Ranger bolts into a wall with the sentry behind
+ * it. Reproducing that here found nothing, and the reason is worth keeping: across four waves the
+ * state this can happen in, a damaged sentry with its engineer standing two hundred units or more
+ * away, occurred in zero samples out of a hundred and thirty seven. The sentry is at full health or
+ * it is dead, and five second sampling cannot see a rare state at all.
+ *
+ * So this counts the event rather than sampling the state. A counter accumulates, and sampling a
+ * counter loses nothing however rare the thing is: one stall in an hour still shows up as a one.
+ *
+ * It only counts. Deciding what the engineer should do about it needs to know how often it happens
+ * and that is what this is for.
+ */
+#define RANGE_REPAIR_PATIENCE	3.0
+
+static int m_iRangeRepairHealth[MAXPLAYERS + 1];
+static float m_ctRangeRepairSince[MAXPLAYERS + 1];
+static int m_iRangeRepairStalls[MAXPLAYERS + 1];
+
+int RangeRepairStallsOf(int client)
+{
+	return m_iRangeRepairStalls[client];
+}
+
+static void NoteRangeRepair(int actor, int sentry)
+{
+	int health = BaseEntity_GetHealth(sentry);
+	float now = GetGameTime();
+
+	//Health went up, or this is the first bolt: either way the clock starts here
+	if (health > m_iRangeRepairHealth[actor] || m_ctRangeRepairSince[actor] <= 0.0)
+	{
+		m_iRangeRepairHealth[actor] = health;
+		m_ctRangeRepairSince[actor] = now;
+
+		return;
+	}
+
+	m_iRangeRepairHealth[actor] = health;
+
+	if (now - m_ctRangeRepairSince[actor] < RANGE_REPAIR_PATIENCE)
+		return;
+
+	//Counted once per stall rather than once per frame of one
+	m_ctRangeRepairSince[actor] = now;
+	m_iRangeRepairStalls[actor]++;
+
+	LogBuildFailure(actor, "repairing at range", "three seconds of bolts and the sentry gained nothing");
+}
+
+void ForgetRangeRepair(int actor)
+{
+	m_iRangeRepairHealth[actor] = 0;
+	m_ctRangeRepairSince[actor] = 0.0;
+}
+
 //A Rescue Ranger bolt repairs at range, so its engineer does not walk into the open to hold a nest
 bool CanRepairFromRange(int actor, int sentry, float dist)
 {
@@ -758,7 +815,17 @@ bool CanRepairFromRange(int actor, int sentry, float dist)
 	if (GetEntProp(actor, Prop_Data, "m_iAmmo", _, 3) < 30)
 		return false;
 	
-	return IsLineOfFireClearEntity(actor, GetEyePosition(actor), sentry);
+	if (!IsLineOfFireClearEntity(actor, GetEyePosition(actor), sentry))
+	{
+		ForgetRangeRepair(actor);
+		
+		return false;
+	}
+	
+	//Watched, not acted on. What to do about a stall is a separate argument and needs this first
+	NoteRangeRepair(actor, sentry);
+	
+	return true;
 }
 
 static void CTFBotMvMEngineerIdle_OnEnd(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
@@ -777,6 +844,8 @@ static Action CTFBotMvMEngineerIdle_OnMoveToSuccess(BehaviorAction action, int a
 
 static void CTFBotMvMEngineerIdle_ResetProperties(int actor)
 {
+	ForgetRangeRepair(actor);
+
 	m_hBuildingToGrab[actor] = INVALID_ENT_REFERENCE;
 	g_bGoingToGrabBuilding[actor] = false;
 	

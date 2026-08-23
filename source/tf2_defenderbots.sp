@@ -449,6 +449,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	CreateNative("Defenderbots_IsPathing", Native_IsPathing);
 	CreateNative("Defenderbots_PathFailed", Native_PathFailed);
 	CreateNative("Defenderbots_PathFailures", Native_PathFailures);
+	CreateNative("Defenderbots_RangeRepairStalls", Native_RangeRepairStalls);
 	
 	RegPluginLibrary("tf2_defenderbots");
 	
@@ -491,6 +492,20 @@ static any Native_PathFailures(Handle plugin, int numParams)
 		return -1;
 	
 	return PathFailuresOf(client);
+}
+
+/* Bolts fired at a sentry that gained nothing for three seconds, counted rather than sampled
+ *
+ * The state this happens in is rare enough that a five second sampler saw it zero times in a
+ * hundred and thirty seven engineer samples. A counter does not care how rare it is. */
+static any Native_RangeRepairStalls(Handle plugin, int numParams)
+{
+	int client = GetNativeCell(1);
+	
+	if (client < 1 || client > MaxClients || !IsClientInGame(client) || !g_bIsDefenderBot[client])
+		return -1;
+	
+	return RangeRepairStallsOf(client);
 }
 
 static any Native_IsPathing(Handle plugin, int numParams)

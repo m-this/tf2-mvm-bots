@@ -29,6 +29,7 @@ enum
 	FEATURE_WAVE_RESISTANCES,
 	FEATURE_ATTACK_STRAFE,
 	FEATURE_SOLDIER_CLOSES_IN,
+	FEATURE_MEDIC_POCKETS_BIGGEST,
 	FEATURE_DEMO_TANK_PIPES,
 	FEATURE_DEMO_STICKY_SELF_VETO,
 	FEATURE_COUNT
@@ -46,6 +47,7 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"wave_resistances",
 	"attack_strafe",
 	"soldier_closes_in",
+	"medic_pockets_biggest",
 	"demo_tank_pipes",
 	"demo_sticky_self_veto"
 };
@@ -86,6 +88,9 @@ void LoadFeatures()
 
 	g_arrFeatureConVars[FEATURE_SOLDIER_CLOSES_IN] = MakeFeature(FEATURE_SOLDIER_CLOSES_IN,
 		"A rocket is fought at a grenade's distance rather than twelve hundred units out.");
+
+	g_arrFeatureConVars[FEATURE_MEDIC_POCKETS_BIGGEST] = MakeFeature(FEATURE_MEDIC_POCKETS_BIGGEST,
+		"The game's medic is pointed at the biggest body. Off leaves him whoever he picked.");
 
 	g_arrFeatureConVars[FEATURE_DEMO_TANK_PIPES] = MakeFeature(FEATURE_DEMO_TANK_PIPES,
 		"The demoman answers a tank with pipes. Off lets him lay stickies on the hull.");

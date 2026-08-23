@@ -270,6 +270,7 @@ native float Defenderbots_GetPathLength(int client);
 native bool Defenderbots_IsPathing(int client);
 native bool Defenderbots_PathFailed(int client);
 native int Defenderbots_PathFailures(int client);
+native int Defenderbots_RangeRepairStalls(int client);
 
 static bool g_bHasPathNatives;
 
@@ -279,6 +280,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	MarkNativeAsOptional("Defenderbots_IsPathing");
 	MarkNativeAsOptional("Defenderbots_PathFailed");
 	MarkNativeAsOptional("Defenderbots_PathFailures");
+	MarkNativeAsOptional("Defenderbots_RangeRepairStalls");
 
 	return APLRes_Success;
 }
@@ -1639,6 +1641,7 @@ static void WriteBotTelemetry(int client, float when, float clock)
 	and has never published. */
 	bool pathFailed = g_bHasPathNatives && Defenderbots_PathFailed(client);
 	int pathFailures = g_bHasPathNatives ? Defenderbots_PathFailures(client) : -1;
+	int repairStalls = g_bHasPathNatives ? Defenderbots_RangeRepairStalls(client) : -1;
 
 	bool firing = (GetEntProp(client, Prop_Data, "m_nButtons") & IN_ATTACK) != 0;
 
@@ -1647,12 +1650,13 @@ static void WriteBotTelemetry(int client, float when, float clock)
 		"{\"event\":\"bot\",\"map\":\"%s\",\"wave\":%d,\"t\":%.1f,\"clock\":%.1f,\"who\":\"%s\",\"class\":\"%s\","
 		... "\"at\":[%.0f,%.0f,%.0f],\"hp\":%d,\"maxhp\":%d,\"weapon\":\"%s\",\"slot\":%d,"
 		... "\"nearest_enemy\":%.0f,\"aim\":\"%s\",\"aim_range\":%.0f,\"firing\":%d,"
-		... "\"path_len\":%.0f,\"pathing\":%d,\"path_failed\":%d,\"path_failures\":%d,"
+		... "\"path_len\":%.0f,\"pathing\":%d,\"path_failed\":%d,\"path_failures\":%d,\"repair_stalls\":%d,"
 		... "\"healing\":\"%s\",\"action\":\"%s\"}",
 		g_sMap, g_iWave, when, clock, name, ClassName(TF2_GetPlayerClass(client)),
 		at[0], at[1], at[2], GetClientHealth(client), TF2Util_GetEntityMaxHealth(client),
 		weaponClass, slot, RangeToNearestEnemy(client), aim, aimRange, firing ? 1 : 0,
-		pathLength, pathing ? 1 : 0, pathFailed ? 1 : 0, pathFailures, healing, stack);
+		pathLength, pathing ? 1 : 0, pathFailed ? 1 : 0, pathFailures, repairStalls,
+		healing, stack);
 
 	WriteLine(line);
 }
