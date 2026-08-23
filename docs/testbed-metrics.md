@@ -73,6 +73,14 @@ Six bots and five buildings at five seconds is roughly 130 lines a minute. The
 results directory is gitignored. A `bot` line carries the whole behaviour stack,
 so keep `STATS_LINE_LENGTH` ahead of it.
 
+### `t` and `clock`
+
+`t` is seconds into the wave, and it is zero for every sample taken between
+waves because there is no wave to be seconds into. Use `clock`, the server's
+game time, to tell two samples apart. Reading a file back on `t` alone made one
+dispenser sampled fourteen times look like fourteen dispensers, which is a bug
+this file exists to find and briefly invented instead.
+
 ## Gotchas paid for already
 
 - **`ActionsManager.Iterator` throws on a client that is not a NextBot**, and a

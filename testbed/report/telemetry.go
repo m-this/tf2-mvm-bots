@@ -24,6 +24,7 @@ type botSample struct {
 	Event   string    `json:"event"`
 	Wave    int       `json:"wave"`
 	T       float64   `json:"t"`
+	Clock   float64   `json:"clock"`
 	Who     string    `json:"who"`
 	Class   string    `json:"class"`
 	At      []float64 `json:"at"`
@@ -40,6 +41,7 @@ type buildingSample struct {
 	Map        string    `json:"map"`
 	Wave       int       `json:"wave"`
 	T          float64   `json:"t"`
+	Clock      float64   `json:"clock"`
 	Owner      string    `json:"owner"`
 	Type       string    `json:"type"`
 	Mode       int       `json:"mode"`
