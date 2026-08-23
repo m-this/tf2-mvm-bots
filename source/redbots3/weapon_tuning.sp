@@ -49,6 +49,13 @@ closing without firing at a rumour. */
  */
 #define SOLDIER_ROCKET_SETTLE	750.0
 
+/* Nearer than this and the ground under the robot is the ground under the man shooting at it
+ *
+ * Wider than the blast itself, because a rocket aimed at the floor lands short of the body and the
+ * robot is still walking in while it flies.
+ */
+#define FEET_AIM_MIN_RANGE	350.0
+
 #define DEMO_PIPE_SETTLE		600.0
 #define DEMO_PIPE_HOLD_FIRE		900.0
 #define DEMO_PIPE_FIRE_ANYWAY	1400.0
