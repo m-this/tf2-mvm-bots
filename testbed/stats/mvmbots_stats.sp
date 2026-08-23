@@ -1094,7 +1094,7 @@ static int TeammatesServedBy(const float at[3], float range)
 	return count;
 }
 
-static void WriteBotTelemetry(int client, float when)
+static void WriteBotTelemetry(int client, float when, float clock)
 {
 	float at[3]; GetClientAbsOrigin(client, at);
 
@@ -1125,17 +1125,17 @@ static void WriteBotTelemetry(int client, float when)
 
 	char line[TELEMETRY_LINE_LENGTH];
 	FormatEx(line, sizeof(line),
-		"{\"event\":\"bot\",\"map\":\"%s\",\"wave\":%d,\"t\":%.1f,\"who\":\"%s\",\"class\":\"%s\","
+		"{\"event\":\"bot\",\"map\":\"%s\",\"wave\":%d,\"t\":%.1f,\"clock\":%.1f,\"who\":\"%s\",\"class\":\"%s\","
 		... "\"at\":[%.0f,%.0f,%.0f],\"hp\":%d,\"maxhp\":%d,\"weapon\":\"%s\",\"slot\":%d,"
 		... "\"healing\":\"%s\",\"action\":\"%s\"}",
-		g_sMap, g_iWave, when, name, ClassName(TF2_GetPlayerClass(client)),
+		g_sMap, g_iWave, when, clock, name, ClassName(TF2_GetPlayerClass(client)),
 		at[0], at[1], at[2], GetClientHealth(client), TF2Util_GetEntityMaxHealth(client),
 		weaponClass, slot, healing, stack);
 
 	WriteLine(line);
 }
 
-static void WriteBuildingTelemetry(int owner, int building, float when)
+static void WriteBuildingTelemetry(int owner, int building, float when, float clock)
 {
 	float at[3]; GetEntPropVector(building, Prop_Send, "m_vecOrigin", at);
 
@@ -1153,10 +1153,10 @@ static void WriteBuildingTelemetry(int owner, int building, float when)
 
 	char line[TELEMETRY_LINE_LENGTH];
 	FormatEx(line, sizeof(line),
-		"{\"event\":\"building\",\"map\":\"%s\",\"wave\":%d,\"t\":%.1f,\"owner\":\"%s\","
+		"{\"event\":\"building\",\"map\":\"%s\",\"wave\":%d,\"t\":%.1f,\"clock\":%.1f,\"owner\":\"%s\","
 		... "\"type\":\"%s\",\"mode\":%d,\"level\":%d,\"hp\":%d,\"maxhp\":%d,\"at\":[%.0f,%.0f,%.0f],"
 		... "\"disposable\":%d,\"kills\":%d,\"enemies_seen\":%d,\"teammates_near\":%d,\"sapped\":%d}",
-		g_sMap, g_iWave, when, ownerName, class,
+		g_sMap, g_iWave, when, clock, ownerName, class,
 		HasEntProp(building, Prop_Send, "m_iObjectMode") ? GetEntProp(building, Prop_Send, "m_iObjectMode") : 0,
 		GetEntProp(building, Prop_Send, "m_iUpgradeLevel"),
 		GetEntProp(building, Prop_Data, "m_iHealth"), GetEntProp(building, Prop_Send, "m_iMaxHealth"),
@@ -1181,7 +1181,14 @@ static void SampleTelemetry()
 
 	g_flNextTelemetrySample = GetGameTime() + TELEMETRY_SAMPLE_INTERVAL;
 
+	/* Seconds into the wave, and the server clock beside it
+	
+	Between waves there is no wave to be seconds into, so t is zero for every sample in the break.
+	That makes a whole break's worth of samples look like one instant: reading the file back, one
+	dispenser sampled fourteen times came out as fourteen dispensers, which is a bug this file was
+	built to find and briefly invented instead. The clock is what tells two samples apart. */
 	float when = g_flWaveStart > 0.0 ? GetGameTime() - g_flWaveStart : 0.0;
+	float clock = GetGameTime();
 
 	for (int i = 1; i <= MaxClients; i++)
 	{
@@ -1191,12 +1198,12 @@ static void SampleTelemetry()
 		if (!IsPlayerAlive(i) || !HasBehaviour(i))
 			continue;
 
-		WriteBotTelemetry(i, when);
+		WriteBotTelemetry(i, when, clock);
 
 		int objects = TF2Util_GetPlayerObjectCount(i);
 
 		for (int n = 0; n < objects; n++)
-			WriteBuildingTelemetry(i, TF2Util_GetPlayerObject(i, n), when);
+			WriteBuildingTelemetry(i, TF2Util_GetPlayerObject(i, n), when, clock);
 	}
 }
 
