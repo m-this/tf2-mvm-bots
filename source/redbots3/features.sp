@@ -29,6 +29,10 @@ enum
 	FEATURE_WAVE_RESISTANCES,
 	FEATURE_ATTACK_STRAFE,
 	FEATURE_SOLDIER_CLOSES_IN,
+	FEATURE_MEDIC_OWN_HEAL,
+	FEATURE_MEDIC_BIGGEST_BODY,
+	FEATURE_DEMO_TANK_PIPES,
+	FEATURE_DEMO_STICKY_SELF_VETO,
 	FEATURE_COUNT
 }
 
@@ -43,7 +47,11 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"ready_when_prepared",
 	"wave_resistances",
 	"attack_strafe",
-	"soldier_closes_in"
+	"soldier_closes_in",
+	"medic_own_heal",
+	"medic_biggest_body",
+	"demo_tank_pipes",
+	"demo_sticky_self_veto"
 };
 
 static ConVar g_arrFeatureConVars[FEATURE_COUNT];
@@ -82,6 +90,18 @@ void LoadFeatures()
 
 	g_arrFeatureConVars[FEATURE_SOLDIER_CLOSES_IN] = MakeFeature(FEATURE_SOLDIER_CLOSES_IN,
 		"A rocket is fought at a grenade's distance rather than twelve hundred units out.");
+
+	g_arrFeatureConVars[FEATURE_MEDIC_OWN_HEAL] = MakeFeature(FEATURE_MEDIC_OWN_HEAL,
+		"The medic does his own walking and aiming. Off hands him back to the game's medic behaviour.");
+
+	g_arrFeatureConVars[FEATURE_MEDIC_BIGGEST_BODY] = MakeFeature(FEATURE_MEDIC_BIGGEST_BODY,
+		"The medic follows the biggest body wherever it is. Off prefers whoever is nearby.");
+
+	g_arrFeatureConVars[FEATURE_DEMO_TANK_PIPES] = MakeFeature(FEATURE_DEMO_TANK_PIPES,
+		"The demoman answers a tank with pipes. Off lets him lay stickies on the hull.");
+
+	g_arrFeatureConVars[FEATURE_DEMO_STICKY_SELF_VETO] = MakeFeature(FEATURE_DEMO_STICKY_SELF_VETO,
+		"A bomb of his own close enough to hurt him stops the detonator. Off presses it anyway.");
 
 	g_arrFeatureConVars[FEATURE_ATTACK_STRAFE] = MakeFeature(FEATURE_ATTACK_STRAFE,
 		"A bot that has arrived at its firing position keeps sidestepping instead of standing still.");

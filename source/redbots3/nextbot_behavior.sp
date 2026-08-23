@@ -1225,6 +1225,22 @@ static bool IsCloserBetterPatient(int medic, const float from[3], int candidate,
 	if (incumbent <= 0 || !IsClientInGame(incumbent) || !IsPlayerAlive(incumbent))
 		return true;
 
+	/* The biggest body wins wherever he is standing, which is the whole of the ranking again
+	
+	The nearby bucket below is a fixed point. Whoever the medic happens to be standing next to
+	outranks the Heavy at the other end of the map, and the heal action only walks when the patient
+	is more than two hundred and fifty units away, so a patient who does not move is a medic who
+	does not move. Anybody can be that patient: a teammate holding a corner, an engineer at his
+	nest, or, for the whole of this mod's history, the test bed's own seat holder.
+	
+	Measured: the medic covers 2414 units in a wave against 23000 to 33000 for everybody else, and
+	sits 86% of samples in the same spot. Nothing else on the team is within a factor of ten.
+	
+	On this side the walk is the cost and it is paid once. A Heavy is where health goes, and the
+	medic arrives at the fight because the Heavy is at the fight. */
+	if (Feature(FEATURE_MEDIC_BIGGEST_BODY))
+		return IsBetterPatient(candidate, incumbent);
+
 	//The man already being beamed keeps his nearby standing a little past the line
 	float incumbentReach = MEDIC_PATIENT_NEARBY;
 
@@ -1425,7 +1441,14 @@ public Action CTFBotMedicHeal_UpdatePost(BehaviorAction action, int actor, float
 	if (GameRules_GetRoundState() == RoundState_BetweenRounds && !g_bShoppedThisBreak[actor])
 		return Plugin_Continue;
 
-	if (PreferredPatient(actor) > 0)
+	/* Off, the game's own medic behaviour is left to run, which is what this replaced
+	
+	Worth being able to switch because the mod's version has never been measured honestly. Every
+	medic experiment in this repo was run against a test-bed seat holder that stood in the RED
+	spawn at full health and never moved, and PreferredPatient ranks a teammate within twelve
+	hundred units above one anywhere else, so the medic pocketed the statue for the whole wave and
+	four correct-looking answers lost to it. See testbed/stats/mvmbots_host.sp. */
+	if (Feature(FEATURE_MEDIC_OWN_HEAL) && PreferredPatient(actor) > 0)
 		return action.SuspendFor(CTFBotDefenderMedicHeal(), "Heal the biggest body");
 	
 	int myWeapon = BaseCombatCharacter_GetActiveWeapon(actor);
