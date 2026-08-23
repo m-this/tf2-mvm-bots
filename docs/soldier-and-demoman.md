@@ -46,7 +46,29 @@ killed themselves  soldier 4
 **A quarter of the Soldier's output goes into his own feet**, and it kills him
 four times in six waves. The Demoman gives up about a sixth the same way.
 
-Three things caused it, all of them absent rather than wrong:
+**And trying to stop it made everything worse.** `explosive_min_range` gave the
+Soldier his shotgun inside 220 units and stopped him aiming at feet inside 350.
+Six waves on Decoy against six without:
+
+```
+                        ON      OFF
+soldier damage       10886    16890
+soldier accuracy       40%      60%
+soldier self-kills       3        6
+demoman damage        8269    11265
+defender deaths         47       28
+```
+
+The hit rate is the explanation. **The ground does not move and a robot does.**
+A rocket at the floor lands and splashes whatever the robot did next; one aimed
+at a chest arrives where the chest was. The splash he catches is the price of
+the shots that land at all, and it is a price worth paying: he traded a third
+of his damage for three fewer self-kills, and the team died more anyway.
+
+So the self-damage is real, it is large, and it is not a defect. Two of the
+three things below are gone.
+
+The original reasoning, kept because it is the reasoning anyone will have:
 
 1. **No minimum range on an explosive.** `EquipBestWeaponForThreat` never asked
    how near the threat was, so a Soldier fired rockets into whatever walked up

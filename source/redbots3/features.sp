@@ -31,7 +31,6 @@ enum
 	FEATURE_ATTACK_STRAFE,
 	FEATURE_SOLDIER_CLOSES_IN,
 	FEATURE_ATTACK_PATH_NUDGE,
-	FEATURE_EXPLOSIVE_MIN_RANGE,
 	FEATURE_BLAST_RESIST_SELF,
 	FEATURE_COUNT
 }
@@ -50,7 +49,6 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"attack_strafe",
 	"soldier_closes_in",
 	"attack_path_nudge",
-	"explosive_min_range",
 	"blast_resist_self"
 };
 
@@ -93,9 +91,6 @@ void LoadFeatures()
 
 	g_arrFeatureConVars[FEATURE_BLAST_RESIST_SELF] = MakeFeature(FEATURE_BLAST_RESIST_SELF,
 		"Blast resistance is worth buying to a Soldier or Demoman whatever the wave carries, because he explodes himself.");
-
-	g_arrFeatureConVars[FEATURE_EXPLOSIVE_MIN_RANGE] = MakeFeature(FEATURE_EXPLOSIVE_MIN_RANGE,
-		"A robot inside his own blast is shot with something that does not explode.");
 
 	g_arrFeatureConVars[FEATURE_ATTACK_PATH_NUDGE] = MakeFeature(FEATURE_ATTACK_PATH_NUDGE,
 		"A fighter the nav mesh will not path steps toward its target instead of standing still.");
