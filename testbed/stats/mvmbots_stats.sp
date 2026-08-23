@@ -835,7 +835,7 @@ static bool IsCountedProjectile(const char[] classname)
  * OnEntityCreated fires before the game attaches the projectile to whoever fired it, so asking for
  * the owner here answers nobody for every shot in the mission.
  */
-static void Frame_CountProjectile(any ref)
+public void Frame_CountProjectile(any ref)
 {
 	int projectile = EntRefToEntIndex(ref);
 	
@@ -843,6 +843,10 @@ static void Frame_CountProjectile(any ref)
 		return;
 	
 	int owner = GetEntPropEnt(projectile, Prop_Send, "m_hOwnerEntity");
+	
+	//A pipe belongs to its thrower; the owner handle is not always the one that is set
+	if ((owner < 1 || owner > MaxClients) && HasEntProp(projectile, Prop_Send, "m_hThrower"))
+		owner = GetEntPropEnt(projectile, Prop_Send, "m_hThrower");
 	
 	if (owner < 1 || owner > MaxClients || !IsClientInGame(owner))
 		return;
