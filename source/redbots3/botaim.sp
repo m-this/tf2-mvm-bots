@@ -881,20 +881,18 @@ bool ShouldAimRocketsAtFeet(int client, int target, int weaponID)
 	if (weaponID == TF_WEAPON_DIRECTHIT)
 		return false;
 	
-	/* Not at the feet of something standing on him, whatever the reasons below say
+	/* Aiming at the body up close was tried and it cost more than the splash did
 	
-	Aiming at the ground is what makes the shot unreflectable and what catches a crowd, and both
-	are worth having at a distance. Up close the ground under the robot is the ground under the
-	Soldier, so it turns every one of those shots into splash on himself, and the rule below fires
-	on every robot Pyro there is, which is the class that walks into his face.
+	The reasoning was sound: a quarter of the Soldier's damage goes into his own feet, and the rule
+	below puts the blast on the floor he is standing next to. Aiming at the chest instead, inside
+	350 units, was measured over six waves on Decoy.
 	
-	Measured on Decoy: 3988 self damage against 16721 dealt, and four deaths to his own rockets.
-	At this range the robot's chest is a bigger target than the floor and the blast is a body
-	further away. */
-	if (Feature(FEATURE_EXPLOSIVE_MIN_RANGE)
-		&& GetVectorDistance(GetAbsOrigin(client), GetAbsOrigin(target)) < FEET_AIM_MIN_RANGE)
-		return false;
+	It took his hit rate from 60 percent to 40 and his damage from 16890 to 10886, and the self
+	damage went up rather than down. The ground does not move and a robot does: a rocket at the
+	floor lands and splashes whatever the robot did next, while one aimed at a body arrives where
+	the body was. The splash he catches is the price of the shots that land at all.
 	
+	*/
 	/* A rocket fired into a Pyro's face comes back
 
 	Robot Pyros airblast, and a reflected rocket is the Soldier's own damage aimed at his team.

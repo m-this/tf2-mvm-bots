@@ -2255,37 +2255,6 @@ static bool IsThrowableReady(int client, int weapon)
 	return HasAmmo(weapon);
 }
 
-/* How close a robot has to be before firing an explosive at it hurts the man firing
- *
- * A rocket and a pipe both burst over a hundred and forty six units. The margin on top is for the
- * robot still walking in while the projectile is in the air.
- */
-#define EXPLOSIVE_SELF_BLAST	220.0
-
-//Its own rather than botaim's, which this file is included ahead of
-static bool IsSelfBlastingWeapon(int weapon)
-{
-	if (weapon < 1)
-		return false;
-
-	switch (TF2Util_GetWeaponID(weapon))
-	{
-		case TF_WEAPON_ROCKETLAUNCHER, TF_WEAPON_GRENADELAUNCHER, TF_WEAPON_DIRECTHIT,
-			TF_WEAPON_PIPEBOMBLAUNCHER, TF_WEAPON_PARTICLE_CANNON, TF_WEAPON_CANNON:
-			return true;
-	}
-
-	return false;
-}
-
-static bool ThreatInsideOwnBlast(int client, const CKnownEntity threat)
-{
-	float threatOrigin[3]; threat.GetLastKnownPosition(threatOrigin);
-	float myOrigin[3]; GetClientAbsOrigin(client, myOrigin);
-
-	return GetVectorDistance(myOrigin, threatOrigin) < EXPLOSIVE_SELF_BLAST;
-}
-
 void EquipBestWeaponForThreat(int client, const CKnownEntity threat)
 {
 	//Don't care about any weapon restrictions here
@@ -2349,14 +2318,6 @@ void EquipBestWeaponForThreat(int client, const CKnownEntity threat)
 	{
 		case TFClass_DemoMan:
 		{
-			/* Same rule as the Soldier below, and both of his guns explode
-			
-			2380 into himself against 13751 dealt. The bottle is what is left when a robot is
-			standing on him, and a bottle that lands beats a pipe that takes a sixth of his health
-			with it. */
-			bool tooCloseForExplosives = Feature(FEATURE_EXPLOSIVE_MIN_RANGE)
-				&& ThreatInsideOwnBlast(client, threat) && melee != -1;
-
 			/* The stickybomb launcher, which this switch used to pass over in silence
 			A Demoman was listed with the classes that only ever want their primary, so the
 			launcher came out when the pipes ran dry and at no other time */
@@ -2371,9 +2332,7 @@ void EquipBestWeaponForThreat(int client, const CKnownEntity threat)
 			It matters more now the launcher is what he reaches for by default: holding eight
 			spent bombs through the reload is a second and a half of nothing with a loaded grenade
 			launcher in the other hand. */
-			if (tooCloseForExplosives)
-				gun = melee;
-			else if (wantSticky && Clip1(secondary) > 0)
+			if (wantSticky && Clip1(secondary) > 0)
 				gun = secondary;
 			else if (gun != -1 && !Clip1(gun) && secondary != -1 && Clip1(secondary))
 				gun = secondary;
@@ -2413,24 +2372,10 @@ void EquipBestWeaponForThreat(int client, const CKnownEntity threat)
 		}
 		case TFClass_Soldier:
 		{
-			/* A robot close enough to be inside his own rocket gets shot with something else
-			
-			Nothing here ever asked how near the threat was, so a Soldier put rockets into whatever
-			walked up to him. Measured on Decoy over six waves: he landed 40 percent of 465 rockets,
-			which is not a bot that cannot shoot, and put 3988 damage into himself while dealing
-			16721. A quarter of his output went into his own feet, and it killed him four times.
-			
-			The shotgun does not explode. Inside the blast it is worth more than a rocket that takes
-			a chunk out of the man firing it, before counting the deaths. */
-			if (Feature(FEATURE_EXPLOSIVE_MIN_RANGE) && ThreatInsideOwnBlast(client, threat)
-				&& IsSelfBlastingWeapon(gun))
-			{
-				if (secondary != -1 && Clip1(secondary) && !IsSelfBlastingWeapon(secondary))
-					gun = secondary;
-				else if (melee != -1)
-					gun = melee;
-			}
-			else if (gun != -1 && !Clip1(gun))
+			/* Handing him the shotgun inside his own blast was tried, with the aim change in
+			botaim, and the pair lost: damage 16890 to 10886 over six waves on Decoy. A rocket
+			that hurts him also kills what is standing on him, and a shotgun does not. */
+			if (gun != -1 && !Clip1(gun))
 			{
 				/* NOTE: we do not want to switch off the rocket launcher against uber threats or else we will conflctingly ignore them
 				on and off due to the detour callback that we do at DHookCallback_IsIgnored_Pre */
