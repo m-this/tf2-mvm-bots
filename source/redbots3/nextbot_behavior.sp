@@ -2700,33 +2700,21 @@ gate on looking at all, which is where the cost is */
 //Far enough up the path that the walk back to the entrance is bought back by the ride
 #define TELEPORTER_WORTH_RIDING	1500.0
 
-/* How far from his nest an engineer with nothing standing is worth teleporting rather than walking
+/* Sending an engineer with no sentry to his own teleporter was tried and lost
  *
- * Measured on Coaltown over six waves: the team had no sentry for 58 percent of the samples, and
- * of that time a third was the engineer being dead and more than half was him alive and walking
- * back. The nests are three and a half thousand units from the spawn and he had built a level
- * three teleporter to cover exactly that, which the gate below never offered him because it asks
- * only about the bomb.
+ * The measurement that suggested it is real: the team has no sentry for well over half of a
+ * Coaltown wave, and more than half of that is the engineer alive and walking back from a spawn
+ * three and a half thousand units from his nest. He builds a level three teleporter for exactly
+ * that journey.
+ *
+ * Twelve waves on two maps, engineer_rides_home: sentry uptime fell from 69 percent to 54, the
+ * worst gap grew from 95 seconds to 125, and the samples of him walking with no sentry went from
+ * 20 to 58. Saying yes here does not put him on the teleporter, it puts him on a walk to the
+ * entrance, which is back in the spawn he is trying to leave. The walk it saves is shorter than
+ * the walk it costs, and the switch is gone rather than turned off.
  */
-#define ENGINEER_RIDE_HOME_RANGE	1500.0
-
 static bool ShouldUseTeleporter(int client)
 {
-	/* An engineer with no nest has somewhere to be and it is not the bomb
-	
-	Everything below decides whether a fighter is behind the fight. His question is different: the
-	sentry is not standing, the ground it stands on is at the other end of the map, and his own
-	teleporter goes there. */
-	if (Feature(FEATURE_ENGINEER_RIDES_HOME) && TF2_GetPlayerClass(client) == TFClass_Engineer
-		&& GetObjectOfType(client, TFObject_Sentry) == INVALID_ENT_REFERENCE)
-	{
-		float nest[3];
-		
-		if (EngineerNestPosition(client, nest)
-			&& GetVectorDistance(GetAbsOrigin(client), nest) > ENGINEER_RIDE_HOME_RANGE)
-			return true;
-	}
-	
 	BombInfo_t bombinfo;
 
 	//No bomb in play, so there is no fight to be late for and no reason to leave the ground

@@ -84,6 +84,23 @@ Both lost for the same reason, which is now a rule in
 behaviour and hands the bot to the game's own code, which is worse than any
 patient. Rank last, never remove.
 
+**`engineer_rides_home`** — an engineer with no sentry, far from his nest,
+takes his own teleporter instead of walking. Twelve waves, two maps:
+
+```
+                        ON     OFF
+sentry standing        54%     69%
+worst gap             125s     95s
+no-sentry samples
+  walking               58      20
+```
+
+Saying yes to `ShouldUseTeleporter` does not put the bot on a teleporter. It
+lets the game's tactical monitor look for one, and the entrance is back in the
+spawn he is trying to leave — so the walk it saves is shorter than the walk it
+costs, and he spent nearly three times as long walking. The measurement that
+suggested the change was sound; the mechanism was not the one I assumed.
+
 ## Reading a change on these two classes
 
 Waves cleared will not settle it. The medic A/Bs came out 6/6 against 5/7 and
