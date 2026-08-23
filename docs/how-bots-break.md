@@ -230,6 +230,47 @@ The rule this leaves behind: **anything the test bed adds to the world is part
 of the experiment.** A fake client is a teammate. Ask what the code under test
 does with it before trusting a number that came out of the same run.
 
+## A failed call can leave the last successful answer in place
+
+The worst version of an instrument that lies is one the codebase already owned.
+
+`PathFollower.ComputeToTarget` returns false when the mesh will not give a path,
+and **it leaves the path object holding whatever it held before**. So
+`GetLength()` goes on answering for the last computation that worked. A bot with
+nowhere to go reports a healthy path of a plausible length, every frame, for as
+long as the failure lasts.
+
+Measured on Decoy: the medic reported a path 10400 units long, constant to
+within fifty units across eighty seconds, while his nearest teammate stood four
+hundred units away. A ratio of 17 to 1, and not one field said anything was
+wrong. Meanwhile `PluginBot_SimulateFrame` was quietly sending him through
+`NudgeTowardsGoal`, which steps 120 units at a time, which is the "he drifts and
+never arrives" that four separate reports had described.
+
+Two rules come out of it:
+
+- **A return value that says "this failed" is the only thing that says it
+  failed.** Not the length, not the position, not the action stack. The mod had
+  been tracking the truth in `m_bPathFailed` since the dead-end-path fix and had
+  never published it; the first version of the standing report checked
+  `path_len <= 0` and saw nothing.
+- **When you check whether a call worked, check the flag the call gave you, not
+  a property of the object it was supposed to fill in.**
+
+## Make the parts add up to the whole
+
+Healing was reported per class for the medic and the engineer, because those are
+the two classes that heal. They came to 1757 of a total of 7246.
+
+Five and a half thousand points of healing were being done by classes the report
+did not believe could do any. The report now prints every class and an
+`unattributed` line for the remainder, so the split has to reconcile with the
+total or say out loud that it does not.
+
+This is the cheapest check in the file and it has now caught two faults: this
+one, and a repair sampler that disagreed with a coarser measurement of the same
+buildings. **Wherever a total is broken into parts, print what is left over.**
+
 ## The failsafe
 
 `UpdateStuckWatchdog` in `nextbot_behavior.sp` catches the shared symptom: a bot
