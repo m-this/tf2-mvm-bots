@@ -53,12 +53,23 @@ this order:
    is inside his follow range, so he never moves — and the pair sit in the
    respawn room for a whole wave.
 
-Cause 3 is **not fixed, and is now believed not to be worth fixing**. Three
-attempts lost their A/B over thirty-six waves, and the last of them showed why:
-healing delivered came out 11159 against 11312, so the wave he spends in the
-spawn costs less than any of the cures did.
+Cause 3 turned out to be **the test bed, not the mod**, and everything written
+about it below is void. See the correction at the end of this section before
+reading any of it.
 
-## Two A/Bs that lost
+## Two A/Bs that lost, and the reason they are all void
+
+> **Void.** Every measurement in this section was taken with a fake client
+> standing in the RED spawn at full health, never moving, which
+> `PreferredPatient` ranks above every real teammate on the map. The medic
+> pocketed it for the whole of every wave. What these A/Bs actually measured is
+> whether a change can beat pocketing a statue, and nothing can, because leaving
+> the statue means walking. The seat holder is a Medic now — the one class the
+> ranking skips — and the medic's median distance to the nearest robot went from
+> 2281 units to 991 with no change to the mod at all. The write-ups are kept
+> because the reasoning in them is still the reasoning a future attempt will
+> have, and because a deleted mistake teaches nobody. The numbers are not
+> evidence of anything.
 
 Kept here because both looked obviously right, and the reasoning that made them
 look right is the reasoning a future attempt will have.
