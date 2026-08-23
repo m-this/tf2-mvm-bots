@@ -53,8 +53,10 @@ this order:
    is inside his follow range, so he never moves — and the pair sit in the
    respawn room for a whole wave.
 
-Cause 3 is **not fixed**, because both attempted fixes lost their A/B. See
-below.
+Cause 3 is **not fixed, and is now believed not to be worth fixing**. Three
+attempts lost their A/B over thirty-six waves, and the last of them showed why:
+healing delivered came out 11159 against 11312, so the wave he spends in the
+spawn costs less than any of the cures did.
 
 ## Two A/Bs that lost
 
@@ -78,6 +80,13 @@ shooting.
 **`medic_leaves_spawn`** — a man safe in the respawn room is not a patient.
 Excluding him: healing 13566 → 10592, and he spent *more* of the wave in the
 spawn. Ranking him last instead: 9089 → 6901, time on target 43% → 15%.
+
+**`medic_holds_ground`** — keep him as a patient, but do not walk into the
+spawn after him. This one could not end the heal action, which was what killed
+the other two. It lost anyway: time on target 46% → 26%, healing 11312 → 11159.
+A medic who does not walk does not close, so the beam that was going to connect
+never does. The near-identical healing is the useful part: it says the spawn
+trips were not costing much to begin with.
 
 Both lost for the same reason, which is now a rule in
 [how-bots-break.md](how-bots-break.md): an empty candidate list ends the

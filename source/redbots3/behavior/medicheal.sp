@@ -31,42 +31,6 @@ BehaviorAction CTFBotDefenderMedicHeal()
 	return action;
 }
 
-/* The nearest teammate who is not standing in the respawn room, or nobody
- *
- * A plain walk of the client list: no path queries and no nav work, so it costs nothing to ask on
- * the frames where it is asked, which are only the ones where the patient is somewhere the medic
- * should not follow him.
- */
-static int NearestTeammateInTheOpen(int medic)
-{
-	int best = -1;
-	float bestRange = 0.0;
-	
-	float mine[3]; mine = GetAbsOrigin(medic);
-	
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (i == medic || !IsClientInGame(i) || !IsPlayerAlive(i))
-			continue;
-		
-		if (GetClientTeam(i) != GetClientTeam(medic))
-			continue;
-		
-		if (TF2Util_IsPointInRespawnRoom(WorldSpaceCenter(i), i))
-			continue;
-		
-		float range = GetVectorDistance(mine, GetAbsOrigin(i));
-		
-		if (best <= 0 || range < bestRange)
-		{
-			best = i;
-			bestRange = range;
-		}
-	}
-	
-	return best;
-}
-
 public Action CTFBotDefenderMedicHeal_OnStart(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
 {
 	return action.Continue();
@@ -100,30 +64,24 @@ public Action CTFBotDefenderMedicHeal_Update(BehaviorAction action, int actor, f
 	
 	float theirOrigin[3]; GetClientAbsOrigin(patient, theirOrigin);
 	
-	/* Who he walks after, which is not always who he is beaming
+	/* He follows whoever he is beaming, wherever that is, and three attempts to qualify that lost
 	
-	Twice now the answer to "the medic spent the wave in the respawn room" has been to stop the man
-	in there being a patient, by excluding him and then by ranking him last, and both lost their
-	A/B badly: with nobody left to pick the heal action ends and the game's own medic behaviour
-	takes the bot, which is worse than any patient.
+	The medic spending a wave in the respawn room beside a man who has just come back is real and
+	was measured. Three ways of stopping it were tried over thirty six waves:
 	
-	So the patient is left alone and the walk is what changes. A man safe in the spawn is still
-	worth beaming if the medic can reach him from outside it; he is not worth following in there
-	while four teammates fight five thousand units up the map. */
-	int follow = patient;
+	  excluding him as a patient      healing 13566 -> 10592, and more time in the spawn, not less
+	  ranking him last as a patient   healing  9089 ->  6901, time on target 43% -> 15%
+	  not walking in there after him  time on target 46% -> 26%, healing unchanged
 	
-	if (Feature(FEATURE_MEDIC_HOLDS_GROUND) && GameRules_GetRoundState() == RoundState_RoundRunning
-		&& TF2Util_IsPointInRespawnRoom(WorldSpaceCenter(patient), patient))
-		follow = NearestTeammateInTheOpen(actor);
+	The first two end the heal action, which hands the bot to the game's own medic code. The third
+	keeps the action and takes away the walk, and a medic who does not walk does not close, so the
+	beam that was going to connect never does.
 	
-	float followOrigin[3];
-	
-	if (follow > 0)
-		GetClientAbsOrigin(follow, followOrigin);
-	
-	if (follow > 0 && GetVectorDistance(GetAbsOrigin(actor), followOrigin) > MEDIC_HEAL_FOLLOW_RANGE)
+	And the number that matters barely moved: 11159 against 11312. The wave he spends in the spawn
+	costs less than any of the cures. */
+	if (GetVectorDistance(GetAbsOrigin(actor), theirOrigin) > MEDIC_HEAL_FOLLOW_RANGE)
 	{
-		g_arrPluginBot[actor].SetPathGoalEntity(follow);
+		g_arrPluginBot[actor].SetPathGoalEntity(patient);
 		g_arrPluginBot[actor].bPathing = true;
 	}
 	else
