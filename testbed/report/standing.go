@@ -174,7 +174,11 @@ func rollupStanding(bots []botSample, buildings []buildingSample) map[string]*st
 		if s.Pathing != 0 {
 			r.walking++
 
-			if s.PathLen <= 0 {
+			// The flag, not the length. A refused computation leaves the old
+			// path in place, so a failing bot reports a healthy length: the
+			// medic read 10400 units, constant to within fifty over eighty
+			// seconds, with his nearest teammate four hundred units away.
+			if s.PathFailed != 0 || s.PathLen <= 0 {
 				r.walkingNoPath++
 			}
 

@@ -115,6 +115,12 @@ int PathFailuresOf(int client)
 	return m_iPathFailures[client];
 }
 
+//Whether the computation that produced the path this bot is holding actually succeeded
+bool PathFailedFor(int client)
+{
+	return m_bPathFailed[client];
+}
+
 static void NudgeTowardsGoal(int client, INextBot myBot, const float goal[3])
 {
 	ILocomotion myLoco = myBot.GetLocomotionInterface();

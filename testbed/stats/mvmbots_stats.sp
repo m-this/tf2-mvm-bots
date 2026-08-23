@@ -268,6 +268,8 @@ WaveCounters g_Wave;
  */
 native float Defenderbots_GetPathLength(int client);
 native bool Defenderbots_IsPathing(int client);
+native bool Defenderbots_PathFailed(int client);
+native int Defenderbots_PathFailures(int client);
 
 static bool g_bHasPathNatives;
 
@@ -275,6 +277,8 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 {
 	MarkNativeAsOptional("Defenderbots_GetPathLength");
 	MarkNativeAsOptional("Defenderbots_IsPathing");
+	MarkNativeAsOptional("Defenderbots_PathFailed");
+	MarkNativeAsOptional("Defenderbots_PathFailures");
 
 	return APLRes_Success;
 }
@@ -1621,6 +1625,14 @@ static void WriteBotTelemetry(int client, float when, float clock)
 	float pathLength = g_bHasPathNatives ? Defenderbots_GetPathLength(client) : -1.0;
 	bool pathing = g_bHasPathNatives && Defenderbots_IsPathing(client);
 
+	/* The length is not enough, and believing it was cost most of an evening
+	
+	A refused computation leaves the path object holding the last one that worked, so the length
+	stays healthy while the bot has nowhere to go. path_failed is the flag the mod already keeps
+	and has never published. */
+	bool pathFailed = g_bHasPathNatives && Defenderbots_PathFailed(client);
+	int pathFailures = g_bHasPathNatives ? Defenderbots_PathFailures(client) : -1;
+
 	bool firing = (GetEntProp(client, Prop_Data, "m_nButtons") & IN_ATTACK) != 0;
 
 	char line[TELEMETRY_LINE_LENGTH];
@@ -1628,12 +1640,12 @@ static void WriteBotTelemetry(int client, float when, float clock)
 		"{\"event\":\"bot\",\"map\":\"%s\",\"wave\":%d,\"t\":%.1f,\"clock\":%.1f,\"who\":\"%s\",\"class\":\"%s\","
 		... "\"at\":[%.0f,%.0f,%.0f],\"hp\":%d,\"maxhp\":%d,\"weapon\":\"%s\",\"slot\":%d,"
 		... "\"nearest_enemy\":%.0f,\"aim\":\"%s\",\"aim_range\":%.0f,\"firing\":%d,"
-		... "\"path_len\":%.0f,\"pathing\":%d,"
+		... "\"path_len\":%.0f,\"pathing\":%d,\"path_failed\":%d,\"path_failures\":%d,"
 		... "\"healing\":\"%s\",\"action\":\"%s\"}",
 		g_sMap, g_iWave, when, clock, name, ClassName(TF2_GetPlayerClass(client)),
 		at[0], at[1], at[2], GetClientHealth(client), TF2Util_GetEntityMaxHealth(client),
 		weaponClass, slot, RangeToNearestEnemy(client), aim, aimRange, firing ? 1 : 0,
-		pathLength, pathing ? 1 : 0, healing, stack);
+		pathLength, pathing ? 1 : 0, pathFailed ? 1 : 0, pathFailures, healing, stack);
 
 	WriteLine(line);
 }
