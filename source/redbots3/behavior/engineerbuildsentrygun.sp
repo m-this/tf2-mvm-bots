@@ -91,6 +91,7 @@ public Action CTFBotMvMEngineerBuildSentrygun_Update(BehaviorAction action, int 
 {
 	if (m_aNestArea[actor] == NULL_AREA) 
 	{
+		LogBuildFailure(actor, "sentry", "no nest area");
 		return action.Done("No hint entity");
 	}
 	
@@ -98,12 +99,17 @@ public Action CTFBotMvMEngineerBuildSentrygun_Update(BehaviorAction action, int 
 	{
 		//And you.
 		
+		LogBuildFailure(actor, "sentry", "told to advance the nest");
 		return action.Done("No sentry");
 	}
 	
 	//Every side of this spot refused him and the walk is not getting shorter. The idle action retries
 	if (GetGameTime() > m_ctSentryGiveUpTime[actor])
+	{
+		LogBuildFailure(actor, "sentry", "every side of the spot refused him");
+		
 		return action.Done("Nowhere here will take a sentry");
+	}
 	
 	float spot[3]; spot = m_vSentrySpot[actor];
 	float stand[3]; stand = m_vSentryStand[actor];

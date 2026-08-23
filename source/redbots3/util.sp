@@ -367,6 +367,23 @@ bool HasSniperRifle(int client)
 //More than an engineer is supposed to own, which is the point: he is not supposed to and he does
 #define MAX_PLAYER_OBJECTS	8
 
+/* Why a build ended without a building, said out loud
+ *
+ * A nest that is standing for two fifths of a wave is the engineer's whole problem, and it was
+ * invisible: every build action has half a dozen ways to end and none of them left a trace, so
+ * "he never built one" and "he built three and lost three" and "he gave up after twelve seconds"
+ * all looked the same from a results file.
+ *
+ * Printed rather than counted, because the interesting thing is the sequence: which reason, in
+ * which order, at what point in the wave. */
+stock void LogBuildFailure(int actor, const char[] what, const char[] why)
+{
+	if (actor < 1 || actor > MaxClients || !IsClientInGame(actor))
+		return;
+	
+	PrintToServer("[defenderbots] %s failed for %N at %.1f: %s", what, actor, GetGameTime(), why);
+}
+
 /* Whether the toolbox in his hands is set to build the thing this action came here to build
 
 Every build action used to ask only whether he was holding the toolbox at all, and the toolbox
