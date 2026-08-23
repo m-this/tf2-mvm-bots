@@ -142,6 +142,22 @@ So: check the precondition yourself where you can, and where you cannot, make
 the failure harmless. The wearables are swept at every wave start rather than
 prevented, because whether the game will accept one cannot be asked in advance.
 
+## An instrument that cannot produce a number looks like a number of zero
+
+Three of the measurements added this session were silently dead, and each one
+was read as evidence before it was caught:
+
+| the instrument | what was wrong | what it said |
+|---|---|---|
+| self-damage per class | the hook was attached behind `if (team != Blue) return`, so it only ever reached robots | `hurt themselves nothing`, in the same run that counted `killed themselves demoman 2` |
+| projectiles fired | the `RequestFrame` callback was `static`, which SourceMod will not call into | `fired 0, hit 9` |
+| what each bot was doing | the report took an end of the action stack, and the iterator does not order it | `MainAction 100%` for every bot on every map |
+
+A zero from a broken counter and a zero from the world are the same character
+in the output. Before believing one, check that the counter can produce a
+non-zero at all — usually by finding the number it disagrees with, which is how
+all three of these were caught.
+
 ## The failsafe
 
 `UpdateStuckWatchdog` in `nextbot_behavior.sp` catches the shared symptom: a bot
