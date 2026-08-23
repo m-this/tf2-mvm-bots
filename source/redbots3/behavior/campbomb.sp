@@ -58,10 +58,10 @@ public Action CTFBotCampBomb_Update(BehaviorAction action, int actor, float inte
 			if (m_flRepathTime[actor] <= GetGameTime())
 			{
 				m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(0.5, 1.0);
-				m_pPath[actor].ComputeToTarget(myBot, nearest);
+				RepathToTarget(actor, myBot, nearest);
 			}
 			
-			m_pPath[actor].Update(myBot);
+			FollowPathOrNudge(actor, myBot, GetAbsOrigin(nearest));
 			
 			return action.Continue();
 		}
@@ -86,10 +86,10 @@ public Action CTFBotCampBomb_Update(BehaviorAction action, int actor, float inte
 		if (m_flRepathTime[actor] <= GetGameTime())
 		{
 			m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(1.0, 2.0);
-			m_pPath[actor].ComputeToPos(myBot, guardPosition);
+			RepathToPos(actor, myBot, guardPosition);
 		}
 		
-		m_pPath[actor].Update(myBot);
+		FollowPathOrNudge(actor, myBot, guardPosition);
 	}
 	
 	CKnownEntity threat = myBot.GetVisionInterface().GetPrimaryKnownThreat(false);
