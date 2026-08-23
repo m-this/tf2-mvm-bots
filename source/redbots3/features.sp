@@ -30,6 +30,7 @@ enum
 	FEATURE_DEMO_HOLD_FIRE,
 	FEATURE_ATTACK_STRAFE,
 	FEATURE_SOLDIER_CLOSES_IN,
+	FEATURE_EXPLOSIVE_FIRE_TRACKING,
 	FEATURE_COUNT
 }
 
@@ -45,7 +46,8 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"wave_resistances",
 	"demo_hold_fire",
 	"attack_strafe",
-	"soldier_closes_in"
+	"soldier_closes_in",
+	"explosive_fire_tracking"
 };
 
 static ConVar g_arrFeatureConVars[FEATURE_COUNT];
@@ -84,6 +86,9 @@ void LoadFeatures()
 
 	g_arrFeatureConVars[FEATURE_DEMO_HOLD_FIRE] = MakeFeature(FEATURE_DEMO_HOLD_FIRE,
 		"The Demoman holds his pipes until the target is near enough for one to arrive.");
+
+	g_arrFeatureConVars[FEATURE_EXPLOSIVE_FIRE_TRACKING] = MakeFeature(FEATURE_EXPLOSIVE_FIRE_TRACKING,
+		"An explosive fires while the aim is still following the target, rather than only once the head has stopped.");
 
 	g_arrFeatureConVars[FEATURE_SOLDIER_CLOSES_IN] = MakeFeature(FEATURE_SOLDIER_CLOSES_IN,
 		"A rocket is fought at a grenade's distance rather than twelve hundred units out.");
