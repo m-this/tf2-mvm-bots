@@ -447,6 +447,8 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	records. Nothing in this plugin depends on anybody calling them. */
 	CreateNative("Defenderbots_GetPathLength", Native_GetPathLength);
 	CreateNative("Defenderbots_IsPathing", Native_IsPathing);
+	CreateNative("Defenderbots_PathFailed", Native_PathFailed);
+	CreateNative("Defenderbots_PathFailures", Native_PathFailures);
 	
 	RegPluginLibrary("tf2_defenderbots");
 	
@@ -462,6 +464,33 @@ static any Native_GetPathLength(Handle plugin, int numParams)
 	
 	//Unguarded, as everywhere else that reads it: the path is made with the bot and outlives it
 	return m_pPath[client].GetLength();
+}
+
+/* Whether the last computation came back with nothing, which the length cannot tell anybody
+ *
+ * A refused computation leaves the path object holding whatever it held before, so GetLength keeps
+ * returning the old answer and a failing bot reads as a bot with a perfectly good path. Measured on
+ * Decoy: the medic reported a path 10400 units long, constant to within fifty units over eighty
+ * seconds, while the nearest teammate stood four hundred units away. Every one of those samples was
+ * a failure wearing the length of the last success. */
+static any Native_PathFailed(Handle plugin, int numParams)
+{
+	int client = GetNativeCell(1);
+	
+	if (client < 1 || client > MaxClients || !IsClientInGame(client) || !g_bIsDefenderBot[client])
+		return false;
+	
+	return PathFailedFor(client);
+}
+
+static any Native_PathFailures(Handle plugin, int numParams)
+{
+	int client = GetNativeCell(1);
+	
+	if (client < 1 || client > MaxClients || !IsClientInGame(client) || !g_bIsDefenderBot[client])
+		return -1;
+	
+	return PathFailuresOf(client);
 }
 
 static any Native_IsPathing(Handle plugin, int numParams)

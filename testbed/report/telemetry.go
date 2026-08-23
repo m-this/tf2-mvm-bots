@@ -40,6 +40,8 @@ type botSample struct {
 	Firing       int       `json:"firing"`
 	PathLen      float64   `json:"path_len"`
 	Pathing      int       `json:"pathing"`
+	PathFailed   int       `json:"path_failed"`
+	PathFailures int       `json:"path_failures"`
 }
 
 type buildingSample struct {
