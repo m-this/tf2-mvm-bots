@@ -28,9 +28,9 @@ type spot struct {
 
 // Which authored block a sampled building should be measured against
 var spotBlockFor = map[string]string{
-	"sentry":     "EngineerNest",
+	"sentry":      "EngineerNest",
 	"mini sentry": "EngineerNest",
-	"dispenser":  "DispenserSpot",
+	"dispenser":   "DispenserSpot",
 }
 
 func loadSpots(mapName string) map[string][]spot {
@@ -179,12 +179,12 @@ func printSpotUse(buildings []buildingSample) {
 	}
 
 	/* Per wave, and the typical sample rather than the best one
-	
+
 	The first version of this took the closest a building ever got and printed that. Wave one is
 	the wave the engineer starts beside his nest with a whole break to build in, so it was almost
 	always on the spot, and one good sample hid every wave after it. Reported from play as exactly
 	that: right before wave one, wrong afterwards.
-	
+
 	So each wave gets its own answer, and the answer is the median of that wave's samples. A
 	building that spent the wave in the wrong place cannot be rescued by the ten seconds it spent
 	being carried past the right one. */

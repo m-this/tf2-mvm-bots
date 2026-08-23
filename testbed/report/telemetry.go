@@ -21,39 +21,43 @@ import (
 )
 
 type botSample struct {
-	Event   string    `json:"event"`
-	Wave    int       `json:"wave"`
-	T       float64   `json:"t"`
-	Clock   float64   `json:"clock"`
-	Who     string    `json:"who"`
-	Class   string    `json:"class"`
-	At      []float64 `json:"at"`
-	HP      int       `json:"hp"`
-	MaxHP   int       `json:"maxhp"`
-	Weapon  string    `json:"weapon"`
-	Slot    int       `json:"slot"`
-	Healing string    `json:"healing"`
-	Action  string    `json:"action"`
+	Event        string    `json:"event"`
+	Wave         int       `json:"wave"`
+	T            float64   `json:"t"`
+	Clock        float64   `json:"clock"`
+	Who          string    `json:"who"`
+	Class        string    `json:"class"`
+	At           []float64 `json:"at"`
+	HP           int       `json:"hp"`
+	MaxHP        int       `json:"maxhp"`
+	Weapon       string    `json:"weapon"`
+	Slot         int       `json:"slot"`
+	Healing      string    `json:"healing"`
+	Action       string    `json:"action"`
+	NearestEnemy float64   `json:"nearest_enemy"`
+	Aim          string    `json:"aim"`
+	AimRange     float64   `json:"aim_range"`
+	Firing       int       `json:"firing"`
 }
 
 type buildingSample struct {
-	Event      string    `json:"event"`
-	Map        string    `json:"map"`
-	Wave       int       `json:"wave"`
-	T          float64   `json:"t"`
-	Clock      float64   `json:"clock"`
-	Owner      string    `json:"owner"`
-	Type       string    `json:"type"`
-	Mode       int       `json:"mode"`
-	Level      int       `json:"level"`
-	HP         int       `json:"hp"`
-	MaxHP      int       `json:"maxhp"`
-	At         []float64 `json:"at"`
-	Disposable int       `json:"disposable"`
-	Kills      int       `json:"kills"`
-	EnemiesSeen int      `json:"enemies_seen"`
-	TeammatesNear int    `json:"teammates_near"`
-	Sapped     int       `json:"sapped"`
+	Event         string    `json:"event"`
+	Map           string    `json:"map"`
+	Wave          int       `json:"wave"`
+	T             float64   `json:"t"`
+	Clock         float64   `json:"clock"`
+	Owner         string    `json:"owner"`
+	Type          string    `json:"type"`
+	Mode          int       `json:"mode"`
+	Level         int       `json:"level"`
+	HP            int       `json:"hp"`
+	MaxHP         int       `json:"maxhp"`
+	At            []float64 `json:"at"`
+	Disposable    int       `json:"disposable"`
+	Kills         int       `json:"kills"`
+	EnemiesSeen   int       `json:"enemies_seen"`
+	TeammatesNear int       `json:"teammates_near"`
+	Sapped        int       `json:"sapped"`
 }
 
 // One bot's share of the samples, which is the only honest way to say "he spent
