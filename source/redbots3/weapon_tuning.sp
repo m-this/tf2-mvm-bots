@@ -41,6 +41,14 @@ worse: absent from this table, it fell through to no limit at all and threw pipe
 
 Nine hundred still covers the approach: he settles at six hundred, so there is room to fire while
 closing without firing at a rumour. */
+/* Where a Soldier fights, when he is allowed to choose it
+ *
+ * Between the Beggar's six hundred and the twelve fifty the stock launcher used to sit at. Far
+ * enough that his own blast does not reach him, near enough that a rocket arrives before the robot
+ * it was aimed at has walked out of the splash.
+ */
+#define SOLDIER_ROCKET_SETTLE	750.0
+
 #define DEMO_PIPE_SETTLE		600.0
 #define DEMO_PIPE_HOLD_FIRE		900.0
 #define DEMO_PIPE_FIRE_ANYWAY	1400.0

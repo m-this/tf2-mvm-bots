@@ -29,6 +29,7 @@ enum
 	FEATURE_WAVE_RESISTANCES,
 	FEATURE_DEMO_HOLD_FIRE,
 	FEATURE_ATTACK_STRAFE,
+	FEATURE_SOLDIER_CLOSES_IN,
 	FEATURE_COUNT
 }
 
@@ -43,7 +44,8 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"ready_when_prepared",
 	"wave_resistances",
 	"demo_hold_fire",
-	"attack_strafe"
+	"attack_strafe",
+	"soldier_closes_in"
 };
 
 static ConVar g_arrFeatureConVars[FEATURE_COUNT];
@@ -82,6 +84,9 @@ void LoadFeatures()
 
 	g_arrFeatureConVars[FEATURE_DEMO_HOLD_FIRE] = MakeFeature(FEATURE_DEMO_HOLD_FIRE,
 		"The Demoman holds his pipes until the target is near enough for one to arrive.");
+
+	g_arrFeatureConVars[FEATURE_SOLDIER_CLOSES_IN] = MakeFeature(FEATURE_SOLDIER_CLOSES_IN,
+		"A rocket is fought at a grenade's distance rather than twelve hundred units out.");
 
 	g_arrFeatureConVars[FEATURE_ATTACK_STRAFE] = MakeFeature(FEATURE_ATTACK_STRAFE,
 		"A bot that has arrived at its firing position keeps sidestepping instead of standing still.");
