@@ -27,6 +27,8 @@ numbers mean, and `docs/how-bots-break.md` before debugging anything: the faults
 in this mod have one shape, and it is worth knowing it before guessing.
 `docs/engineer-and-medic.md` covers the two classes that generate most of the
 reports, including two fixes that looked obviously right and lost their A/B.
+`docs/soldier-and-demoman.md` covers the two lowest-scoring seats, where the
+answer turned out to be self-inflicted blast rather than aim.
 
 # Notes
 - Initial AI code is a port over from [[TF2] MvM AFK Bot](https://github.com/Pelipoika/TF2_Idlebot) AI code.
