@@ -90,6 +90,38 @@ engineer starts beside his nest with a whole break to build in. Taking the
 closest a building ever got reported every map as perfect and hid the thing
 actually being complained about, which was every wave after the first.
 
+## Having no answer is worse than having a poor one
+
+Three separate changes this session removed a candidate from a list because it
+looked wrong, and all three made the bot worse:
+
+| removed | what happened |
+|---|---|
+| an authored spot a path query refused | the engineer built somewhere random instead |
+| a teammate the medic could not path to | the medic dropped out of the heal action and walked to the bomb |
+| a teammate standing in the respawn room | the medic spent *more* of the wave in the spawn, healing fell 13566 → 10592 |
+
+The behaviours are written so that an empty answer ends the action, and what
+takes the bot next is the game's own code, which knows nothing about any of
+this. So a filter that removes the last candidate does not produce a better
+choice, it produces no choice.
+
+**Rank it last. Do not remove it.** The only things that should remove a
+candidate outright are permanent and physical: a building already standing on
+the spot, a teammate who is dead.
+
+## Measure the thing the change is aimed at
+
+`medic_nearest` and `medic_leaves_spawn` were both obviously right and both
+lost. Waves cleared barely moved either time (6/6 against 5/7, then 6/6 against
+7/5) because clear rate is dominated by everything else; what settled both was
+healing delivered and time-on-target, which is what the change was actually
+about.
+
+Beware the variance. The same OFF arm measured 29%, 35% and 43% beam time on
+three different runs of the same two maps. A 6-wave, 2-map A/B separates a
+halving; it does not separate ten percent.
+
 ## The failsafe
 
 `UpdateStuckWatchdog` in `nextbot_behavior.sp` catches the shared symptom: a bot

@@ -1199,6 +1199,21 @@ static bool IsCloserBetterPatient(int medic, const float from[3], int candidate,
 	if (incumbent == m_iPreferredPatient[medic])
 		incumbentReach += MEDIC_PATIENT_HYSTERESIS;
 
+	/* Where a patient is standing is deliberately not part of this, and it was measured twice
+	
+	A medic was watched spending a whole wave in the respawn room beaming a demoman who had just
+	come back, a hundred and fifty units away, while four teammates fought five thousand units up
+	the map. The obvious answer is that a man safe in the spawn is not a patient.
+	
+	Tried as medic_leaves_spawn, twice, twelve waves each. Excluding him outright left the medic
+	with nobody, which ends the heal action and hands him to the game's own medic behaviour: he
+	spent more of the wave in the spawn, not less, and healing fell from 13566 to 10592. Ranking
+	him last instead of excluding him was worse again, 9089 to 6901, with time on target falling
+	from 43 percent to 15.
+	
+	Both are gone. What the numbers say is that a medic who is beaming somebody is worth more than
+	a medic who is walking to somebody better, whoever either of them is, and every rule that
+	narrows his choice costs more than the choice is worth. */
 	bool candidateIsNearby = GetVectorDistance(from, GetAbsOrigin(candidate)) <= MEDIC_PATIENT_NEARBY;
 	bool incumbentIsNearby = GetVectorDistance(from, GetAbsOrigin(incumbent)) <= incumbentReach;
 
@@ -1266,6 +1281,8 @@ int PreferredPatient(int medic)
 		a job the dispenser beside him was going to do for nothing */
 		if (TF2_GetPlayerClass(i) == TFClass_Engineer && HealthFraction(i) >= 1.0)
 			continue;
+
+
 
 		/* Not being able to path to him makes him the last resort, not a non-candidate
 		
