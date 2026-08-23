@@ -58,6 +58,59 @@ what the bots were doing (312 samples)
 - **two rows for one owner and one building type** means a duplicate, which is
   a real bug that happened and survived four waves.
 
+## Where they stood, and how close the fight was
+
+```
+how close the nearest robot was
+  heavy     median 745, inside his own blast radius 4% of samples
+  medic     median 1896, inside his own blast radius 2% of samples
+
+where they stood
+  Wesley     medic     stood still 79% of the time, longest 105s at 707 -2559 512, 7396 units walked per wave
+  Bob        engineer  stood still 41% of the time, longest 85s at -179 889 416, 33687 units walked per wave
+                       wrench out 13 samples, 15% of them out of reach of his own buildings
+```
+
+Both are computed in the report from `at` and `nearest_enemy`, which the plugin
+has always written and nothing read. No extra sampling cost.
+
+- **median nearest robot** is the front line, as a number. "The soldier is too
+  close" and "the medic is nowhere near the fight" are both claims about this
+  and were argued about for two sessions without it. A class whose median is
+  double everybody else's is not in the fight.
+- **inside his own blast radius** is 146 units, a rocket's own splash. This is
+  the mechanism behind the self-damage column, one step upstream.
+- **stood still** is the share of five-second gaps in which the bot moved under
+  100 units. Every class fighting normally lands between 15% and 45%. Anything
+  near 80% is a bot that has stopped, and `longest` and the coordinates say
+  where to go and look.
+- **units walked per wave** is the same fact without a threshold in it, and it
+  separates faster than the share does: 30000 or more is a bot working the map,
+  and the parked medic was doing 4866.
+- **wrench out of reach** is an engineer holding a wrench more than 100 units
+  from anything he owns. He cannot repair from there. It does not prove he is
+  swinging, only that swinging would achieve nothing.
+
+Positions are worth printing rather than summarising. Two of these went straight
+to a named place on the map that somebody could walk to.
+
+## Repairs
+
+```
+buildings took    3140, engineer put back 1890 (60%)
+```
+
+Sampled twice a second, because a sentry that loses two hundred health and gets
+it back inside one five-second telemetry interval is invisible at five seconds.
+Construction and upgrades are skipped: both raise health for reasons that have
+nothing to do with the wrench.
+
+There is no repair event to hook — the game fires nothing when a wrench
+connects, and metal spent covers building and upgrading too — so this is health
+differences and nothing cleverer. An engineer who never swings and one who
+repairs perfectly produce identical uptime and identical `sentries lost`. This
+is the column that separates them.
+
 ## Self-damage
 
 `hurt themselves` and `killed themselves` on the wave line, per class. A soldier

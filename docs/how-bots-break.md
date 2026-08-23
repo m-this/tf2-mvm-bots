@@ -7,6 +7,39 @@ looked at it guessed at a cause, and was wrong about as often as right.
 This is the accumulated shape of those faults, so the next person starts from
 the pattern instead of from the symptom.
 
+## The loop
+
+**Reproduce it as a number, then fix it, then measure the fix, then look at the
+number again.** In that order, every time.
+
+1. **Telemetry first.** Somebody reports "the medic just stands there". Do not
+   go and read the medic code. Go and find the number that would say so, and if
+   there isn't one, add it. `where they stood` exists because of that report,
+   and it turned an opinion into *86% of samples in the same spot, 2414 units
+   walked against 23000 for everybody else*.
+2. **Reproduce.** The number has to show the fault in a run before anything is
+   changed. If it doesn't, either the report is about something else or the
+   instrument is wrong, and both of those are worth knowing before writing code.
+3. **Fix, behind a switch.** A named feature in `features.sp`, defaulting on, so
+   one build can play both sides.
+4. **A/B it.** `testbed/ab.sh --feature <name>`. Judge on the number from step 1
+   *and* on the outcome, because a change can move the number it was aimed at
+   and lose the wave.
+5. **Look again.** Re-read the same telemetry after the change. This is the step
+   that catches a fix that moved the metric by breaking the metric.
+
+The reason for the order is in this file over and over: **guessing at causes was
+wrong about as often as right**, and the wrong guesses were confident, specific
+and reasonable. Four separate medic experiments were run against an instrument
+nobody had checked, and every one of them lost. Three of the numbers this
+session were reproduced from data that had been on disk for days and simply
+never read.
+
+Corollary: **an instrument is cheaper than a fix and always worth building
+first.** `nearest_enemy` and `at` were being written into every sample for a
+week before anything read them. The three faults they exposed cost one afternoon
+of Go and no server time at all.
+
 ## The pattern
 
 **Every one of them is a decision made from a model of the world that was never
@@ -157,6 +190,45 @@ A zero from a broken counter and a zero from the world are the same character
 in the output. Before believing one, check that the counter can produce a
 non-zero at all — usually by finding the number it disagrees with, which is how
 all three of these were caught.
+
+## Worse than a zero: an instrument that produces a plausible number
+
+The three above announce themselves eventually, because a zero next to a
+non-zero is an argument somebody has to settle. The fourth one did not.
+
+The test bed puts a fake client on RED so a server with nobody on it can start a
+wave. It was a Scout, at full health, standing in the respawn room, and it never
+moved. `PreferredPatient` ranks a teammate within twelve hundred units above a
+teammate anywhere else, and the medic spawns in that same room. So the medic
+latched onto the statue on the first frame of every wave and beamed it until he
+died.
+
+Nothing about that looks broken from the results file. Healing was non-zero.
+Time on target was 42%. The medic was inside his own heal action for 95% of
+samples. Every one of those numbers is the instrument measuring itself.
+
+Four medic experiments were run against it, and all four lost:
+
+| the change | what the numbers said |
+|---|---|
+| `medic_nearest` | healing halved, 14592 to 7481 |
+| `medic_leaves_spawn`, excluding him | healing 13566 to 10592, and more time in the spawn |
+| `medic_leaves_spawn`, ranking him last | healing 9089 to 6901, time on target 43% to 15% |
+| not walking after a patient in the spawn | time on target 46% to 26% |
+
+Every one of them was really being asked *can you beat pocketing an immobile
+fake client*, and the answer to that is no, because anything that makes the
+medic leave the statue makes him walk. All four were deleted on the strength of
+it, and three of them were probably right.
+
+The seat holder is a Medic now, which is the one class `PreferredPatient` skips
+outright, so it is invisible to the thing under test. Changing that one word
+moved the medic's median distance to the nearest robot from 2281 units to 991 —
+into line with the rest of the team — on the first wave after the change.
+
+The rule this leaves behind: **anything the test bed adds to the world is part
+of the experiment.** A fake client is a teammate. Ask what the code under test
+does with it before trusting a number that came out of the same run.
 
 ## The failsafe
 

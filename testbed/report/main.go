@@ -34,6 +34,8 @@ type wave struct {
 	DefenderDeaths    int `json:"defender_deaths"`
 	Backstabs         int `json:"backstabs"`
 	SentriesLost      int `json:"sentries_lost"`
+	BuildingRepaired  int `json:"building_repaired"`
+	BuildingDamage    int `json:"building_damage"`
 	BusterDetonations int `json:"buster_detonations"`
 
 	SoldierRocket int `json:"soldier_rocket_damage"`
@@ -57,11 +59,11 @@ type wave struct {
 	// Per class, keyed by the class name the plugin writes
 	SelfDamageBy map[string]int `json:"-"`
 	SelfDeathsBy map[string]int `json:"-"`
-	DamageBy   map[string]int `json:"-"`
-	KillsBy    map[string]int `json:"-"`
-	GiantsBy   map[string]int `json:"-"`
-	KilledByBy map[string]int `json:"-"`
-	CauseBy    map[string]int `json:"-"`
+	DamageBy     map[string]int `json:"-"`
+	KillsBy      map[string]int `json:"-"`
+	GiantsBy     map[string]int `json:"-"`
+	KilledByBy   map[string]int `json:"-"`
+	CauseBy      map[string]int `json:"-"`
 }
 
 var classes = []string{"scout", "soldier", "pyro", "demoman", "heavy",
@@ -145,6 +147,7 @@ type summary struct {
 	waves, cleared                        int
 	kills, giants, deaths, stabs          int
 	sentriesLost, busters                 int
+	repaired, buildingDamage              int
 	damage, tankDamage, sentryDamage      int
 	demoPipe, demoSticky, demoMelee       int
 	solRocket, solOther                   int
@@ -160,7 +163,7 @@ func summarise(waves []wave) summary {
 	s := summary{
 		damageBy: map[string]int{}, killsBy: map[string]int{},
 		giantsBy: map[string]int{}, killedBy: map[string]int{},
-		causeBy: map[string]int{},
+		causeBy:      map[string]int{},
 		selfDamageBy: map[string]int{}, selfDeathsBy: map[string]int{},
 	}
 
@@ -175,6 +178,8 @@ func summarise(waves []wave) summary {
 		s.deaths += w.DefenderDeaths
 		s.stabs += w.Backstabs
 		s.sentriesLost += w.SentriesLost
+		s.repaired += w.BuildingRepaired
+		s.buildingDamage += w.BuildingDamage
 		s.busters += w.BusterDetonations
 		s.damage += w.Damage
 		s.demoPipe += w.DemoPipe
@@ -266,6 +271,13 @@ func print(name string, s summary) {
 	fmt.Printf("  defenders died    %d\n", s.deaths)
 	fmt.Printf("  sentries lost     %d\n", s.sentriesLost)
 
+	// An engineer who never swings and one who repairs perfectly look the same
+	// from uptime and sentries lost. This is the difference between them.
+	if s.repaired > 0 || s.buildingDamage > 0 {
+		fmt.Printf("  buildings took    %d, engineer put back %d (%s)\n",
+			s.buildingDamage, s.repaired, percent(s.repaired, s.buildingDamage))
+	}
+
 	if s.damage == 0 {
 		fmt.Printf("  (no contribution numbers in this file)\n")
 		return
@@ -324,6 +336,7 @@ func compare(now, then summary) {
 	fmt.Printf("  sentry damage     %d -> %d\n", then.sentryDamage, now.sentryDamage)
 	fmt.Printf("  healing done      %d -> %d\n", then.healing, now.healing)
 	fmt.Printf("  sentries lost     %d -> %d\n", then.sentriesLost, now.sentriesLost)
+	fmt.Printf("  repaired          %d -> %d\n", then.repaired, now.repaired)
 	fmt.Printf("  backstabbed       %d -> %d\n", then.causeBy["backstab"], now.causeBy["backstab"])
 }
 
@@ -351,6 +364,7 @@ func main() {
 
 	if bots, buildings, err := loadTelemetry(args[0]); err == nil {
 		printTelemetry(bots, buildings)
+		printStanding(bots, buildings)
 	}
 
 	if len(args) == 1 {

@@ -67,6 +67,14 @@ Five seconds is a hundred and some samples in a long wave and a handful in a sho
 enough to tell "lost it once and rebuilt" from "never had one". */
 #define ENGINEER_SAMPLE_INTERVAL	5.0
 
+/* How often a building's health is read, which is not the same question as how often it is sampled
+ *
+ * Uptime is a fraction of the wave and five seconds resolves it fine. Repair is a sum of health put
+ * back, and a sentry that loses two hundred and gets it back inside one interval is invisible at
+ * five seconds and worth a hundred and fifty at half a second. Two engineers with three buildings
+ * each is six property reads twice a second, which is nothing. */
+#define REPAIR_SAMPLE_INTERVAL	0.5
+
 public Plugin myinfo =
 {
 	name = "MvM Defender Bots: wave statistics",
@@ -116,6 +124,14 @@ enum struct WaveCounters
 	int busterDetonations;
 	int sentriesLost;
 	int dispensersLost;
+	/* What the wrench actually did, which nothing has ever counted
+	
+	An engineer was watched standing still with the wrench out and the sentry losing health, and the
+	only numbers to argue about it with were "he had a sentry up 80% of the wave" and "18 sentries
+	lost". Both are consistent with an engineer who repairs perfectly and one who never swings.
+	Health put back in is the difference between them. */
+	int buildingRepaired;
+	int buildingDamageTaken;
 	/* Contribution, not just body count
 
 	Waves cleared says whether the team held. It does not say who held it, and two builds that
@@ -190,6 +206,8 @@ enum struct WaveCounters
 		this.backstabs = 0;
 		this.busterDetonations = 0;
 		this.sentriesLost = 0;
+		this.buildingRepaired = 0;
+		this.buildingDamageTaken = 0;
 		this.dispensersLost = 0;
 		this.damageDealt = 0;
 		this.damageToTanks = 0;
@@ -341,6 +359,86 @@ static void SampleEngineers()
 	}
 }
 
+/* Health put back into a building, and health taken out of it
+ *
+ * There is no repair event to hook: the game fires nothing when a wrench connects, and the metal
+ * an engineer spends covers building and upgrading as well. So this reads the health twice a second
+ * and adds up which way it moved.
+ *
+ * Keyed by owner and object type rather than entity index. Indices are reused, and a fresh sentry
+ * standing where a dead one stood would otherwise read as a hundred and eighty points of repair.
+ *
+ * Two things are skipped rather than counted. A building still going up is gaining health because
+ * it is being built, not repaired, and an upgrade raises maximum health and fills it, which is a
+ * jump of several hundred that has nothing to do with the wrench. Both would swamp the number they
+ * are sitting in. */
+static int g_iLastObjectHealth[MAXPLAYERS + 1][4];
+static int g_iLastObjectLevel[MAXPLAYERS + 1][4];
+static float g_flNextRepairSample;
+
+static void ResetRepairSamples()
+{
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		for (int t = 0; t < 4; t++)
+		{
+			g_iLastObjectHealth[i][t] = -1;
+			g_iLastObjectLevel[i][t] = -1;
+		}
+	}
+
+	g_flNextRepairSample = 0.0;
+}
+
+static void SampleRepairs()
+{
+	if (GetGameTime() < g_flNextRepairSample)
+		return;
+
+	g_flNextRepairSample = GetGameTime() + REPAIR_SAMPLE_INTERVAL;
+
+	static TFObjectType types[3];
+	types[0] = TFObject_Sentry;
+	types[1] = TFObject_Dispenser;
+	types[2] = TFObject_Teleporter;
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || TF2_GetClientTeam(i) != TFTeam_Red)
+			continue;
+
+		for (int t = 0; t < 3; t++)
+		{
+			int building = FindOwnedObject(i, types[t]);
+
+			//Gone, or not finished. Either way the next reading is a seed and not a difference
+			if (building == -1 || GetEntProp(building, Prop_Send, "m_bBuilding") != 0)
+			{
+				g_iLastObjectHealth[i][t] = -1;
+				g_iLastObjectLevel[i][t] = -1;
+
+				continue;
+			}
+
+			int health = GetEntProp(building, Prop_Data, "m_iHealth");
+			int level = GetEntProp(building, Prop_Send, "m_iUpgradeLevel");
+
+			if (g_iLastObjectHealth[i][t] >= 0 && g_iLastObjectLevel[i][t] == level)
+			{
+				int moved = health - g_iLastObjectHealth[i][t];
+
+				if (moved > 0)
+					g_Wave.buildingRepaired += moved;
+				else
+					g_Wave.buildingDamageTaken += -moved;
+			}
+
+			g_iLastObjectHealth[i][t] = health;
+			g_iLastObjectLevel[i][t] = level;
+		}
+	}
+}
+
 public void OnGameFrame()
 {
 	float now = GetEngineTime();
@@ -378,6 +476,7 @@ public void OnGameFrame()
 	g_flLastFrame = now;
 
 	SampleEngineers();
+	SampleRepairs();
 	SampleTelemetry();
 }
 
@@ -421,6 +520,7 @@ static void Event_WaveBegin(Event event, const char[] name, bool dontBroadcast)
 	g_Wave.Reset();
 
 	ResetEngineerSamples();
+	ResetRepairSamples();
 
 	/* The features that are on go in the file with the numbers they produced
 
@@ -619,7 +719,7 @@ static void WriteWaveResult(const char[] result)
 		... "\"demo_pipe_damage\":%d,\"demo_sticky_damage\":%d,\"demo_melee_damage\":%d,"
 		... "\"soldier_rocket_damage\":%d,\"soldier_other_damage\":%d,"
 		... "\"fired_soldier\":%d,\"hit_soldier\":%d,\"fired_demoman\":%d,\"hit_demoman\":%d,"
-		... "\"jars_thrown\":%d}",
+		... "\"jars_thrown\":%d,\"building_repaired\":%d,\"building_damage\":%d}",
 		g_sMap, g_iWave, result, duration,
 		g_Wave.robotKills, g_Wave.giantKills, g_Wave.tankKills, g_Wave.sentryKills,
 		g_Wave.defenderDeaths, g_Wave.backstabs, g_Wave.busterDetonations,
@@ -696,7 +796,7 @@ static void WriteWaveResult(const char[] result)
 		g_Wave.projectilesHit[view_as<int>(TFClass_Soldier)],
 		g_Wave.projectilesFired[view_as<int>(TFClass_DemoMan)],
 		g_Wave.projectilesHit[view_as<int>(TFClass_DemoMan)],
-		g_Wave.jarsThrown);
+		g_Wave.jarsThrown, g_Wave.buildingRepaired, g_Wave.buildingDamageTaken);
 
 	WriteLine(line);
 
@@ -1140,7 +1240,7 @@ static void WriteLine(const char[] line)
  * report, where it can be changed without another run.
  */
 #define TELEMETRY_SAMPLE_INTERVAL	5.0
-#define TELEMETRY_LINE_LENGTH		1024
+#define TELEMETRY_LINE_LENGTH		1280
 
 /* How far from a building somebody counts as being served by it
  *
@@ -1278,6 +1378,75 @@ static float RangeToNearestEnemy(int client)
 	return best;
 }
 
+/* What the bot is actually pointing at, and whether it is pressing the trigger
+ *
+ * "He got stuck firing at a wall" was reported from play and there was no way to check it. The
+ * action stack says which behaviour is running, the position says where he is, and neither of them
+ * can tell a bot shooting a robot apart from a bot shooting the wall in front of the robot.
+ *
+ * A trace from the eye along the view angles is the same ray the weapon fires, so what it hits is
+ * what the shot hits. Once a sample, one trace per bot.
+ *
+ * Named for the report rather than for the entity: "world" and "robot" are the answer to the
+ * question being asked, and obj_sentrygun with somebody else's name on it is not. */
+static void AimTrace(int client, char[] what, int length, float &range)
+{
+	float eye[3]; GetClientEyePosition(client, eye);
+	float angles[3]; GetClientEyeAngles(client, angles);
+
+	Handle trace = TR_TraceRayFilterEx(eye, angles, MASK_SHOT, RayType_Infinite, TraceIgnoreShooter, client);
+
+	if (!TR_DidHit(trace))
+	{
+		strcopy(what, length, "nothing");
+		range = -1.0;
+
+		delete trace;
+
+		return;
+	}
+
+	float end[3]; TR_GetEndPosition(end, trace);
+	range = GetVectorDistance(eye, end);
+
+	int hit = TR_GetEntityIndex(trace);
+
+	delete trace;
+
+	if (hit <= 0)
+	{
+		strcopy(what, length, "world");
+
+		return;
+	}
+
+	if (hit <= MaxClients)
+	{
+		strcopy(what, length, TF2_GetClientTeam(hit) == TFTeam_Blue ? "robot" : "teammate");
+
+		return;
+	}
+
+	char class[64]; GetEntityClassname(hit, class, sizeof(class));
+
+	//A building of his own and a building of somebody else's are different answers
+	if (StrContains(class, "obj_") == 0)
+	{
+		int owner = GetEntPropEnt(hit, Prop_Send, "m_hBuilder");
+
+		Format(what, length, "%s%s", owner == client ? "own_" : "", class[4]);
+
+		return;
+	}
+
+	strcopy(what, length, class);
+}
+
+public bool TraceIgnoreShooter(int entity, int mask, any data)
+{
+	return entity != data;
+}
+
 static void WriteBotTelemetry(int client, float when, float clock)
 {
 	float at[3]; GetClientAbsOrigin(client, at);
@@ -1307,14 +1476,21 @@ static void WriteBotTelemetry(int client, float when, float clock)
 			GetClientName(patient, healing, sizeof(healing));
 	}
 
+	char aim[64]; float aimRange;
+	AimTrace(client, aim, sizeof(aim), aimRange);
+
+	bool firing = (GetEntProp(client, Prop_Data, "m_nButtons") & IN_ATTACK) != 0;
+
 	char line[TELEMETRY_LINE_LENGTH];
 	FormatEx(line, sizeof(line),
 		"{\"event\":\"bot\",\"map\":\"%s\",\"wave\":%d,\"t\":%.1f,\"clock\":%.1f,\"who\":\"%s\",\"class\":\"%s\","
 		... "\"at\":[%.0f,%.0f,%.0f],\"hp\":%d,\"maxhp\":%d,\"weapon\":\"%s\",\"slot\":%d,"
-		... "\"nearest_enemy\":%.0f,\"healing\":\"%s\",\"action\":\"%s\"}",
+		... "\"nearest_enemy\":%.0f,\"aim\":\"%s\",\"aim_range\":%.0f,\"firing\":%d,"
+		... "\"healing\":\"%s\",\"action\":\"%s\"}",
 		g_sMap, g_iWave, when, clock, name, ClassName(TF2_GetPlayerClass(client)),
 		at[0], at[1], at[2], GetClientHealth(client), TF2Util_GetEntityMaxHealth(client),
-		weaponClass, slot, RangeToNearestEnemy(client), healing, stack);
+		weaponClass, slot, RangeToNearestEnemy(client), aim, aimRange, firing ? 1 : 0,
+		healing, stack);
 
 	WriteLine(line);
 }
