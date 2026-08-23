@@ -710,7 +710,17 @@ methodmap BotAim
 			
 			delete trace;
 			
-			if (this.IsHeadSteady())
+			/* On target is the gate, and steady is a second one only these weapons carry
+			
+			IsHeadAimingOnTarget has already been required above and is the same test every hitscan
+			weapon passes to fire. This adds that the head must also have stopped moving, and it is
+			invalidated by any eye movement above a small per-frame rate, so a bot following a
+			walking robot almost never qualifies.
+			
+			What that produces is a Demoman firing forty five pipes in a wave from a launcher that
+			can fire one every six tenths of a second, and he is the second lowest scoring seat on
+			the team. A rocket wants a still head far less than a sniper does: it has splash. */
+			if (Feature(FEATURE_EXPLOSIVE_FIRE_TRACKING) || this.IsHeadSteady())
 			{
 				this.PressFireButton();	
 			}
