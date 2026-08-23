@@ -151,6 +151,7 @@ enum struct WaveCounters
 	The Soldier and the Demoman are the two seats that fight with an arcing projectile and they are
 	the two lowest scoring seats on the team. "He does a thousand a wave" cannot tell a bot that
 	never shoots from a bot whose every shot goes past the robot, and those want opposite fixes. */
+	int jarsThrown;
 	int projectilesFired[view_as<int>(TFClass_Engineer) + 1];
 	int projectilesHit[view_as<int>(TFClass_Engineer) + 1];
 	int selfDamageByClass[view_as<int>(TFClass_Engineer) + 1];
@@ -201,6 +202,8 @@ enum struct WaveCounters
 		this.demoMeleeDamage = 0;
 		this.soldierRocketDamage = 0;
 		this.soldierOtherDamage = 0;
+		
+		this.jarsThrown = 0;
 		
 		for (int i = 0; i < sizeof(this.projectilesFired); i++)
 		{
@@ -615,7 +618,8 @@ static void WriteWaveResult(const char[] result)
 		... "\"selfdeaths_medic\":%d,\"selfdeaths_sniper\":%d,\"selfdeaths_spy\":%d,"
 		... "\"demo_pipe_damage\":%d,\"demo_sticky_damage\":%d,\"demo_melee_damage\":%d,"
 		... "\"soldier_rocket_damage\":%d,\"soldier_other_damage\":%d,"
-		... "\"fired_soldier\":%d,\"hit_soldier\":%d,\"fired_demoman\":%d,\"hit_demoman\":%d}",
+		... "\"fired_soldier\":%d,\"hit_soldier\":%d,\"fired_demoman\":%d,\"hit_demoman\":%d,"
+		... "\"jars_thrown\":%d}",
 		g_sMap, g_iWave, result, duration,
 		g_Wave.robotKills, g_Wave.giantKills, g_Wave.tankKills, g_Wave.sentryKills,
 		g_Wave.defenderDeaths, g_Wave.backstabs, g_Wave.busterDetonations,
@@ -691,7 +695,8 @@ static void WriteWaveResult(const char[] result)
 		g_Wave.projectilesFired[view_as<int>(TFClass_Soldier)],
 		g_Wave.projectilesHit[view_as<int>(TFClass_Soldier)],
 		g_Wave.projectilesFired[view_as<int>(TFClass_DemoMan)],
-		g_Wave.projectilesHit[view_as<int>(TFClass_DemoMan)]);
+		g_Wave.projectilesHit[view_as<int>(TFClass_DemoMan)],
+		g_Wave.jarsThrown);
 
 	WriteLine(line);
 
@@ -818,7 +823,7 @@ public void OnEntityCreated(int entity, const char[] classname)
 	if (StrEqual(classname, "tank_boss"))
 		SDKHook(entity, SDKHook_OnTakeDamagePost, OnTankDamagePost);
 	
-	if (IsCountedProjectile(classname))
+	if (IsCountedProjectile(classname) || IsThrownJar(classname))
 		RequestFrame(Frame_CountProjectile, EntIndexToEntRef(entity));
 }
 
@@ -828,6 +833,20 @@ static bool IsCountedProjectile(const char[] classname)
 	return StrEqual(classname, "tf_projectile_rocket")
 		|| StrEqual(classname, "tf_projectile_pipe")
 		|| StrEqual(classname, "tf_projectile_pipe_remote");
+}
+
+/* Jars, counted separately because they are thrown rather than fired
+ *
+ * A Scout was measured holding Mad Milk for seventy five seconds at a stretch, which is three
+ * times its recharge, so the question is whether the bottle is ever leaving his hand at all. The
+ * weapon share cannot answer that: holding it and throwing it look the same from a slot number.
+ */
+static bool IsThrownJar(const char[] classname)
+{
+	return StrEqual(classname, "tf_projectile_jar")
+		|| StrEqual(classname, "tf_projectile_jar_milk")
+		|| StrEqual(classname, "tf_projectile_jar_gas")
+		|| StrEqual(classname, "tf_projectile_cleaver");
 }
 
 /* Counted a frame later, because the owner is not set when the entity is created
@@ -853,6 +872,15 @@ public void Frame_CountProjectile(any ref)
 	
 	if (TF2_GetClientTeam(owner) != TFTeam_Red)
 		return;
+	
+	char classname[64]; GetEntityClassname(projectile, classname, sizeof(classname));
+	
+	if (IsThrownJar(classname))
+	{
+		g_Wave.jarsThrown++;
+		
+		return;
+	}
 	
 	int class = view_as<int>(TF2_GetPlayerClass(owner));
 	
