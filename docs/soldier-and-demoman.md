@@ -102,6 +102,27 @@ The mechanism does what it says and buys nothing with it. Credits spent there
 come out of upgrades that produce damage, and on this harness a five percent
 swing over six waves is inside the noise. Deleted.
 
+## What worked: letting him shoot
+
+`demo_hold_fire` capped his pipes at 900 units. Twelve waves on two maps, each
+way:
+
+```
+                  demoman dmg   shots   accuracy   team deaths   cleared
+ON  (cap 900)           20073     450        43%           146         6
+OFF (cap 1400)          22285     492        40%           103         7
+```
+
+Better on every axis except the hit rate, which is the axis that does not
+matter: **the shots he was not allowed to take are worth more than the ones he
+lands.** +11% damage, 30% fewer team deaths, one more wave.
+
+It had won an A/B before, bundled with `attack_strafe` and never split. Split
+now, `attack_strafe` was doing the work. The cap is gone.
+
+The lesson generalises past this file: a pair that wins together says nothing
+about either half, and `testbed/ab.sh` says so in its own header. Split it.
+
 ## Still open
 
 The Soldier's rocket launcher has no entry in `weapon_tuning.sp` and falls
