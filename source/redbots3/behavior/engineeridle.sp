@@ -91,10 +91,38 @@ static Action CTFBotMvMEngineerIdle_OnStart(BehaviorAction action, int actor, Be
 	return action.Continue();
 }
 
+/* An engineer with no sentry who is not building one, said out loud every few seconds
+ *
+ * Measured on Coaltown: wave four ran for eight minutes and the engineer had a sentry standing for
+ * fifteen percent of it, with one gap of three hundred and eighty five seconds. No build action
+ * failed in that time, because no build action ran. He was inside this update the whole while, so
+ * one of its early returns owns the wave and there is no way to tell which from outside.
+ *
+ * Throttled per engineer, and only while he has nothing standing, so a working nest is silent. */
+#define ENGINEER_STALL_REPORT	10.0
+
+static float m_ctEngineerStallReport[MAXPLAYERS + 1];
+
+static void ReportEngineerStall(int actor, const char[] where)
+{
+	if (m_ctEngineerStallReport[actor] > GetGameTime())
+		return;
+	
+	m_ctEngineerStallReport[actor] = GetGameTime() + ENGINEER_STALL_REPORT;
+	
+	PrintToServer("[defenderbots] engineer %N has no sentry at %.1f: %s (nest %s, carrying %s, grabbing %s)",
+		actor, GetGameTime(), where,
+		m_aNestArea[actor] == NULL_AREA ? "none" : "held",
+		TF2_IsCarryingObject(actor) ? "yes" : "no",
+		g_bGoingToGrabBuilding[actor] ? "yes" : "no");
+}
+
 static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, float interval, ActionResult result)
 {
 	int sentry    = GetObjectOfType(actor, TFObject_Sentry);
 	int dispenser = GetObjectOfType(actor, TFObject_Dispenser);
+	
+	bool stalled = sentry == INVALID_ENT_REFERENCE && GameRules_GetRoundState() == RoundState_RoundRunning;
 	
 	bool bShouldAdvance = CTFBotMvMEngineerIdle_ShouldAdvanceNestSpot(actor);
 
@@ -295,6 +323,10 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 			DetonateObjectOfType(actor, TFObject_Dispenser);
 			
 			g_arrPluginBot[actor].bPathing = false;
+			
+			if (stalled)
+				ReportEngineerStall(actor, "the building he was fetching is gone");
+			
 			return action.Continue();
 		}
 		
@@ -385,7 +417,12 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 	}
 	
 	if (bShouldAdvance)
+	{
+		if (stalled)
+			ReportEngineerStall(actor, "advancing the nest");
+		
 		return action.Continue();
+	}
 	
 	UpdateSentryUnderFire(actor, sentry);
 
@@ -433,6 +470,9 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 		}
 	}
 	
+	if (m_aNestArea[actor] == NULL_AREA && stalled)
+		ReportEngineerStall(actor, "no nest area to build on");
+	
 	if (m_aNestArea[actor] != NULL_AREA)
 	{
 		if (sentry != INVALID_ENT_REFERENCE)
@@ -448,6 +488,9 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 		{
 			/* do not have a sentry; retreat for a few seconds if we had a
 			 * sentry before this; then build a new sentry */
+			if (m_ctSentryCooldown[actor] >= GetGameTime())
+				ReportEngineerStall(actor, "waiting out the rebuild cooldown");
+			
 			if (m_ctSentryCooldown[actor] < GetGameTime()) 
 			{
 				m_ctSentryCooldown[actor] = GetGameTime() + 3.0;
@@ -880,6 +923,17 @@ bool IsSentrySafe(int sentry)
 		return false;
 	
 	return GetEntProp(sentry, Prop_Send, "m_iAmmoShells") > 50;
+}
+
+//Where this engineer's nest is, false when he has not been given one yet
+bool EngineerNestPosition(int actor, float out[3])
+{
+	if (m_aNestArea[actor] == NULL_AREA)
+		return false;
+	
+	NestBuildPosition(m_aNestArea[actor], out);
+	
+	return true;
 }
 
 bool CTFBotMvMEngineerIdle_ShouldAdvanceNestSpot(int actor)

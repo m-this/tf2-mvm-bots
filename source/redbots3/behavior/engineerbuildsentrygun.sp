@@ -84,6 +84,8 @@ public Action CTFBotMvMEngineerBuildSentrygun_OnStart(BehaviorAction action, int
 	//After the teleport above, so a between-rounds walk is priced from where he actually starts it
 	m_ctSentryReachDeadline[actor] = GetGameTime() + BuildReachTime(GetAbsOrigin(actor), m_vSentryStand[actor]);
 	
+	LogBuildFailure(actor, "sentry", "started");
+	
 	return action.Continue();
 }
 
@@ -218,6 +220,8 @@ public Action CTFBotMvMEngineerBuildSentrygun_Update(BehaviorAction action, int 
 		return action.Continue();
 	
 	SetPlayerReady(actor, true);
+	
+	LogBuildFailure(actor, "sentry", "built one");
 	
 	return action.Done("Built a sentry");
 }
