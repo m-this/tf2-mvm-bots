@@ -138,4 +138,24 @@ cp "$root/gamedata/tf2.defenderbots.txt" \
 
 cp -r "$root/configs/defenderbots" "$out/addons/sourcemod/configs/"
 
+# A loadout the run wants instead of the shipped one.
+#
+# Some faults only exist for a weapon the shipped loadout does not carry. The
+# engineer firing a Rescue Ranger at a wall was reported from play and cannot be
+# reproduced here at all, because configs/defenderbots/loadout.cfg gives him a
+# stock shotgun and the whole code path is behind TF2_IsRescueRangerEquipped.
+#
+# Overlaying the file rather than editing the shipped one keeps the reproduction
+# in the repository next to the thing it reproduces, and keeps a run that forgot
+# to set this measuring the loadout everybody actually plays.
+if [ -n "${TESTBED_LOADOUT:-}" ]; then
+	if [ ! -f "$root/$TESTBED_LOADOUT" ]; then
+		echo "TESTBED_LOADOUT: no such file: $root/$TESTBED_LOADOUT" >&2
+		exit 1
+	fi
+
+	cp "$root/$TESTBED_LOADOUT" "$out/addons/sourcemod/configs/defenderbots/loadout.cfg"
+	echo "loadout overlaid from $TESTBED_LOADOUT"
+fi
+
 echo "staged into $out"
