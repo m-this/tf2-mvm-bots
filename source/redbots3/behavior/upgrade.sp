@@ -1,3 +1,10 @@
+/* What blast resistance is worth to a man who explodes himself, whatever the wave carries
+ *
+ * Ranked with the resistances rather than above them: it is still a defensive buy, and putting it
+ * over damage would be trading the output this is meant to protect.
+ */
+#define BLAST_RESIST_SELF_FLOOR	85
+
 #define BUY_UPGRADES_MAX_TIME	30.0
 #define BUY_UPGRADES_FAST_MAX_TIME	3.0
 
@@ -685,6 +692,24 @@ static int LoadoutUpgradePriority(int client, int slot, const char[] attribute)
 /* What this class contributes with, which is not always the weapon in its hands */
 static int ClassUpgradePriority(TFClassType pclass, int slot, const char[] attribute)
 {
+	/* Blast resistance is never worthless to the two classes that blast themselves
+	
+	The general table prices a resistance by what the coming wave carries, which is the right
+	question for damage somebody else deals and the wrong one for these two. Measured over six
+	waves on Decoy: the Soldier put 3988 into himself while dealing 16721, and it killed him four
+	times; the Demoman 2380 against 13751. That damage is in every wave whatever the robots are
+	made of, so there is a floor under what the resistance is worth to them.
+	
+	Ranked with the resistances rather than above them. It is still a defensive buy, and putting it
+	over damage would trade away the output it is there to protect. */
+	if (Feature(FEATURE_BLAST_RESIST_SELF) && StrEqual(attribute, "dmg taken from blast reduced")
+		&& (pclass == TFClass_Soldier || pclass == TFClass_DemoMan))
+	{
+		int worth = ResistancePriority(WaveHasExplosiveRobots());
+		
+		return worth > BLAST_RESIST_SELF_FLOOR ? worth : BLAST_RESIST_SELF_FLOOR;
+	}
+
 	switch (pclass)
 	{
 		case TFClass_Engineer:
