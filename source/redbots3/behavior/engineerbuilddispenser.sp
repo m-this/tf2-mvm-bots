@@ -113,6 +113,7 @@ public Action CTFBotMvMEngineerBuildDispenser_Update(BehaviorAction action, int 
 {
 	if (m_aNestArea[actor] == NULL_AREA) 
 	{
+		LogBuildFailure(actor, "dispenser", "no nest area");
 		return action.Done("No hint entity");
 	}
 	
@@ -122,6 +123,7 @@ public Action CTFBotMvMEngineerBuildDispenser_Update(BehaviorAction action, int 
 	{
 		//Fuck you.
 		
+		LogBuildFailure(actor, "dispenser", "no sentry to feed");
 		return action.Done("No sentry");
 	}
 	
@@ -133,6 +135,7 @@ public Action CTFBotMvMEngineerBuildDispenser_Update(BehaviorAction action, int 
 	inside those three seconds. */
 	if (!IsSentrySafe(sentry))
 	{
+		LogBuildFailure(actor, "dispenser", "sentry under fire");
 		return action.Done("Sentry not safe");
 	}
 	
@@ -140,6 +143,7 @@ public Action CTFBotMvMEngineerBuildDispenser_Update(BehaviorAction action, int 
 	{
 		//Fuck you too.
 		
+		LogBuildFailure(actor, "dispenser", "told to advance the nest");
 		return action.Done("Need to advance nest");
 	}
 	
@@ -151,7 +155,11 @@ public Action CTFBotMvMEngineerBuildDispenser_Update(BehaviorAction action, int 
 	below is what answers for it. */
 	//Every side of the spot refused him, and a wave held for one dispenser is the worse trade
 	if (GetGameTime() > m_ctDispenserGiveUpTime[actor])
+	{
+		LogBuildFailure(actor, "dispenser", "ran out of time to place it");
+		
 		return action.Done("Nowhere to put a dispenser");
+	}
 	
 	float spot[3]; spot = m_vDispenserSpot[actor];
 	float stand[3]; stand = m_vDispenserStand[actor];
