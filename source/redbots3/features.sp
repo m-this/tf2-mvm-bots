@@ -30,6 +30,7 @@ enum
 	FEATURE_DEMO_HOLD_FIRE,
 	FEATURE_ATTACK_STRAFE,
 	FEATURE_ENGINEER_RIDES_HOME,
+	FEATURE_MEDIC_HOLDS_GROUND,
 	FEATURE_COUNT
 }
 
@@ -45,7 +46,8 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"wave_resistances",
 	"demo_hold_fire",
 	"attack_strafe",
-	"engineer_rides_home"
+	"engineer_rides_home",
+	"medic_holds_ground"
 };
 
 static ConVar g_arrFeatureConVars[FEATURE_COUNT];
@@ -84,6 +86,9 @@ void LoadFeatures()
 
 	g_arrFeatureConVars[FEATURE_DEMO_HOLD_FIRE] = MakeFeature(FEATURE_DEMO_HOLD_FIRE,
 		"The Demoman holds his pipes until the target is near enough for one to arrive.");
+
+	g_arrFeatureConVars[FEATURE_MEDIC_HOLDS_GROUND] = MakeFeature(FEATURE_MEDIC_HOLDS_GROUND,
+		"The medic does not walk into the respawn room after a patient while a wave is being fought.");
 
 	g_arrFeatureConVars[FEATURE_ENGINEER_RIDES_HOME] = MakeFeature(FEATURE_ENGINEER_RIDES_HOME,
 		"An engineer with no sentry takes his own teleporter back to the nest instead of walking it.");
