@@ -925,17 +925,6 @@ bool IsSentrySafe(int sentry)
 	return GetEntProp(sentry, Prop_Send, "m_iAmmoShells") > 50;
 }
 
-//Where this engineer's nest is, false when he has not been given one yet
-bool EngineerNestPosition(int actor, float out[3])
-{
-	if (m_aNestArea[actor] == NULL_AREA)
-		return false;
-	
-	NestBuildPosition(m_aNestArea[actor], out);
-	
-	return true;
-}
-
 bool CTFBotMvMEngineerIdle_ShouldAdvanceNestSpot(int actor)
 {
 	if (m_aNestArea[actor] == NULL_AREA)
