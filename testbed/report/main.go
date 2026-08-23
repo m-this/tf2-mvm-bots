@@ -54,7 +54,15 @@ type wave struct {
 	TankDamage   int `json:"tank_damage"`
 	SentryDamage int `json:"sentry_damage"`
 	Healing      int `json:"healing"`
-	Ubers        int `json:"ubers"`
+
+	// The same quantity by two routes: the player_healed event summed per
+	// healer, and the number tf_player_manager shows on the Tab screen.
+	HealingScoreboard int `json:"healing_scoreboard"`
+	HealingMedic      int `json:"healing_medic"`
+	HealingEngineer   int `json:"healing_engineer"`
+	HealingSoldier    int `json:"healing_soldier"`
+	HealingSniper     int `json:"healing_sniper"`
+	Ubers             int `json:"ubers"`
 
 	// Per class, keyed by the class name the plugin writes
 	SelfDamageBy map[string]int `json:"-"`
@@ -148,6 +156,9 @@ type summary struct {
 	kills, giants, deaths, stabs          int
 	sentriesLost, busters                 int
 	repaired, buildingDamage              int
+	healScoreboard                        int
+	healMedic, healEngineer               int
+	healSoldier, healSniper               int
 	damage, tankDamage, sentryDamage      int
 	demoPipe, demoSticky, demoMelee       int
 	solRocket, solOther                   int
@@ -195,6 +206,11 @@ func summarise(waves []wave) summary {
 		s.tankDamage += w.TankDamage
 		s.sentryDamage += w.SentryDamage
 		s.healing += w.Healing
+		s.healScoreboard += w.HealingScoreboard
+		s.healMedic += w.HealingMedic
+		s.healEngineer += w.HealingEngineer
+		s.healSoldier += w.HealingSoldier
+		s.healSniper += w.HealingSniper
 		s.ubers += w.Ubers
 
 		for k, v := range w.DamageBy {
@@ -287,6 +303,34 @@ func print(name string, s summary) {
 	fmt.Printf("  of it, sentries   %d (%s)\n", s.sentryDamage, percent(s.sentryDamage, s.damage))
 	fmt.Printf("  damage to tanks   %d\n", s.tankDamage)
 	fmt.Printf("  healing done      %d, %d ubers\n", s.healing, s.ubers)
+
+	// Who did the healing, and whether the two ways of counting it agree. The
+	// engineer's share is his dispenser: player_healed names him as the healer
+	// for it, so it has always been inside the total and never visible.
+	if s.healMedic > 0 || s.healEngineer > 0 || s.healScoreboard > 0 {
+		fmt.Printf("  healing by class  medic %d  engineer %d", s.healMedic, s.healEngineer)
+
+		if s.healSoldier > 0 {
+			fmt.Printf("  soldier %d", s.healSoldier)
+		}
+
+		if s.healSniper > 0 {
+			fmt.Printf("  sniper %d", s.healSniper)
+		}
+
+		fmt.Println()
+
+		fmt.Printf("  scoreboard says   %d", s.healScoreboard)
+
+		// Two routes to one quantity. A gap is not automatically a bug, but it
+		// is always worth a look, and silence about it is how a broken counter
+		// survives.
+		if gap := s.healScoreboard - s.healing; gap > s.healing/10 || gap < -s.healing/10 {
+			fmt.Printf("   (the event sum says %d, which is a %d gap)", s.healing, gap)
+		}
+
+		fmt.Println()
+	}
 	fmt.Printf("  damage by class   %s\n", ranked(s.damageBy))
 	fmt.Printf("  kills by class    %s\n", ranked(s.killsBy))
 	fmt.Printf("  giants by class   %s\n", ranked(s.giantsBy))
@@ -335,6 +379,8 @@ func compare(now, then summary) {
 	fmt.Printf("  damage dealt      %d -> %d\n", then.damage, now.damage)
 	fmt.Printf("  sentry damage     %d -> %d\n", then.sentryDamage, now.sentryDamage)
 	fmt.Printf("  healing done      %d -> %d\n", then.healing, now.healing)
+	fmt.Printf("  of it, the medic  %d -> %d\n", then.healMedic, now.healMedic)
+	fmt.Printf("  of it, dispensers %d -> %d\n", then.healEngineer, now.healEngineer)
 	fmt.Printf("  sentries lost     %d -> %d\n", then.sentriesLost, now.sentriesLost)
 	fmt.Printf("  repaired          %d -> %d\n", then.repaired, now.repaired)
 	fmt.Printf("  backstabbed       %d -> %d\n", then.causeBy["backstab"], now.causeBy["backstab"])
