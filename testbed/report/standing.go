@@ -49,6 +49,9 @@ type standRollup struct {
 	firing        int
 	firingAtWorld int
 	aimedAt       map[string]int
+	walking       int
+	walkingNoPath int
+	walkingStill  int
 }
 
 func distance(a, b []float64) float64 {
@@ -162,6 +165,24 @@ func rollupStanding(bots []botSample, buildings []buildingSample) map[string]*st
 			continue
 		}
 
+		/* Asked to walk, and whether anything came of it
+
+		The pair separates the two states that look identical from outside and have been confused
+		in at least three reported faults. A bot pathing with a path of zero length was told there
+		is no way there and is walking along nothing; a bot pathing with a real path and no
+		movement is being stopped by something in the world. */
+		if s.Pathing != 0 {
+			r.walking++
+
+			if s.PathLen <= 0 {
+				r.walkingNoPath++
+			}
+
+			if step < parkedStep {
+				r.walkingStill++
+			}
+		}
+
 		if s.Class == "engineer" && s.Slot == 2 {
 			r.wrenchOut++
 
@@ -271,6 +292,12 @@ func printStanding(bots []botSample, buildings []buildingSample) {
 		}
 
 		fmt.Printf(", %.0f units walked per wave\n", r.travelled/float64(max(wavesIn(bots, who), 1)))
+
+		if r.walking > 0 {
+			fmt.Printf("    %-16s %-9s asked to walk in %d%% of samples, %d%% of those with no path at all, %d%% of those without moving\n",
+				"", "", pct(r.walking, r.steps), pct(r.walkingNoPath, r.walking),
+				pct(r.walkingStill, r.walking))
+		}
 
 		if r.firing > 0 {
 			fmt.Printf("    %-16s %-9s trigger held in %d%% of samples, %d%% of those into the world%s\n",

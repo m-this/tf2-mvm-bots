@@ -38,6 +38,8 @@ type botSample struct {
 	Aim          string    `json:"aim"`
 	AimRange     float64   `json:"aim_range"`
 	Firing       int       `json:"firing"`
+	PathLen      float64   `json:"path_len"`
+	Pathing      int       `json:"pathing"`
 }
 
 type buildingSample struct {
@@ -68,6 +70,7 @@ type botRollup struct {
 	slots    map[int]int
 	actions  map[string]int
 	beaming  int // medic only: samples with the medigun actually on somebody
+	trigger  int // medic only: samples with the trigger held, connected or not
 	hurt     int // samples below four fifths health
 	stillFor map[string]int
 }
@@ -105,6 +108,10 @@ func rollupBots(samples []botSample) map[string]*botRollup {
 
 		if s.Healing != "" {
 			r.beaming++
+		}
+
+		if s.Firing != 0 {
+			r.trigger++
 		}
 
 		if s.MaxHP > 0 && float64(s.HP) < 0.8*float64(s.MaxHP) {
@@ -313,8 +320,14 @@ func printTelemetry(bots []botSample, buildings []buildingSample) {
 
 			fmt.Printf("    %-16s %-9s %s\n", who, r.class, topActions(r.actions, r.samples))
 
+			// Holding the trigger and healing somebody are different things. The
+			// medigun reaches about 450 units; a medic aiming at a patient 926
+			// away with the button down is delivering nothing, and every number
+			// except this one counts it as a medic at work.
 			if r.class == "medic" {
-				fmt.Printf("    %-16s %-9s beam on somebody %d%% of the time\n", "", "", pct(r.beaming, r.samples))
+				fmt.Printf("    %-16s %-9s beam on somebody %d%% of the time, trigger held %d%% (%s of that connected)\n",
+					"", "", pct(r.beaming, r.samples), pct(r.trigger, r.samples),
+					percent(r.beaming, r.trigger))
 			}
 
 			fmt.Printf("    %-16s %-9s %s, hurt %d%% of the time\n", "", "", slotShare(r.slots, r.samples), pct(r.hurt, r.samples))

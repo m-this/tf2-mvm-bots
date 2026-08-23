@@ -437,7 +437,41 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 {
 	g_bLateLoad = late;
 	
+	/* Two facts about a bot that nothing outside this plugin can work out for itself
+	
+	"He is not moving" and "he has nowhere to walk" look identical from every angle a watcher has,
+	and telling them apart has been the hard part of five separate faults. The path length and
+	whether the bot believes it is walking are both held in here, so they are published from here.
+	
+	Exported rather than logged because the test bed wants them per sample beside everything else it
+	records. Nothing in this plugin depends on anybody calling them. */
+	CreateNative("Defenderbots_GetPathLength", Native_GetPathLength);
+	CreateNative("Defenderbots_IsPathing", Native_IsPathing);
+	
+	RegPluginLibrary("tf2_defenderbots");
+	
 	return APLRes_Success;
+}
+
+static any Native_GetPathLength(Handle plugin, int numParams)
+{
+	int client = GetNativeCell(1);
+	
+	if (client < 1 || client > MaxClients || !IsClientInGame(client) || !g_bIsDefenderBot[client])
+		return -1.0;
+	
+	//Unguarded, as everywhere else that reads it: the path is made with the bot and outlives it
+	return m_pPath[client].GetLength();
+}
+
+static any Native_IsPathing(Handle plugin, int numParams)
+{
+	int client = GetNativeCell(1);
+	
+	if (client < 1 || client > MaxClients || !IsClientInGame(client) || !g_bIsDefenderBot[client])
+		return false;
+	
+	return g_arrPluginBot[client].bPathing;
 }
 
 /* The features that are on, published once the server's own configs have run

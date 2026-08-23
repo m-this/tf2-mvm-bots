@@ -248,6 +248,34 @@ enum struct WaveCounters
 
 WaveCounters g_Wave;
 
+/* Two facts the bots plugin knows about itself and nothing else can work out
+ *
+ * Optional, because this plugin has to load on a server without the mod: asking for a native that
+ * is not there is a load failure, and a statistics plugin that refuses to start is worse than one
+ * that records two fields as unknown.
+ */
+native float Defenderbots_GetPathLength(int client);
+native bool Defenderbots_IsPathing(int client);
+
+static bool g_bHasPathNatives;
+
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
+{
+	MarkNativeAsOptional("Defenderbots_GetPathLength");
+	MarkNativeAsOptional("Defenderbots_IsPathing");
+
+	return APLRes_Success;
+}
+
+public void OnAllPluginsLoaded()
+{
+	g_bHasPathNatives = GetFeatureStatus(FeatureType_Native, "Defenderbots_GetPathLength") == FeatureStatus_Available
+		&& GetFeatureStatus(FeatureType_Native, "Defenderbots_IsPathing") == FeatureStatus_Available;
+
+	if (!g_bHasPathNatives)
+		LogMessage("mvmbots_stats: the bots plugin is not exporting its path state, so path_len will read -1");
+}
+
 public void OnPluginStart()
 {
 	g_cvPath = CreateConVar("mvmbots_stats_path", "logs/mvmbots_stats.jsonl",
@@ -376,6 +404,28 @@ static int g_iLastObjectHealth[MAXPLAYERS + 1][4];
 static int g_iLastObjectLevel[MAXPLAYERS + 1][4];
 static float g_flNextRepairSample;
 
+//A teleporter entrance and a teleporter exit are the same object type and different buildings
+static int FindOwnedObjectOfMode(int client, TFObjectType type, int mode)
+{
+	int count = TF2Util_GetPlayerObjectCount(client);
+
+	for (int i = 0; i < count; i++)
+	{
+		int owned = TF2Util_GetPlayerObject(client, i);
+
+		if (TF2_GetObjectType(owned) != type)
+			continue;
+
+		int ownedMode = HasEntProp(owned, Prop_Send, "m_iObjectMode")
+			? GetEntProp(owned, Prop_Send, "m_iObjectMode") : 0;
+
+		if (ownedMode == mode)
+			return owned;
+	}
+
+	return -1;
+}
+
 static void ResetRepairSamples()
 {
 	for (int i = 1; i <= MaxClients; i++)
@@ -397,19 +447,28 @@ static void SampleRepairs()
 
 	g_flNextRepairSample = GetGameTime() + REPAIR_SAMPLE_INTERVAL;
 
-	static TFObjectType types[3];
-	types[0] = TFObject_Sentry;
-	types[1] = TFObject_Dispenser;
-	types[2] = TFObject_Teleporter;
+	/* Four slots, because an engineer owns four buildings and only three types
+	
+	Both teleporters are TFObject_Teleporter, so keying on type alone puts the entrance and the
+	exit in one slot and FindOwnedObject hands back whichever comes first in his object list. Two
+	entities taking turns in one slot is two health readings being subtracted from each other. It
+	is quiet here because both usually sit at full health, which is exactly the kind of quiet that
+	stays wrong until somebody kills a teleporter. */
+	static TFObjectType types[4];
+	static int modes[4];
+	types[0] = TFObject_Sentry;      modes[0] = 0;
+	types[1] = TFObject_Dispenser;   modes[1] = 0;
+	types[2] = TFObject_Teleporter;  modes[2] = 0;
+	types[3] = TFObject_Teleporter;  modes[3] = 1;
 
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (!IsClientInGame(i) || TF2_GetClientTeam(i) != TFTeam_Red)
 			continue;
 
-		for (int t = 0; t < 3; t++)
+		for (int t = 0; t < 4; t++)
 		{
-			int building = FindOwnedObject(i, types[t]);
+			int building = FindOwnedObjectOfMode(i, types[t], modes[t]);
 
 			//Gone, or not finished. Either way the next reading is a seed and not a difference
 			if (building == -1 || GetEntProp(building, Prop_Send, "m_bBuilding") != 0)
@@ -1479,6 +1538,15 @@ static void WriteBotTelemetry(int client, float when, float clock)
 	char aim[64]; float aimRange;
 	AimTrace(client, aim, sizeof(aim), aimRange);
 
+	/* Whether he is walking, and whether there is anything to walk along
+	
+	A path length of zero with pathing true is the failure this pair exists for: the bot asked to
+	go somewhere, the query came back with nothing, and it walks along nothing while every other
+	field says it is travelling. That has been the cause of at least three reported faults and it
+	has never been visible in a results file. */
+	float pathLength = g_bHasPathNatives ? Defenderbots_GetPathLength(client) : -1.0;
+	bool pathing = g_bHasPathNatives && Defenderbots_IsPathing(client);
+
 	bool firing = (GetEntProp(client, Prop_Data, "m_nButtons") & IN_ATTACK) != 0;
 
 	char line[TELEMETRY_LINE_LENGTH];
@@ -1486,11 +1554,12 @@ static void WriteBotTelemetry(int client, float when, float clock)
 		"{\"event\":\"bot\",\"map\":\"%s\",\"wave\":%d,\"t\":%.1f,\"clock\":%.1f,\"who\":\"%s\",\"class\":\"%s\","
 		... "\"at\":[%.0f,%.0f,%.0f],\"hp\":%d,\"maxhp\":%d,\"weapon\":\"%s\",\"slot\":%d,"
 		... "\"nearest_enemy\":%.0f,\"aim\":\"%s\",\"aim_range\":%.0f,\"firing\":%d,"
+		... "\"path_len\":%.0f,\"pathing\":%d,"
 		... "\"healing\":\"%s\",\"action\":\"%s\"}",
 		g_sMap, g_iWave, when, clock, name, ClassName(TF2_GetPlayerClass(client)),
 		at[0], at[1], at[2], GetClientHealth(client), TF2Util_GetEntityMaxHealth(client),
 		weaponClass, slot, RangeToNearestEnemy(client), aim, aimRange, firing ? 1 : 0,
-		healing, stack);
+		pathLength, pathing ? 1 : 0, healing, stack);
 
 	WriteLine(line);
 }

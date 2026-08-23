@@ -32,6 +32,7 @@ enum
 	FEATURE_MEDIC_OWN_HEAL,
 	FEATURE_MEDIC_BIGGEST_BODY,
 	FEATURE_DEMO_TANK_PIPES,
+	FEATURE_RANGE_REPAIR_GIVES_UP,
 	FEATURE_DEMO_STICKY_SELF_VETO,
 	FEATURE_COUNT
 }
@@ -51,6 +52,7 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"medic_own_heal",
 	"medic_biggest_body",
 	"demo_tank_pipes",
+	"range_repair_gives_up",
 	"demo_sticky_self_veto"
 };
 
@@ -99,6 +101,9 @@ void LoadFeatures()
 
 	g_arrFeatureConVars[FEATURE_DEMO_TANK_PIPES] = MakeFeature(FEATURE_DEMO_TANK_PIPES,
 		"The demoman answers a tank with pipes. Off lets him lay stickies on the hull.");
+
+	g_arrFeatureConVars[FEATURE_RANGE_REPAIR_GIVES_UP] = MakeFeature(FEATURE_RANGE_REPAIR_GIVES_UP,
+		"An engineer whose bolts are not healing the sentry walks to it instead. Off keeps firing.");
 
 	g_arrFeatureConVars[FEATURE_DEMO_STICKY_SELF_VETO] = MakeFeature(FEATURE_DEMO_STICKY_SELF_VETO,
 		"A bomb of his own close enough to hurt him stops the detonator. Off presses it anyway.");
