@@ -122,6 +122,26 @@ Beware the variance. The same OFF arm measured 29%, 35% and 43% beam time on
 three different runs of the same two maps. A 6-wave, 2-map A/B separates a
 halving; it does not separate ten percent.
 
+## A thrown native takes the rest of the callback with it
+
+SourcePawn has no way to catch one, so a native that throws is a `return` you
+did not write, from wherever it happened, skipping every line after it.
+
+Two of these have cost real time:
+
+- `ActionsManager.Iterator` throws on a client that is not a NextBot. The
+  test-bed's seat-holder is an ordinary fake client, so the first client of
+  every telemetry pass killed the whole pass and the results file simply never
+  appeared.
+- `TF2Util_EquipPlayerWearable` asserts that the wearable ended up attached and
+  throws when the game declines it. The hat entity is created a few lines
+  earlier, so every refusal leaks a `tf_wearable` that nobody wears and nothing
+  frees. A server that leaks an edict per bot per respawn runs out of them.
+
+So: check the precondition yourself where you can, and where you cannot, make
+the failure harmless. The wearables are swept at every wave start rather than
+prevented, because whether the game will accept one cannot be asked in advance.
+
 ## The failsafe
 
 `UpdateStuckWatchdog` in `nextbot_behavior.sp` catches the shared symptom: a bot

@@ -194,6 +194,9 @@ static void Event_MvmWaveBegin(Event event, const char[] name, bool dontBroadcas
 	for (int i = 1; i <= MaxClients; i++)
 		g_bShoppedThisBreak[i] = false;
 	
+	//A hat the game refused is an edict nobody will ever free, and there is one per refusal
+	RemoveOrphanedWearables();
+	
 	if (redbots_manager_mode.IntValue == MANAGER_MODE_AUTO_BOTS)
 		ManageDefenderBots(true);
 	

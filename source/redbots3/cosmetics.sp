@@ -228,6 +228,43 @@ static bool WearHat(int client)
 	return true;
 }
 
+/* Wearables the game refused, standing in the world with nobody wearing them
+ *
+ * TF2Util_EquipPlayerWearable asserts that the wearable ended up attached, and throws when the
+ * game declined it. A thrown native takes the rest of the callback with it, so the hat entity that
+ * was created a few lines earlier is never cleaned up and never worn: it just stays. Seen in the
+ * error log dozens of times across a mission, and a server that leaks an edict per bot per respawn
+ * eventually runs out of them.
+ *
+ * The equip cannot be tested in advance, so the leak is swept instead of prevented. Anything of
+ * ours whose owner is not a player in the game is nobody's hat.
+ */
+#define ORPHAN_WEARABLE_SWEEP	64
+
+void RemoveOrphanedWearables()
+{
+	int hat = -1;
+	int removed = 0;
+	
+	while ((hat = FindEntityByClassname(hat, "tf_wearable")) != -1 && removed < ORPHAN_WEARABLE_SWEEP)
+	{
+		int owner = GetEntPropEnt(hat, Prop_Send, "m_hOwnerEntity");
+		
+		if (owner > 0 && owner <= MaxClients && IsClientInGame(owner))
+			continue;
+		
+		//A wearable still being handed out this frame is not an orphan yet
+		if (owner > 0)
+			continue;
+		
+		RemoveEntity(hat);
+		removed++;
+	}
+	
+	if (removed > 0 && redbots_manager_debug.BoolValue)
+		LogMessage("[cosmetics] swept %d wearable(s) nobody was wearing", removed);
+}
+
 /* Take the hat off the way the game does it
 
 Deleting the entity is not the same thing. The player holds a handle to every wearable it is
