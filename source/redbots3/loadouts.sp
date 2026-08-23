@@ -138,6 +138,18 @@ public Action Timer_GiveCustomLoadout(Handle timer, int client)
 	
 	char itemClassname[35];
 	
+	/* The Beggar's Bazooka is a weapon a person is good with and a bot may not be
+	
+	It is the wiki's answer for tanks and single giants and it was chosen for that. What it asks
+	of the man holding it is to load three rockets and release, and what it gives back is a random
+	spread on every one. A bot presses fire in tenth-of-a-second pulses and cannot aim off a
+	spread, so both halves of the trade may be going the wrong way for it.
+	
+	The Soldier is the lowest scoring seat on the team and nothing else has explained why, so the
+	weapon itself is the thing left to measure. */
+	if (Feature(FEATURE_SOLDIER_STOCK_LAUNCHER) && TF2_GetPlayerClass(client) == TFClass_Soldier)
+		m_iWeaponPrimary[client] = TF_ITEMDEF_DEFAULT;
+	
 	if (m_iWeaponPrimary[client] > TF_ITEMDEF_DEFAULT)
 	{
 		TF2_RemoveWeaponSlot(client, TFWeaponSlot_Primary);

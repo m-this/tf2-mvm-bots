@@ -29,6 +29,7 @@ enum
 	FEATURE_WAVE_RESISTANCES,
 	FEATURE_ATTACK_STRAFE,
 	FEATURE_SOLDIER_CLOSES_IN,
+	FEATURE_SOLDIER_STOCK_LAUNCHER,
 	FEATURE_COUNT
 }
 
@@ -43,7 +44,8 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"ready_when_prepared",
 	"wave_resistances",
 	"attack_strafe",
-	"soldier_closes_in"
+	"soldier_closes_in",
+	"soldier_stock_launcher"
 };
 
 static ConVar g_arrFeatureConVars[FEATURE_COUNT];
@@ -79,6 +81,9 @@ void LoadFeatures()
 
 	g_arrFeatureConVars[FEATURE_WAVE_RESISTANCES] = MakeFeature(FEATURE_WAVE_RESISTANCES,
 		"Buy the resistance the coming wave's robots call for, rather than ranking resistances last.");
+
+	g_arrFeatureConVars[FEATURE_SOLDIER_STOCK_LAUNCHER] = MakeFeature(FEATURE_SOLDIER_STOCK_LAUNCHER,
+		"The soldier carries the stock rocket launcher instead of the loadout's Beggar's Bazooka.");
 
 	g_arrFeatureConVars[FEATURE_SOLDIER_CLOSES_IN] = MakeFeature(FEATURE_SOLDIER_CLOSES_IN,
 		"A rocket is fought at a grenade's distance rather than twelve hundred units out.");
