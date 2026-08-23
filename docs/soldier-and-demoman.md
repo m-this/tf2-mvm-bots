@@ -85,6 +85,23 @@ The original reasoning, kept because it is the reasoning anyone will have:
    else deals. These two explode themselves in every wave whatever the robots
    are made of, so the resistance has a floor for them now.
 
+**Blast resistance did not pay either.** `blast_resist_self` put a floor under
+the resistance for these two, on the grounds that their own weapons are in
+every wave. Six waves on Decoy each way:
+
+```
+                        ON      OFF
+soldier self-damage   2147     3272     <- the resistance works
+soldier self-kills       1        3
+soldier damage       13485    14187
+waves cleared            3        3
+defender deaths         50       40
+```
+
+The mechanism does what it says and buys nothing with it. Credits spent there
+come out of upgrades that produce damage, and on this harness a five percent
+swing over six waves is inside the noise. Deleted.
+
 ## Still open
 
 The Soldier's rocket launcher has no entry in `weapon_tuning.sp` and falls
