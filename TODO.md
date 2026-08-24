@@ -170,10 +170,21 @@ so far:
   is the decision rather than where the crosshair drifted. The bot samples carry
   it as `picked`, with `(healed)` after it when something is healing that robot.
 
-What the instruments say so far, from 181 wave 3 samples before a run timed out:
-the giants on the field early are giant soldiers and the bots do choose them, 15
-samples of it. The giant heavy and his medics arrive later in the wave and have
-not been measured yet.
+What the instruments say, over three runs of wave 3 and 579 samples of it: the
+giants the bots meet are giant soldiers, and they do choose them. Not one sample
+has a giant heavy or a medic in it, ours or theirs. The bots lose the wave in
+147 to 173 seconds, to the ordinary demomen, heavies and pyros that come first.
+
+So for a bot team the reported moment never arrives. Swagdoll is on the server
+when he plays it, the team lives longer with him, and the giant heavy is what
+they meet when they get that far. That is the thing to say back to him, and it
+also means this item cannot be measured end to end until the bots can survive
+the first half of the wave.
+
+One instrument caveat found here: on this mission three `wave_begin` lines came
+with one `wave_end`. A wave that is lost and restarted is not always closing its
+own record, which the wave counting in `run.sh` believes. Worth fixing before
+trusting a clear rate from this mission.
 
 Do not add a balancing knob for this. `CTFBotDefenderAttack_SelectTarget` already
 prefers the healer of whatever it picked, through `GetHealerOfPlayer`, so the
