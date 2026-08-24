@@ -34,6 +34,8 @@ static void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast
 
 static void Event_MvmWaveFailed(Event event, const char[] name, bool dontBroadcast)
 {
+	OpenTheBreak();
+	
 	m_iWaveFailCounterTick++;
 	
 	//The same wave comes back down the same route, so there is nothing new to say about the nests
@@ -68,8 +70,23 @@ static void Event_MvmWaveFailed(Event event, const char[] name, bool dontBroadca
 	CreateTimer(0.1, Timer_WaveFailure, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
+/* A break is a fresh shopping trip for everybody
+ *
+ * It used to be cleared when a wave began, which is when a break ends. So every bot that lived
+ * through a wave was still marked as having shopped for the whole of the next break, and
+ * GetDesiredBotAction has nothing else to offer an engineer or a medic between rounds: they stood
+ * where the wave left them until it started again. A bot that died shopped normally, because a
+ * spawn clears the same flag, which is what made it look intermittent. */
+static void OpenTheBreak()
+{
+	for (int i = 1; i <= MaxClients; i++)
+		g_bShoppedThisBreak[i] = false;
+}
+
 static void Event_MvmWaveComplete(Event event, const char[] name, bool dontBroadcast)
 {
+	OpenTheBreak();
+
 	/* Before anything below sends the engineers off to shop
 	The upgrade session is what tears their buildings down, and it needs this answer to know whether
 	it should */
@@ -189,10 +206,6 @@ static void Event_MvmWaveBegin(Event event, const char[] name, bool dontBroadcas
 	
 	//One a tick, because the frame this runs on is the one the server dies on
 	QueueBehaviourReset();
-	
-	//The next break is a fresh shopping trip for everybody
-	for (int i = 1; i <= MaxClients; i++)
-		g_bShoppedThisBreak[i] = false;
 	
 	//A hat the game refused is an edict nobody will ever free, and there is one per refusal
 	RemoveOrphanedWearables();

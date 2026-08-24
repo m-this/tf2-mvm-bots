@@ -371,3 +371,80 @@ func topAim(aimed map[string]int, samples int) string {
 
 	return " (aimed at " + strings.Join(parts, ", ") + ")"
 }
+
+/* What the bots did between waves.
+ *
+ * The break is where a wave is won: the shopping, the nest, the teleporter. It
+ * was also the one part of a mission no table here covered, because everything
+ * else filters on t > 0.
+ *
+ * The number is the share of break samples with no Defender action anywhere on
+ * the stack. A bot whose stack is MainAction < TacticalMonitor < ScenarioMonitor
+ * has nothing of this mod's on it and stands where the round reset left him,
+ * which is what a play-test reported after a lost wave.
+ */
+func printBreak(bots []botSample) {
+	type breakRollup struct {
+		class    string
+		samples  int
+		idle     int
+		longest  int
+		run      int
+		idleAt   []float64
+		distance float64
+		last     []float64
+	}
+
+	rolled := map[string]*breakRollup{}
+
+	for _, s := range bots {
+		if s.T > 0 {
+			continue
+		}
+		r := rolled[s.Who]
+		if r == nil {
+			r = &breakRollup{class: s.Class}
+			rolled[s.Who] = r
+		}
+		r.samples++
+		if r.last != nil {
+			if step := distance(r.last, s.At); step > 0 {
+				r.distance += step
+			}
+		}
+		r.last = s.At
+
+		if hasBehaviour(s.Action) {
+			r.run = 0
+			continue
+		}
+		r.idle++
+		r.run++
+		if r.run > r.longest {
+			r.longest = r.run
+			r.idleAt = s.At
+		}
+	}
+
+	if len(rolled) == 0 {
+		return
+	}
+
+	fmt.Printf("\n  between waves\n")
+
+	for _, who := range sortedKeys(rolled) {
+		r := rolled[who]
+		fmt.Printf("    %-16s %-9s no behaviour in %d%% of samples, longest %.0fs",
+			who, r.class, pct(r.idle, r.samples), float64(r.longest)*sampleSeconds)
+		if r.idleAt != nil {
+			fmt.Printf(" at %.0f %.0f %.0f", r.idleAt[0], r.idleAt[1], r.idleAt[2])
+		}
+		fmt.Printf(", %.0f units walked\n", r.distance)
+	}
+}
+
+// Whether anything of this mod's is on the stack. The game's own MainAction,
+// TacticalMonitor and ScenarioMonitor are always there and decide nothing.
+func hasBehaviour(action string) bool {
+	return strings.Contains(action, "Defender")
+}
