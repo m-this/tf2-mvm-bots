@@ -254,35 +254,58 @@ reproduced.
 
 ## Crashes and the test-bed
 
-### 10. Nest relocation trips the server watchdog. Open, and it is off
+### 10. Nest relocation trips the server watchdog. Fixed, and the feature is still off by default
 
-`sm_redbots_manager_engineer_nest_relocate` defaults to 0 because turning it on
-kills the server at the first wave transition:
+`sm_redbots_manager_engineer_nest_relocate` was 0 because turning it on killed
+the server at the first wave transition. Reproduced again today on Decoy with two
+engineers: the server crashed before a single wave finished.
+
+This time there is a backtrace rather than a guess. The core was read with the
+game's own binaries copied out of the container, which is what makes the frames
+resolve:
 
 ```
-WatchDog! Server took too long to process (probably infinite loop).
-FATAL ERROR: Host_Error: WatchdogHandler called - server exiting.
+WatchDogHandler <- Host_Error <- Sys_Error
+ <signal handler called>
+CNavArea::GetZ <- CNavArea::ComputePortal
+CNavArea::ComputeAdjacentConnectionHeightChange
+SMPathFollowerCost::operator()
+NavAreaBuildPath (maxPathLength=0)
+Path::Compute
+natives::nextbot::path::ComputeToPos
+ ... SourcePawn JIT frames ...
+CHookManager::PlayerRunCmd
+CBasePlayer::PhysicsSimulate
 ```
 
-Reproduced twice on `mvm_decoy` with two engineers in the lineup, both times
-straight after wave 1. The same mission on 1.5.5-tf2ap.10 plays six waves, and
-so does this build with the convar at 0, so it is this feature and nothing else
-in the release.
+So the frame the watchdog killed was a nav mesh search, reached from this mod's
+own per-frame path refresh inside `PlayerRunCmd`, with no bound on the search.
+An unreachable goal makes `NavAreaBuildPath` walk the whole mesh, and six bots
+asking in the same frame multiplies it. Relocation makes unreachable goals more
+likely, which is why it shows there first and why the same shape has now produced
+four crashes.
 
-What was tried and did not fix it: the evaluation used to run a full nav mesh
-sweep per engineer inside the `mvm_wave_complete` frame, which is a real hazard
-and is now one engineer per timer tick. The crash did not move. So the cost is
-not in `ShouldRelocateNest`, and the next place to look is the relocation branch
-in `CTFBotMvMEngineerIdle_Update`. An action that suspends for another which
-finishes at once and hands control straight back spins inside a single frame,
-which is what the watchdog measures.
+The fix is a limit rather than a special case. `PATHS_PER_FRAME` is 2: the
+per-frame refresh computes at most two paths a frame across the whole team, and
+anybody refused tries again next frame. At 66 ticks that is 130 a second against
+a refresh that wants one every 0.2 seconds per bot, so nothing waits for a path.
+A behaviour that computes once when it starts is never refused, because it has no
+retry.
 
-The teardown gating rides on the same convar, and getting that wrong is worth
-recording: gating only on "is the nest moving" meant that with the feature off
-nothing ever moved, so the teardown never ran and every engineer held wave one's
-nest for the whole mission. It now asks the convar too, so with the feature off
-`CTFBotUpgrade_OnEnd` detonates after every shopping trip exactly as it did
-before, and nothing else in the release depends on this being fixed.
+Measured:
+
+| | result |
+| --- | --- |
+| relocation on, before | crashed before wave 1 finished |
+| relocation on, after | 3 waves cleared, then 3 more waves, no crash, no stalls |
+| relocation off, after | 2 waves cleared, 206 robots, 17 deaths, 31819 damage |
+| relocation off, before | 2 waves cleared, 206 robots, 17 deaths, 32314 damage |
+
+The last two are the regression check: the budget changes nothing about a normal
+run.
+
+The convar stays 0. The crash is what kept it off; whether the feature is worth
+having is a different question and wants its own measurement.
 
 ### 12. The Gas Passer crashed the server. Fixed; the rest of the watchdog is still open
 
