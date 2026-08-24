@@ -2590,24 +2590,6 @@ void AddBotsWithPresetTeamComp(int count = 6, int teamType = 0)
 	}
 }
 
-/* Whether a sniper on RED has anywhere to stand
- *
- * The game's own sniping behaviour walks to a func_tfbot_hint of its team and does nothing without
- * one. A map config that names no SniperSpot takes the team off every hint the map carries, because
- * those were placed for the robots and lead a defender into their spawn. That leaves a defender
- * sniper with a rifle standing where he spawned for the whole mission, which is what a play-test
- * reported of the stock loadout: a Huntsman has no rifle, so he fights instead and looks fine. */
-bool HasDefenderSniperSpot()
-{
-	int ent = -1;
-
-	while ((ent = FindEntityByClassname(ent, "func_tfbot_hint")) != -1)
-		if (GetEntProp(ent, Prop_Send, "m_iTeamNum") == view_as<int>(TFTeam_Red))
-			return true;
-
-	return false;
-}
-
 void SetupSniperSpotHints()
 {
 	if (g_arrMapConfig.adtSniperSpot.Length > 0)
