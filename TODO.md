@@ -77,33 +77,40 @@ Measured on the same mission as item 17, two waves, both cleared either way:
 Every bot on the team is now at 0%. Two waves is too small to call the healing a
 win; it is enough to say nothing regressed.
 
-### 15. Sniper bots on the stock loadout stand in spawn. Fixed for the case that causes it
+### 15. Sniper bots on the stock loadout stand in spawn. Explained by item 17, and one fix measured and thrown away
 
 Peppy, and he said it predates 1.9.0: "Sniper bots with the stock loadout don't
 seem to work, they just stay in spawn."
 
-Measured first. A sniper had never been in a test-bed lineup: 3417 engineer
-samples in `results/` and not one sniper. Forced into one on Decoy, on the build
-that has item 17 fixed, he works: `SniperLurk` under his stack for the whole
-mission, 111 samples with 17 of them standing still, 19236 units walked, 1970
-damage and 14 kills over three waves. He is the weakest seat and he is playing.
+A sniper had never been in a test-bed lineup: 3417 engineer samples in
+`results/` and not one sniper, which is why this survived. Forced into one on
+Decoy, on the build with item 17 fixed, he works: `SniperLurk` under his stack
+for the whole mission, 1970 damage and 14 kills over three waves.
 
-Two things are behind the report, and one of them was item 17. A rifle sniper is
-one of the classes `ShouldTakeUpPosition` refuses, so with the stale shopping
-flag he had no behaviour for the whole break and stood where he spawned. That is
-the same freeze the engineers had, and it is fixed.
+That is the answer. A rifle sniper is one of the classes `ShouldTakeUpPosition`
+refuses, so with item 17's stale shopping flag he had no behaviour for the whole
+break and stood where he spawned. The same freeze as the engineers, and fixed
+with them.
 
-The other is a map with no configuration. All twenty-seven shipped map configs
-name a `SniperSpot` block, and `SetupSniperSpotHints` takes the team off every
-`func_tfbot_hint` the map carries when the config names none, because those hints
-were placed for the robots and lead a defender into their spawn. The game's own
-sniping behaviour walks to a hint of its own team and does nothing without one,
-so on an unconfigured map a rifle sniper has nowhere to go and no behaviour that
-would send him anywhere else.
+The rest of this item is a fix that was written, measured and thrown away, and
+it is worth keeping because the reasoning was sound and the measurement said no.
 
-`HasDefenderSniperSpot` asks whether any hint belongs to RED. Without one, the
-sniper fights like a Huntsman sniper already does and walks to the front between
-waves. With one, nothing changes, which the Decoy run above is the control for.
+`SetupSniperSpotHints` takes the team off every `func_tfbot_hint` when the map
+config names no `SniperSpot`, and the game's sniping behaviour walks to a hint of
+its own team. So on an unconfigured map a rifle sniper looked like he would have
+nowhere to go, and the fix was to let him fight instead. Decoy with its
+`SniperSpot` block removed, two waves each way:
+
+| | damage | kills | standing still |
+| --- | --- | --- | --- |
+| lurking, as shipped | 4521 | 35 | 24 of 63 samples |
+| falling back to attacking | 570 | 7 | 11 of 82 samples |
+
+The premise was wrong. The game's lurk finds its own spot without a hint, and a
+sniper on his rifle is worth eight times a sniper walking around shooting at
+things. The change was reverted. What it did prove is that standing still is what
+a sniper is supposed to do, so "he is not moving" is not evidence of a broken
+sniper, and the next report of one wants damage per wave beside it.
 
 ### 16. Engineers build two dispensers. Measured: it is a blueprint, not a building
 
