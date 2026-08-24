@@ -107,6 +107,42 @@ bot doing this often is a bot the map's nav mesh has a hole in. */
 #define PATH_NUDGE_STEP		120.0
 #define PATH_RETRY_INTERVAL	0.5
 
+/* How many paths the whole team may compute in one frame
+ *
+ * NavAreaBuildPath is a search over the map's nav areas and it is what the watchdog has caught the
+ * server inside three times now, most recently with nest relocation on: the symbolised frame was
+ * CNavArea::GetZ under ComputePortal under NavAreaBuildPath, reached from a plugin's ComputeToPos
+ * inside the per-frame PlayerRunCmd forward. An unreachable goal makes that search walk the whole
+ * mesh, and six bots asking in the same frame multiplies it.
+ *
+ * Two a frame at 66 ticks is a hundred and thirty a second, which is far more than the 0.2 second
+ * refresh below ever wants, so nobody waits for a path in practice. What it removes is the frame
+ * where everybody asks at once. */
+#define PATHS_PER_FRAME	2
+
+static int m_iPathBudgetTick;
+static int m_iPathsThisTick;
+
+/* Whether there is room to compute a path this frame. Only the per-frame refresh asks: a behaviour
+that computes once when it starts has nothing to retry with, so it is never refused. */
+static bool TakePathBudget()
+{
+	int tick = GetGameTickCount();
+	
+	if (tick != m_iPathBudgetTick)
+	{
+		m_iPathBudgetTick = tick;
+		m_iPathsThisTick = 0;
+	}
+	
+	if (m_iPathsThisTick >= PATHS_PER_FRAME)
+		return false;
+	
+	m_iPathsThisTick++;
+	
+	return true;
+}
+
 static bool m_bPathFailed[MAXPLAYERS + 1];
 static int m_iPathFailures[MAXPLAYERS + 1];
 
@@ -281,7 +317,7 @@ void PluginBot_SimulateFrame(int client)
 			else
 				goal = GetAbsOrigin(g_arrPluginBot[client].iPathGoalEntity);
 			
-			if (m_flRepathTime[client] <= GetGameTime())
+			if (m_flRepathTime[client] <= GetGameTime() && TakePathBudget())
 			{
 				CBaseCombatCharacter(client).UpdateLastKnownArea();
 				
