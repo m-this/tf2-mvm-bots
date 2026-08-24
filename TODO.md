@@ -386,9 +386,15 @@ A sweep of every map found two more of the same shape, and both are fixed:
   half a second now and the search is run for the nearest four candidates
   rather than all of them.
 
-The pattern is worth naming, because it has now produced three separate
-crashes: a nav mesh call inside something that reads like a predicate, called
-from a per-frame path. Anything asking the mesh a question wants a clock on it.
+The pattern is worth naming, because it has now produced four separate crashes:
+a nav mesh call inside something that reads like a predicate, called from a
+per-frame path. Anything asking the mesh a question wants a clock on it.
+
+Item 10 is the fourth, and it came with a symbolised backtrace and a limit:
+`PATHS_PER_FRAME` caps the whole team at two path computations a frame. That is
+the general answer to this pattern rather than another special case, and the
+residual intermittent watchdog crash recorded here should be measured against it
+before anything else is tried.
 
 ### 13. The test-bed needs a machine with memory free. Open
 
