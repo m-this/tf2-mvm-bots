@@ -1143,6 +1143,27 @@ static void OnDefenderDamagePost(int victim, int attacker, int inflictor, float 
 	
 	if (class >= 0 && class < sizeof(g_Wave.selfDamageByClass))
 		g_Wave.selfDamageByClass[class] += RoundToNearest(damage);
+
+	/* Which of his own weapons did it
+	
+	The demoman takes a third of his own output back on Rottenburg, and the class total cannot say
+	whether that is a pipe fired at something that walked into him or a sticky trap he stood in.
+	Those are different faults with different fixes. */
+	char what[64] = "unknown";
+
+	if (inflictor > 0 && IsValidEntity(inflictor))
+		GetEntityClassname(inflictor, what, sizeof(what));
+
+	char line[ENGINEER_LINE_LENGTH];
+	char who[MAX_NAME_LENGTH]; GetClientName(victim, who, sizeof(who));
+
+	FormatEx(line, sizeof(line),
+		"{\"event\":\"selfhurt\",\"map\":\"%s\",\"wave\":%d,\"who\":\"%s\",\"class\":\"%s\","
+		... "\"weapon\":\"%s\",\"damage\":%d,\"hp\":%d}",
+		g_sMap, g_iWave, who, ClassName(TF2_GetPlayerClass(victim)), what,
+		RoundToNearest(damage), GetClientHealth(victim));
+
+	WriteLine(line);
 }
 
 static void OnTankDamagePost(int victim, int attacker, int inflictor, float damage, int damagetype)
