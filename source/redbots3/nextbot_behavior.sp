@@ -1552,11 +1552,18 @@ So does the Medic, once he has done his shopping: his place is beside the man he
 that man is walking to the front anyway. Sending him there himself made him stand on the front
 line with a medigun and nobody in front of it, which is a medic doing nothing for the length of the
 break when he could be handing out overheal the whole way there. */
+/* Whether the break ends with this one walking to where the robots come out
+ *
+ * The three that say no have somewhere else to be: the engineer has his nest, the spy is lurking
+ * and the sniper with a rifle has his spot. The medic used to be a fourth, on the reasoning that
+ * he follows a patient, and between rounds he has no patient to follow: he heals nobody, so
+ * nothing suspends for him and he stood where the last wave left him for the whole break. His
+ * patient is walking to the front, so that is where he goes. */
 static bool ShouldTakeUpPosition(int client)
 {
 	switch (TF2_GetPlayerClass(client))
 	{
-		case TFClass_Engineer, TFClass_Spy, TFClass_Medic:
+		case TFClass_Engineer, TFClass_Spy:
 			return false;
 		
 		case TFClass_Sniper:

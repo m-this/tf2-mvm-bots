@@ -55,17 +55,27 @@ after.
 
 The medic is still standing, and that is item 19.
 
-### 19. The medic has nothing to do between waves. Open
+### 19. The medic had nothing to do between waves. Fixed and measured
 
-Left behind by item 17. With the shopping flag fixed the medic still spends
-three quarters of the break with no behaviour on his stack, because
-`GetDesiredBotAction` offers him the same three things as everybody else and
-`ShouldTakeUpPosition` says no to a medic: his job is to follow a patient, and
-the patient is walking to the front.
+Left behind by item 17. With the shopping flag fixed the medic still spent three
+quarters of the break with no behaviour on his stack.
 
-So the answer is probably a fourth branch, "follow the patient", rather than
-sending him to the front on his own. `PreferredPatient` already names who that
-is. Measure it the same way: the between-waves table in the run report.
+`ShouldTakeUpPosition` refused four classes, on the reasoning that each has
+somewhere else to be: the engineer has his nest, the spy is lurking, the sniper
+with a rifle has his spot, and the medic follows a patient. The first three hold.
+The medic does not: between rounds he heals nobody, so nothing suspends for him,
+and following a patient is not a behaviour he has when there is no healing to do.
+His patient is walking to the front, so that is where he goes now.
+
+Measured on the same mission as item 17, two waves, both cleared either way:
+
+| | medic, no behaviour in the break | healing done | defenders died | damage |
+| --- | --- | --- | --- | --- |
+| before | 76% | 876 | 18 | 30922 |
+| after | 0% | 1560 | 17 | 32314 |
+
+Every bot on the team is now at 0%. Two waves is too small to call the healing a
+win; it is enough to say nothing regressed.
 
 ### 15. Sniper bots on the stock loadout stand in spawn. Open, from the 1.9.0 play-test
 
