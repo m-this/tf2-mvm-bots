@@ -2235,13 +2235,22 @@ void ManageDefenderBots(bool bManage, bool bAddBots = true)
 
 void AddBotsBasedOnLineupMode(int count, bool bAdjustTime = true)
 {
-	if (AddBotsFromTeamComposition(count))
+	LogMessage("Fill: asked for %d, RED holds %d of %d", count, GetHumanAndDefenderBotCount(TFTeam_Red),
+		redbots_manager_defender_team_size.IntValue);
+
+	//The lineup mode fills what the named team left, and not the whole ask again: a three seat team
+	//and an ask for six used to be nine bots on RED
+	count -= AddBotsFromTeamComposition(count);
+
+	if (count < 1)
 	{
 		if (bAdjustTime)
 			ExtendUpgradeTimeForNewBots();
 
 		return;
 	}
+	LogMessage("Fill: the lineup mode adds %d more", count);
+
 	switch (redbots_manager_bot_lineup_mode.IntValue)
 	{
 		case BOT_LINEUP_MODE_RANDOM:
@@ -2328,9 +2337,9 @@ int CollectMissingTeamComposition(ArrayList classes, ArrayList seats, int count)
 	return collected;
 }
 
-/* Fill the empty seats from the named team
-False when the convar named nothing to add, and the caller falls back to the lineup mode */
-bool AddBotsFromTeamComposition(int count)
+/* Fill the empty seats from the named team, and say how many it filled
+Zero when the convar named nothing to add, and the caller asks the lineup mode for the rest */
+int AddBotsFromTeamComposition(int count)
 {
 	ArrayList classes = new ArrayList(TF2_CLASS_MAX_NAME_LENGTH);
 	ArrayList seats = new ArrayList();
@@ -2351,7 +2360,9 @@ bool AddBotsFromTeamComposition(int count)
 	if (added > 0)
 		PrintToChatAll("%s Adding %d bot(s)...", PLUGIN_PREFIX, added);
 
-	return added >= count;
+	LogMessage("Fill: the named team filled %d of %d", added, count);
+
+	return added;
 }
 
 /* Decide what to do when a player decides to change their team
