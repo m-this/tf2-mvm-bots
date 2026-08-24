@@ -414,6 +414,7 @@ func main() {
 	if bots, buildings, err := loadTelemetry(args[0]); err == nil {
 		printTelemetry(bots, buildings)
 		printStanding(bots, buildings)
+		printBreak(bots)
 	}
 
 	if len(args) == 1 {

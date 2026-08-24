@@ -8,35 +8,65 @@ what was changed, is in `specs/playtest-1.3.md`. This file is what is left.
 
 ## Bugs from the 1.9.0 play-test
 
-### 17. Engineers freeze in spawn after a restart or a lost wave. Open, from the 1.9.0 play-test
+### 17. Engineers freeze in spawn between waves. Fixed and measured
 
-Two reports of what is probably one bug. EZKSupernova: "if you restart a mission
-via the vote menu, the engi bots just freeze in spawn", which Peppy confirmed,
-and "the engie bots just freeze in spawn when wave is lost".
+EZKSupernova reported it twice: "if you restart a mission via the vote menu, the
+engi bots just freeze in spawn", which Peppy confirmed, and "the engie bots just
+freeze in spawn when wave is lost".
 
-What those two have in common is that the round ends without the mission
-advancing. A wave completing runs the nest re-score and the teardown; a restart
-and a loss both reset the world under a bot whose action stack was built for the
-wave that is gone. An engineer holding a handle to a sentry the reset deleted,
-or suspended for a build action that will never finish because the building it
-was placing no longer exists, stands still and looks exactly like this.
+Neither the restart nor the loss was the cause. The break was.
 
-It is engineers only, out of six bots, which is the useful part of the report:
-the engineer is the one class here with a long-lived action stack that owns
-world entities. Everybody else re-decides every tick.
+`g_bShoppedThisBreak` was cleared in `Event_MvmWaveBegin`, which is when a break
+ends rather than when one starts. So every bot that lived through a wave carried
+"has shopped" into the whole of the next break, and `GetDesiredBotAction` has
+three things to offer a bot between rounds: collect loose money, go and shop, or
+walk to the front. The first is rare, the second was skipped by the stale flag,
+and the third refuses an engineer and a medic. Nothing left, so the bot was
+handed back to the game, which has no answer for a defender between waves, and
+he stood where the wave left him.
 
-Two events to look at, `mvm_wave_failed` and whatever the vote restart fires,
-against `CTFBotMvMEngineerIdle_Update` and the build actions, and against
-`CTFBotUpgrade_OnEnd`, which detonates after shopping and is already gated on
-the relocation convar per item 10.
+A bot that died shopped normally, because a spawn clears the same flag. That is
+what made it intermittent, and it is why a lost wave and a vote restart were
+what got reported: a restart kills nobody, so nobody's flag is cleared and the
+whole team stands still.
 
-Repro on the test-bed, both ways, and both are scriptable with nobody on the
-server: lose a wave by leaving the bots to it on a mission they cannot clear,
-and fire the restart from the console rather than the vote menu once it is
-confirmed the two take the same path. Telemetry is the engineer's current action
-name and his building handles, logged on the reset and again five seconds later.
-A frozen engineer is one whose action name does not change, and that is the
-number to hold a fix against.
+The flag is cleared when the break opens now, on `mvm_wave_complete` and on
+`mvm_wave_failed`.
+
+The test-bed grew two things to see it with, and both stay. `report` has a
+"between waves" table: the share of break samples with no Defender action
+anywhere on the action stack, the longest run of them, where he stood and how
+far he walked. And `TESTBED_BOT_MANAGER_MODE=2` plays a mission in AUTO_BOTS,
+which is what tf2-archipelago runs; the test-bed had only ever played
+READY_BOTS, and this bug does not show there because a lost wave kills enough
+bots to clear their own flags.
+
+Measured on Decoy, two waves, AUTO_BOTS, six bots with two engineers, both waves
+cleared in both arms. The number is the share of between-wave samples with no
+behaviour at all:
+
+| | engineer | engineer | medic | soldier | heavy | demo |
+| --- | --- | --- | --- | --- | --- | --- |
+| before | 86% | 100% | 100% | 6% | 6% | 20% |
+| after | 0% | 0% | 76% | 0% | 0% | 0% |
+
+The engineers walked 2509 and 777 units in the break before, and 14803 and 15873
+after.
+
+The medic is still standing, and that is item 19.
+
+### 19. The medic has nothing to do between waves. Open
+
+Left behind by item 17. With the shopping flag fixed the medic still spends
+three quarters of the break with no behaviour on his stack, because
+`GetDesiredBotAction` offers him the same three things as everybody else and
+`ShouldTakeUpPosition` says no to a medic: his job is to follow a patient, and
+the patient is walking to the front.
+
+So the answer is probably a fourth branch, "follow the patient", rather than
+sending him to the front on his own. `PreferredPatient` already names who that
+is. Measure it the same way: the between-waves table in the run report.
+
 ### 15. Sniper bots on the stock loadout stand in spawn. Open, from the 1.9.0 play-test
 
 Peppy, and he says it predates 1.9.0: "Sniper bots with the stock loadout don't

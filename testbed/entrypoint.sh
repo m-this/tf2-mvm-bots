@@ -154,14 +154,14 @@ install_server_cfg() {
 	setpause 0
 
 	// The bots. Mode 1 is READY_BOTS: RED is filled between waves, which is
-	// what lets a wave start with no human on the server at all. Mode 2 waits
-	// for the wave to begin before filling, and with nobody to begin it that
-	// is a server that sits still.
+	// what lets a wave start with no human on the server at all. Mode 2 is
+	// AUTO_BOTS, which fills when the wave begins, and is what tf2-archipelago
+	// runs: BOT_MANAGER_MODE=2 plays a mission the way a player's server does.
 	//
 	// min_players -1 turns off the mod's own ready-up gate, which otherwise
 	// counts RED before the bots exist and blocks the ready that would have
 	// spawned them.
-	sm_redbots_manager_mode 1
+	sm_redbots_manager_mode ${BOT_MANAGER_MODE:-1}
 	sm_redbots_manager_defender_team_size ${BOT_TEAM_SIZE:-6}
 	sm_redbots_manager_min_players -1
 	sm_redbots_manager_kick_bots 0
