@@ -267,16 +267,19 @@ WaveCounters g_Wave;
  * that records two fields as unknown.
  */
 native float Defenderbots_GetPathLength(int client);
+native int Defenderbots_GetAttackTarget(int client);
 native bool Defenderbots_IsPathing(int client);
 native bool Defenderbots_PathFailed(int client);
 native int Defenderbots_PathFailures(int client);
 native int Defenderbots_RangeRepairStalls(int client);
 
 static bool g_bHasPathNatives;
+static bool g_bHasTargetNative;
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
 	MarkNativeAsOptional("Defenderbots_GetPathLength");
+	MarkNativeAsOptional("Defenderbots_GetAttackTarget");
 	MarkNativeAsOptional("Defenderbots_IsPathing");
 	MarkNativeAsOptional("Defenderbots_PathFailed");
 	MarkNativeAsOptional("Defenderbots_PathFailures");
@@ -287,6 +290,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnAllPluginsLoaded()
 {
+	g_bHasTargetNative = GetFeatureStatus(FeatureType_Native, "Defenderbots_GetAttackTarget") == FeatureStatus_Available;
 	g_bHasPathNatives = GetFeatureStatus(FeatureType_Native, "Defenderbots_GetPathLength") == FeatureStatus_Available
 		&& GetFeatureStatus(FeatureType_Native, "Defenderbots_IsPathing") == FeatureStatus_Available;
 
@@ -1535,6 +1539,18 @@ static float RangeToNearestEnemy(int client)
  *
  * Named for the report rather than for the entity: "world" and "robot" are the answer to the
  * question being asked, and obj_sentrygun with somebody else's name on it is not. */
+//How many things are healing this one, which is what makes a giant unkillable
+static int GetHealerCount(int client)
+{
+	return HasEntProp(client, Prop_Send, "m_nNumHealers") ? GetEntProp(client, Prop_Send, "m_nNumHealers") : 0;
+}
+
+//The game's own word for a giant, which is the same one the kill counter reads
+static bool IsGiant(int client)
+{
+	return HasEntProp(client, Prop_Send, "m_bIsMiniBoss") && GetEntProp(client, Prop_Send, "m_bIsMiniBoss") != 0;
+}
+
 static void AimTrace(int client, char[] what, int length, float &range)
 {
 	float eye[3]; GetClientEyePosition(client, eye);
@@ -1568,7 +1584,19 @@ static void AimTrace(int client, char[] what, int length, float &range)
 
 	if (hit <= MaxClients)
 	{
-		strcopy(what, length, TF2_GetClientTeam(hit) == TFTeam_Blue ? "robot" : "teammate");
+		if (TF2_GetClientTeam(hit) != TFTeam_Blue)
+		{
+			strcopy(what, length, "teammate");
+
+			return;
+		}
+
+		/* Which robot, not just "a robot"
+		
+		A wave that wipes the team is usually one robot the bots should have shot first, and a giant
+		with two medics behind it is the case a player reported. "robot" cannot tell a giant medic
+		from a scout, so the answer names the class, and says giant when the robot is one. */
+		FormatEx(what, length, "%s%s", IsGiant(hit) ? "giant " : "", ClassName(TF2_GetPlayerClass(hit)));
 
 		return;
 	}
@@ -1625,6 +1653,19 @@ static void WriteBotTelemetry(int client, float when, float clock)
 	char aim[64]; float aimRange;
 	AimTrace(client, aim, sizeof(aim), aimRange);
 
+	/* The robot this bot chose, by class, and whether anything is healing it
+	
+	The crosshair says where he is pointing; this says who he picked. A giant with two medics behind
+	it is the case a player reported, and the question it asks is whether anybody chose a medic. */
+	char picked[64] = "";
+	int target = g_bHasTargetNative ? Defenderbots_GetAttackTarget(client) : -1;
+
+	if (target > 0 && target <= MaxClients && IsClientInGame(target) && IsPlayerAlive(target))
+	{
+		FormatEx(picked, sizeof(picked), "%s%s%s", IsGiant(target) ? "giant " : "",
+			ClassName(TF2_GetPlayerClass(target)), GetHealerCount(target) > 0 ? " (healed)" : "");
+	}
+
 	/* Whether he is walking, and whether there is anything to walk along
 	
 	A path length of zero with pathing true is the failure this pair exists for: the bot asked to
@@ -1651,12 +1692,12 @@ static void WriteBotTelemetry(int client, float when, float clock)
 		... "\"at\":[%.0f,%.0f,%.0f],\"hp\":%d,\"maxhp\":%d,\"weapon\":\"%s\",\"slot\":%d,"
 		... "\"nearest_enemy\":%.0f,\"aim\":\"%s\",\"aim_range\":%.0f,\"firing\":%d,"
 		... "\"path_len\":%.0f,\"pathing\":%d,\"path_failed\":%d,\"path_failures\":%d,\"repair_stalls\":%d,"
-		... "\"healing\":\"%s\",\"action\":\"%s\"}",
+		... "\"healing\":\"%s\",\"picked\":\"%s\",\"action\":\"%s\"}",
 		g_sMap, g_iWave, when, clock, name, ClassName(TF2_GetPlayerClass(client)),
 		at[0], at[1], at[2], GetClientHealth(client), TF2Util_GetEntityMaxHealth(client),
 		weaponClass, slot, RangeToNearestEnemy(client), aim, aimRange, firing ? 1 : 0,
 		pathLength, pathing ? 1 : 0, pathFailed ? 1 : 0, pathFailures, repairStalls,
-		healing, stack);
+		healing, picked, stack);
 
 	WriteLine(line);
 }

@@ -140,58 +140,78 @@ dispensers standing. If it turns out to be the blueprint that bothers people, th
 fix is the engineer cancelling the placement when he stops walking to a spot, and
 the `ghost` lines are what would measure it.
 
-### 20. Bavarian Botbash wave 3 is unwinnable with bots. Open, from a player
+### 20. Bavarian Botbash wave 3 wipes the bot team. Reproduced, open
 
 Swagdoll: "Bavarian Botbash Wave 3 is still basically impossible for me. That
 Giant Crit Heavy and his two Giant Medics keep wiping everything and I'm not good
 enough at Sniper to counter it."
 
-The wave is a giant crit Heavy with two giant Medics behind him. Two medics is a
-permanent uber on a giant that kills anything it can see. A person beats it by
-killing the medics first, which breaks the chain, and this mod has no idea a
-medic is worth more than what it is healing.
+Reproduced with nobody on the server. Rottenburg, `mvm_rottenburg_advanced_bavarian_botbash`:
 
-A new balancing knob would be an admission that the bots cannot play the game, so
-that is the last resort and not the plan. What the bots are missing is target
-priority: `CTFBotDefenderAttack_SelectTarget` picks by threat and range, and a
-giant medic behind a giant heavy is neither the nearest nor the most dangerous
-looking thing on the field.
+| wave | result | deaths |
+| --- | --- | --- |
+| 1 | lost, lost, lost, then cleared | 7, 7, 11, 5 |
+| 3 | lost | 18 |
+| 3, second run | lost | 23 |
 
-Reproduce first. Rottenburg, the Bavarian Botbash popfile, wave 3, six bots, and
-the wave result plus who killed whom is what the test-bed already writes down.
-Then the change is a rule in target selection: a robot medic healing something is
-the target, before the thing it is healing. Measure the same wave again, and on a
-mission without giant medics as well, because a rule that always shoots medics
-first is a rule that ignores the giant standing on the hatch.
+So the bots lose wave 1 of this mission three times out of four before they ever
+reach the wave that was reported. What killed them on wave 3: pyro 10, heavy 8,
+soldier 4, and half the deaths were bullet and half melee, which is a team being
+walked over at close range rather than shelled from a distance.
 
-### 7. Bot seating for specific classes. Open, and 1.9.0 named the mechanism
+Three things were built to work on this, and they are the useful part of the item
+so far:
 
-Reported three times now and not diagnosed. Three things decide the lineup and they may
-not agree: the class preference flags (`player_pref.sp`), the lineup modes
-(`menu.sp`), and `sm_redbots_manager_team_composition`.
+- `testbed/run.sh --wave 3` jumps straight to a wave with `tf_mvm_jump_to_wave`.
+  A wave 3 iteration is three minutes instead of forty, which is the difference
+  between measuring this and reading about it.
+- The aim trace names the robot: `giant soldier` rather than `robot`.
+- `Defenderbots_GetAttackTarget` publishes who each bot decided to shoot, which
+  is the decision rather than where the crosshair drifted. The bot samples carry
+  it as `picked`, with `(healed)` after it when something is healing that robot.
 
-The 1.9.0 play-test named the mechanism and the launcher half is fixed. Peppy:
-"the bot seats I set as 'Let the mod pick' still picks from classes that I have
-unchecked in the Classes tab." Those two settings are
-`sm_redbots_manager_team_composition` and `sm_redbots_manager_class_blacklist`.
-tf2-archipelago was dropping the draw seats out of the composition, so a team of
-nothing but draws wrote an empty convar. See its item 9; it writes the seats out
-as holes now.
+What the instruments say so far, from 181 wave 3 samples before a run timed out:
+the giants on the field early are giant soldiers and the bots do choose them, 15
+samples of it. The giant heavy and his medics arrive later in the wave and have
+not been measured yet.
 
-What is left is this mod's rule, and it is a real one.
-`GetWantedTeamComposition` falls back to the map config's own composition when
-the convar is empty, and `IsBotClassBlacklisted` then returns false for every
-class that default names, because a named team beats the blacklist. That rule is
-right for a team somebody typed into the console and wrong for a default this
-mod guessed at: the map's answer is a suggestion and the blacklist is an
-instruction. The map default should be filtered through
-`PickAllowedBotClass` like everything else.
+Do not add a balancing knob for this. `CTFBotDefenderAttack_SelectTarget` already
+prefers the healer of whatever it picked, through `GetHealerOfPlayer`, so the
+idea of shooting the medic first is in there; what is not known is whether it
+fires when the medic is a giant behind a giant. That is the next measurement, and
+it wants a longer timeout than 1300s to see the end of the wave.
 
-Telemetry before the fix. Nothing today says why a bot got the class it got.
-Log the wanted class, the class after `PickAllowedBotClass`, and where the
-lineup came from (convar, map config, or lineup mode), once per bot added. A
-test-bed run on a map whose config names a composition, with that class
-blacklisted and no convar set, then says it in one line.
+### 7. Bot seating for specific classes. Fixed and measured
+
+Reported three times, and the 1.9.0 play-test named the mechanism. Peppy: "the
+bot seats I set as 'Let the mod pick' still picks from classes that I have
+unchecked in the Classes tab."
+
+Two halves, one each side. tf2-archipelago was dropping draw seats out of
+`sm_redbots_manager_team_composition`, so a team of nothing but draws wrote an
+empty convar; that is its item 9 and it is fixed there.
+
+An empty convar is what makes `GetWantedTeamComposition` fall back to the map
+config's own composition, and `IsBotClassBlacklisted` returned false for every
+class any composition named. That rule is right for a team somebody typed into
+the console and wrong for a default this mod guessed at: a guess does not get to
+overrule a class the server was told never to play. It asks the convar alone
+now.
+
+Nothing said why a bot was the class it was, so `AddDefenderTFBot` writes one
+line whenever the blacklist changes its mind, naming the wanted class, the class
+it settled on, and where the lineup came from.
+
+Measured on Decoy, whose map config names `scout,soldier,demoman,heavyweapons,engineer,medic`,
+with `BOT_CLASS_BLACKLIST=medic` and no convar lineup. Two waves, both cleared,
+and no medic on RED in 433 bot samples:
+
+```
+Adding demoman (wanted medic), lineup from the map config
+```
+
+A team typed into the convar still beats the blacklist, which is the rule that
+was kept rather than measured.
 
 ### 18. One ask adds twice. Fixed and measured
 
