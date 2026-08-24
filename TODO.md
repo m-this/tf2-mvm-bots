@@ -186,6 +186,16 @@ with one `wave_end`. A wave that is lost and restarted is not always closing its
 own record, which the wave counting in `run.sh` believes. Worth fixing before
 trusting a clear rate from this mission.
 
+One lead was followed and closed. The demoman takes a third of his own output
+back on Rottenburg: 3836 self-damage against 11010 dealt over a full mission, and
+he kills himself about once a run. A `selfhurt` line now names the weapon, and
+the answer is `tf_projectile_pipe` and `tf_projectile_rocket`, not the sticky
+trap. That is the same trade `EquipBestWeaponForThreat` already records for the
+soldier: handing him a shotgun inside his own blast was measured and lost, 16890
+damage to 10886 over six waves, because a rocket that hurts him also kills what
+is standing on him. So the self-damage is the price of the damage, and the
+demoman's case is the same shape. Not a lead.
+
 Do not add a balancing knob for this. `CTFBotDefenderAttack_SelectTarget` already
 prefers the healer of whatever it picked, through `GetHealerOfPlayer`, so the
 idea of shooting the medic first is in there; what is not known is whether it
