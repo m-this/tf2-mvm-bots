@@ -94,6 +94,24 @@ has always written and nothing read. No extra sampling cost.
 Positions are worth printing rather than summarising. Two of these went straight
 to a named place on the map that somebody could walk to.
 
+## Between waves
+
+Every other table here filters on `t > 0`, which is a wave running. The break is
+the other half of a mission: the shopping, the nest, the teleporter, the walk to
+the front.
+
+The number is the share of break samples with no `Defender` action anywhere on
+the action stack. `MainAction < TacticalMonitor < ScenarioMonitor` is a bot with
+nothing of this mod's on it, and the game has no answer for a defender between
+waves, so he stands where the wave left him.
+
+It found the freeze reported as "the engi bots just freeze in spawn": the
+engineers were at 86% and 100% of break samples with no behaviour, and the walk
+figure beside it said 777 units for a whole break.
+
+Read it with `TESTBED_BOT_MANAGER_MODE=2`. That is AUTO_BOTS, which is what
+tf2-archipelago runs, and the freeze does not show in READY_BOTS.
+
 ## Repairs
 
 ```
