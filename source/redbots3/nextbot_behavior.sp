@@ -1475,7 +1475,8 @@ Action GetDesiredBotAction(int client, BehaviorAction action)
 			}
 			case TFClass_Sniper:
 			{
-				if (HasSniperRifle(client))
+				//A rifle is only worth a spot to shoot from, and the map does not always give him one
+				if (HasSniperRifle(client) && HasDefenderSniperSpot())
 				{
 					//NOTE: we set the sniping behavior manually in Timer_PlayerSpawn
 					return Plugin_Continue;
@@ -1567,7 +1568,7 @@ static bool ShouldTakeUpPosition(int client)
 			return false;
 		
 		case TFClass_Sniper:
-			return !HasSniperRifle(client);
+			return !HasSniperRifle(client) || !HasDefenderSniperSpot();
 	}
 
 	return true;

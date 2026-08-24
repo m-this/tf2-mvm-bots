@@ -1694,6 +1694,96 @@ static void WriteBuildingTelemetry(int owner, int building, float when, float cl
 	WriteLine(line);
 }
 
+/* Every building in the world, counted against its builder rather than his object list
+ *
+ * A play-test reported an engineer with two dispensers. The per-owner samples above walk
+ * TF2Util_GetPlayerObject, which is the game's own list and holds one entry per type, so a second
+ * dispenser on the same builder is exactly the thing that list cannot show. This one walks the
+ * entities instead and writes a line when a builder holds more than one of a type.
+ *
+ * Disposable sentries are skipped: a second one of those is the upgrade working.
+ */
+static void SampleDuplicateBuildings(float when, float clock)
+{
+	static const char types[][] = {"obj_dispenser", "obj_sentrygun", "obj_teleporter"};
+
+	for (int t = 0; t < sizeof(types); t++)
+	{
+		int held[MAXPLAYERS + 1][2];
+		int built[MAXPLAYERS + 1][2];
+
+		for (int i = 1; i <= MaxClients; i++)
+		{
+			held[i][0] = 0;
+			held[i][1] = 0;
+			built[i][0] = 0;
+			built[i][1] = 0;
+		}
+
+		int entity = -1;
+
+		while ((entity = FindEntityByClassname(entity, types[t])) != -1)
+		{
+			int builder = GetEntPropEnt(entity, Prop_Send, "m_hBuilder");
+
+			if (builder < 1 || builder > MaxClients)
+				continue;
+
+			if (HasEntProp(entity, Prop_Send, "m_bDisposableBuilding")
+				&& GetEntProp(entity, Prop_Send, "m_bDisposableBuilding") != 0)
+				continue;
+
+			/* A blueprint is not a building, and it is owned by the same engineer
+			
+			The first run of this counted one: an engineer walking to a spot with a dispenser on his
+			toolbox holds a placing entity and the one already standing, which reads as two. It is
+			also what a person watching the game sees as a second dispenser, so it is written down
+			rather than skipped quietly. */
+			if (GetEntProp(entity, Prop_Send, "m_bPlacing") != 0 || GetEntProp(entity, Prop_Send, "m_bCarried") != 0)
+			{
+				char ghostOwner[MAX_NAME_LENGTH]; GetClientName(builder, ghostOwner, sizeof(ghostOwner));
+				char ghostLine[ENGINEER_LINE_LENGTH];
+
+				FormatEx(ghostLine, sizeof(ghostLine),
+					"{\"event\":\"ghost\",\"map\":\"%s\",\"wave\":%d,\"t\":%.1f,\"clock\":%.1f,"
+					... "\"owner\":\"%s\",\"type\":\"%s\",\"carried\":%d}",
+					g_sMap, g_iWave, when, clock, ghostOwner, types[t],
+					GetEntProp(entity, Prop_Send, "m_bCarried") != 0 ? 1 : 0);
+
+				WriteLine(ghostLine);
+				continue;
+			}
+
+			int mode = HasEntProp(entity, Prop_Send, "m_iObjectMode")
+				? GetEntProp(entity, Prop_Send, "m_iObjectMode") : 0;
+
+			held[builder][mode == 1 ? 1 : 0]++;
+
+			if (GetEntProp(entity, Prop_Send, "m_bBuilding") == 0)
+				built[builder][mode == 1 ? 1 : 0]++;
+		}
+
+		for (int i = 1; i <= MaxClients; i++)
+		{
+			for (int mode = 0; mode < 2; mode++)
+			{
+				if (held[i][mode] < 2 || !IsClientInGame(i))
+					continue;
+
+				char name[MAX_NAME_LENGTH]; GetClientName(i, name, sizeof(name));
+				char line[ENGINEER_LINE_LENGTH];
+
+				FormatEx(line, sizeof(line),
+					"{\"event\":\"duplicate\",\"map\":\"%s\",\"wave\":%d,\"t\":%.1f,\"clock\":%.1f,"
+					... "\"owner\":\"%s\",\"type\":\"%s\",\"mode\":%d,\"held\":%d,\"built\":%d}",
+					g_sMap, g_iWave, when, clock, name, types[t], mode, held[i][mode], built[i][mode]);
+
+				WriteLine(line);
+			}
+		}
+	}
+}
+
 /* Sampled in both round states, unlike the engineer uptime above
  *
  * Half of what has gone wrong went wrong between waves: the walk to the front, the shopping trip,
@@ -1731,6 +1821,8 @@ static void SampleTelemetry()
 		for (int n = 0; n < objects; n++)
 			WriteBuildingTelemetry(i, TF2Util_GetPlayerObject(i, n), when, clock);
 	}
+
+	SampleDuplicateBuildings(when, clock);
 }
 
 //The name the rest of the file already writes into its keys, so the two agree without a lookup

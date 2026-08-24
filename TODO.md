@@ -77,56 +77,85 @@ Measured on the same mission as item 17, two waves, both cleared either way:
 Every bot on the team is now at 0%. Two waves is too small to call the healing a
 win; it is enough to say nothing regressed.
 
-### 15. Sniper bots on the stock loadout stand in spawn. Open, from the 1.9.0 play-test
+### 15. Sniper bots on the stock loadout stand in spawn. Fixed for the case that causes it
 
-Peppy, and he says it predates 1.9.0: "Sniper bots with the stock loadout don't
+Peppy, and he said it predates 1.9.0: "Sniper bots with the stock loadout don't
 seem to work, they just stay in spawn."
 
-A Sniper standing in spawn is a bot with nowhere it wants to be. The place to
-look is `SetupSniperSpotHints`, which is the only thing in this mod that tells a
-Sniper where to stand: with no `SniperSpot` block in the map config it does not
-add hints, it strips the team off every `func_tfbot_hint` on the map instead,
-and logs an error saying so. Twenty-two of the twenty-eight map configs have no
-hand-walked data at all, per item 3, and the six that do may not carry sniper
-spots either. Check that first, because it explains "stays in spawn" exactly and
-it explains why it is not new.
+Measured first. A sniper had never been in a test-bed lineup: 3417 engineer
+samples in `results/` and not one sniper. Forced into one on Decoy, on the build
+that has item 17 fixed, he works: `SniperLurk` under his stack for the whole
+mission, 111 samples with 17 of them standing still, 19236 units walked, 1970
+damage and 14 kills over three waves. He is the weakest seat and he is playing.
 
-Why the loadout would matter is the other half and it may be a coincidence of
-reporting: a stock Sniper Rifle wants a scoped shot at range, and a bot with no
-spot to hold and no threat in range of the rifle has no reason to leave. If a
-Huntsman Sniper walks out and a stock one does not, the gate is a weapon range
-check rather than the hints, and `EquipBestWeaponForThreat` is where to look.
+Two things are behind the report, and one of them was item 17. A rifle sniper is
+one of the classes `ShouldTakeUpPosition` refuses, so with the stale shopping
+flag he had no behaviour for the whole break and stood where he spawned. That is
+the same freeze the engineers had, and it is fixed.
 
-Repro on the test-bed, on a map whose config has no `SniperSpot`, with a lineup
-forced to Sniper through `sm_redbots_manager_team_composition`. The report
-already writes down damage a wave per bot, so a Sniper at zero for six waves is
-the signal, and distance walked from spawn is the telemetry to add if it is not
-there: it separates "never left" from "left and did nothing".
+The other is a map with no configuration. All twenty-seven shipped map configs
+name a `SniperSpot` block, and `SetupSniperSpotHints` takes the team off every
+`func_tfbot_hint` the map carries when the config names none, because those hints
+were placed for the robots and lead a defender into their spawn. The game's own
+sniping behaviour walks to a hint of its own team and does nothing without one,
+so on an unconfigured map a rifle sniper has nowhere to go and no behaviour that
+would send him anywhere else.
 
-### 16. Engineers build two dispensers. Open, from the 1.9.0 play-test
+`HasDefenderSniperSpot` asks whether any hint belongs to RED. Without one, the
+sniper fights like a Huntsman sniper already does and walks to the front between
+waves. With one, nothing changes, which the Decoy run above is the control for.
+
+### 16. Engineers build two dispensers. Measured: it is a blueprint, not a building
 
 Peppy: "Engineer bots can sometimes build 2 dispensers."
 
-Two engineers is the obvious reading and it is fine: they skip a dispenser spot
-another engineer already occupies, and two engineers with two dispensers is the
-lineup working. One engineer with two is the bug, and the report does not say
-which, so the first job is telemetry that does.
+The per-owner building samples walk `TF2Util_GetPlayerObject`, which is the
+game's own list and holds one entry per type, so a second dispenser on one
+builder is exactly what that list cannot show. A second instrument walks the
+entities instead and counts them against `m_hBuilder`.
 
-The suspect is the dispenser build ending on a flag. The build stopped ending
-itself three seconds in on a flag only the idle action refreshes, and Mannworks
-went from 13% dispenser uptime to 39%, so the flag is not the only thing holding
-that state. An engineer who believes he has no dispenser while one stands behind
-him builds a second, and the game allows it: the limit is one per engineer only
-because the engineer usually detonates the first.
+First run, four waves: two engineers each held two dispensers, for three samples
+each. Second run, with entities that are being placed or carried excluded: none
+at all, over four waves.
 
-Log the owner and the entity index at every `obj_dispenser` spawn, plus the
-count that engineer already owns. A run where the count reaches two names the
-engineer and the frame, and a run where two different engineers each own one
-says there was never a bug.
+So no engineer ever holds two built dispensers. What he holds is the blueprint,
+which is a real `obj_dispenser` with his name on it, while his own dispenser
+stands at the nest. That is what a person watching sees as a second one, and it
+is why the report says "sometimes".
 
-`testbed/sweep.sh` plays every installed map, which is the right shape here
-because "sometimes" is a rate. Count dispensers per engineer across a sweep
-before and after any fix.
+Both are written down now: a `duplicate` line if a builder ever holds two of a
+type, and a `ghost` line for each blueprint or carried building. A three wave run
+had eight ghost samples on one engineer, dispenser and sentry, so a blueprint can
+be out for the length of a walk across the map.
+
+That is the honest end of this item unless somebody sends a screenshot of two
+dispensers standing. If it turns out to be the blueprint that bothers people, the
+fix is the engineer cancelling the placement when he stops walking to a spot, and
+the `ghost` lines are what would measure it.
+
+### 20. Bavarian Botbash wave 3 is unwinnable with bots. Open, from a player
+
+Swagdoll: "Bavarian Botbash Wave 3 is still basically impossible for me. That
+Giant Crit Heavy and his two Giant Medics keep wiping everything and I'm not good
+enough at Sniper to counter it."
+
+The wave is a giant crit Heavy with two giant Medics behind him. Two medics is a
+permanent uber on a giant that kills anything it can see. A person beats it by
+killing the medics first, which breaks the chain, and this mod has no idea a
+medic is worth more than what it is healing.
+
+A new balancing knob would be an admission that the bots cannot play the game, so
+that is the last resort and not the plan. What the bots are missing is target
+priority: `CTFBotDefenderAttack_SelectTarget` picks by threat and range, and a
+giant medic behind a giant heavy is neither the nearest nor the most dangerous
+looking thing on the field.
+
+Reproduce first. Rottenburg, the Bavarian Botbash popfile, wave 3, six bots, and
+the wave result plus who killed whom is what the test-bed already writes down.
+Then the change is a rule in target selection: a robot medic healing something is
+the target, before the thing it is healing. Measure the same wave again, and on a
+mission without giant medics as well, because a rule that always shoots medics
+first is a rule that ignores the giant standing on the hatch.
 
 ### 7. Bot seating for specific classes. Open, and 1.9.0 named the mechanism
 
