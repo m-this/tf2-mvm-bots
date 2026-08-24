@@ -5,6 +5,7 @@
 #   testbed/run.sh --mission mvm_decoy_advanced     a named popfile
 #   testbed/run.sh --waves 12 --timeout 3600        stop after twelve results
 #   testbed/run.sh --out results/after.jsonl        somewhere to compare against
+#   testbed/run.sh --wave 3                         start at wave 3 of the mission
 #   testbed/run.sh --docker                         compile in the image instead
 #
 # It brings the server up, waits for the game to finish downloading itself the
@@ -19,6 +20,9 @@ root=$(CDPATH= cd -- "$here/.." && pwd)
 
 map=${TESTBED_MAP:-mvm_decoy}
 mission=""
+# Which wave to start on. A report about one wave is a report about one wave, and
+# playing the two before it to reach it costs half an hour a run.
+jump=""
 waves=6
 timeout=2400
 out=""
@@ -33,6 +37,7 @@ while [ $# -gt 0 ]; do
 	case "$1" in
 	--map) map=$2; shift 2 ;;
 	--mission) mission=$2; shift 2 ;;
+	--wave) jump=$2; shift 2 ;;
 	--waves) waves=$2; shift 2 ;;
 	--timeout) timeout=$2; shift 2 ;;
 	--out) out=$2; shift 2 ;;
@@ -178,6 +183,17 @@ sleep 5
 # a nudge rather than the thing that starts the wave. It matters on the first
 # wave of a fresh server, where the mod has not filled RED yet.
 eval "$rcon 'mp_tournament_restart'" >/dev/null 2>&1 || true
+
+# The jump is a cheat command, so cheats go on for it and off again after. It
+# grants the credits of the waves it skipped, which is what a team arriving at
+# that wave would have had.
+if [ -n "$jump" ]; then
+	say "jumping to wave $jump"
+	sleep 5
+	eval "$rcon 'sv_cheats 1'" >/dev/null 2>&1 || true
+	eval "$rcon 'tf_mvm_jump_to_wave $jump'" >/dev/null 2>&1 || true
+	eval "$rcon 'sv_cheats 0'" >/dev/null 2>&1 || true
+fi
 
 say "watching for $waves wave results, giving up after ${timeout}s"
 

@@ -450,6 +450,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	CreateNative("Defenderbots_PathFailed", Native_PathFailed);
 	CreateNative("Defenderbots_PathFailures", Native_PathFailures);
 	CreateNative("Defenderbots_RangeRepairStalls", Native_RangeRepairStalls);
+	CreateNative("Defenderbots_GetAttackTarget", Native_GetAttackTarget);
 	
 	RegPluginLibrary("tf2_defenderbots");
 	
@@ -506,6 +507,18 @@ static any Native_RangeRepairStalls(Handle plugin, int numParams)
 		return -1;
 	
 	return RangeRepairStallsOf(client);
+}
+
+/* Who this bot decided to shoot, which is the decision rather than where the crosshair happens to
+be pointing. A wave that wipes the team is usually one robot nobody chose. */
+static any Native_GetAttackTarget(Handle plugin, int numParams)
+{
+	int client = GetNativeCell(1);
+	
+	if (client < 1 || client > MaxClients || !IsClientInGame(client) || !g_bIsDefenderBot[client])
+		return -1;
+	
+	return m_iAttackTarget[client];
 }
 
 static any Native_IsPathing(Handle plugin, int numParams)
@@ -2459,6 +2472,16 @@ void AddDefenderTFBot(int count, char[] class, char[] team = "red", char[] diffi
 	if (honorBlacklist)
 		PickAllowedBotClass(class, allowed, sizeof(allowed));
 
+	//Says why a bot is the class it is, which nothing did: the wanted class, what the blacklist left
+	//of it, and whether the lineup was typed into the console or read off the map config
+	if (!StrEqual(class, allowed) || redbots_manager_debug.BoolValue)
+	{
+		char typed[128]; redbots_manager_team_composition.GetString(typed, sizeof(typed));
+
+		LogMessage("Adding %s (wanted %s), lineup from %s", allowed, class,
+			typed[0] != '\0' ? "the convar" : (g_arrMapConfig.strComposition[0] != '\0' ? "the map config" : "the lineup mode"));
+	}
+
 	//Send command as many times as needed because custom names aren't supported when adding multiple
 	for (int i = 0; i < count; i++)
 		ServerCommand("tf_bot_add %d %s %s %s %s %s", 1, allowed, team, difficulty, quotaManaged ? "" : "noquota", TFBOT_IDENTITY_NAME);
@@ -2507,9 +2530,14 @@ void GetWantedTeamComposition(char[] out, int maxlen)
 }
 
 //Does sm_redbots_manager_team_composition ask for this class anywhere in the team it names?
-bool IsClassInTeamComposition(const char[] class)
+bool IsClassInTeamComposition(const char[] class, bool bTypedTeamOnly = false)
 {
-	char list[128]; GetWantedTeamComposition(list, sizeof(list));
+	char list[128];
+
+	if (bTypedTeamOnly)
+		redbots_manager_team_composition.GetString(list, sizeof(list));
+	else
+		GetWantedTeamComposition(list, sizeof(list));
 
 	if (list[0] == '\0')
 		return false;
@@ -2535,8 +2563,11 @@ bool IsClassInTeamComposition(const char[] class)
 
 bool IsBotClassBlacklisted(const char[] class)
 {
-	//The named team is more specific than the blacklist, so what it asks for is never blacklisted
-	if (IsClassInTeamComposition(class))
+	/* A team somebody typed out is more specific than the blacklist, so what it asks for is never
+	blacklisted. The map config's own composition is not that: it is this mod's guess at a good team
+	for the map, and a guess does not get to overrule a class the server was told never to play.
+	Reported from a play-test as seats set to "Let the mod pick" drawing unticked classes. */
+	if (IsClassInTeamComposition(class, true))
 		return false;
 
 	char list[128]; redbots_manager_class_blacklist.GetString(list, sizeof(list));
