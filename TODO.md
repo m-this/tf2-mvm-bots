@@ -200,11 +200,26 @@ defender deaths an attempt. The bots do already shoot robot medics, 56 samples o
 it in one wave, so the idea this item started with is in the mod and working.
 Nobody has added a balancing knob and nobody should.
 
-The next thing to measure is the giant demoknights. The chosen-target counts for
-the wave are `demoman 148, medic 56, giant soldier 3`, which is a team spending
-the wave on the escort while the thing that kills them is a charge they never see
-coming. A defender who cannot outrun a demoknight has to shoot it before it
-arrives, and nothing in the target ranking knows that.
+The demoknights were the next guess and they were measured too. `ThreatPriority`
+ranks a medic, a support class, a giant and a bomb carrier, and a charging
+demoknight is none of those: it closes seven hundred and fifty units a second, so
+it is outside urgent range until it is inside melee. A `charge_first` rank above
+the medic, three attempts: 18 deaths, 39 robots, 119 seconds, against 18, 38 and
+127 without it. No effect, and nothing proved the rule ever fired, so it was
+reverted rather than shipped as a switch nobody has evidence for.
+
+Four attempts, four measurements, and the wave is still lost every time. What is
+left to try, in the order a measurement is cheapest:
+
+- Count what actually kills them by robot class and weapon on this wave rather
+  than in the aggregate. `killed us` says pyro and heavy on the wrong mission and
+  has not been read for the right one.
+- Sentry uptime through the wave: the engineer put 8% of his buildings' damage
+  back on the wrong mission, and a nest that is down is a team fighting in the
+  open whatever it decided to shoot.
+- Whether the team should retreat at all. Nothing in this mod ever gives ground,
+  and a wave that walks over a held line is the one case where falling back to
+  the next choke is what a person does.
 
 ### 7. Bot seating for specific classes. Fixed and measured
 
