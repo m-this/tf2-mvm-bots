@@ -236,7 +236,17 @@ units to 564, and deaths went from 18 to 22 with the same robots killed. Spread
 out, they lose the medic's beam, each other's fire and the sentry's cover, and a
 robot demoman kills them one at a time instead of two at once. Reverted.
 
-Six attempts, six measurements, and the wave is still lost every time. What is
+The eighth came from the build logging once it worked, and it is the closest any
+of them got. Two of five build attempts end with no sentry and none of them end
+on a reason the action names, so they are interruptions rather than refusals, and
+the trace has the engineer walking to the upgrade station mid-wave with nothing
+built. Holding him back from shopping while his nest is down: robots killed 38 to
+49, and deaths 18 to 22 with sentry uptime 50% to 41%. He is present and shooting
+and his sentry is the one he could not afford to upgrade, so it dies faster.
+Reverted, and the trade is worth remembering: an engineer's damage is his sentry
+plus himself, and this bought one with the other.
+
+Eight attempts, eight measurements, and the wave is still lost every time. What is
 left to try, in the order a measurement is cheapest:
 
 - Count what actually kills them by robot class and weapon on this wave rather
