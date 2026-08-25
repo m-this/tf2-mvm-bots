@@ -179,6 +179,10 @@ enum struct WaveCounters
 	int projectilesFired[view_as<int>(TFClass_Engineer) + 1];
 	int projectilesHit[view_as<int>(TFClass_Engineer) + 1];
 	int selfDamageByClass[view_as<int>(TFClass_Engineer) + 1];
+
+	//What the team bought at the station, which nothing here has ever counted
+	int upgradesBought;
+	int upgradeCreditsSpent;
 	int selfDeathsByClass[view_as<int>(TFClass_Engineer) + 1];
 	/* Who killed what, on both sides
 
@@ -217,6 +221,8 @@ enum struct WaveCounters
 		this.buildingRepaired = 0;
 		this.buildingDamageTaken = 0;
 		this.dispensersLost = 0;
+		this.upgradesBought = 0;
+		this.upgradeCreditsSpent = 0;
 		this.damageDealt = 0;
 		this.damageToTanks = 0;
 		this.sentryDamage = 0;
@@ -775,7 +781,7 @@ static void WriteWaveResult(const char[] result)
 		"{\"event\":\"wave_end\",\"map\":\"%s\",\"wave\":%d,\"result\":\"%s\",\"duration\":%.1f,"
 		... "\"robot_kills\":%d,\"giant_kills\":%d,\"tank_kills\":%d,\"sentry_kills\":%d,"
 		... "\"defender_deaths\":%d,\"backstabs\":%d,\"buster_detonations\":%d,"
-		... "\"sentries_lost\":%d,\"dispensers_lost\":%d,"
+		... "\"sentries_lost\":%d,\"dispensers_lost\":%d,\"upgrades\":%d,\"upgrade_credits\":%d,"
 		... "\"damage\":%d,\"tank_damage\":%d,\"sentry_damage\":%d,"
 		... "\"healing\":%d,\"ubers\":%d,"
 		... "\"damage_scout\":%d,\"damage_sniper\":%d,\"damage_soldier\":%d,"
@@ -811,7 +817,7 @@ static void WriteWaveResult(const char[] result)
 		g_sMap, g_iWave, result, duration,
 		g_Wave.robotKills, g_Wave.giantKills, g_Wave.tankKills, g_Wave.sentryKills,
 		g_Wave.defenderDeaths, g_Wave.backstabs, g_Wave.busterDetonations,
-		g_Wave.sentriesLost, g_Wave.dispensersLost,
+		g_Wave.sentriesLost, g_Wave.dispensersLost, g_Wave.upgradesBought, g_Wave.upgradeCreditsSpent,
 		g_Wave.damageDealt, g_Wave.damageToTanks, g_Wave.sentryDamage,
 		g_Wave.healingDone, g_Wave.ubersDeployed,
 		g_Wave.damageByClass[view_as<int>(TFClass_Scout)],
@@ -1362,6 +1368,33 @@ static void CollectScoreboardHealing()
 
 		g_Wave.healingScoreboard += now - g_iHealingAtWaveStart[i];
 	}
+}
+
+/* Every purchase at the upgrade station, counted per wave
+ *
+ * Whether the bots shop at all is the first question of any argument about why a wave beat them,
+ * and nothing here could answer it: max health is not an upgrade Mann vs Machine sells, so a team
+ * of stock-health bots says nothing either way. */
+public void OnClientCommandKeyValues_Post(int client, KeyValues kv)
+{
+	if (client < 1 || client > MaxClients || !IsClientInGame(client))
+		return;
+
+	if (TF2_GetClientTeam(client) != TFTeam_Red)
+		return;
+
+	char name[32]; kv.GetSectionName(name, sizeof(name));
+
+	if (!StrEqual(name, "MVM_Upgrade") || !kv.JumpToKey("upgrade"))
+		return;
+
+	int count = kv.GetNum("count", 1);
+	kv.GoBack();
+
+	if (count == 0)
+		return;
+
+	g_Wave.upgradesBought += count;
 }
 
 static void Event_ChargeDeployed(Event event, const char[] name, bool dontBroadcast)

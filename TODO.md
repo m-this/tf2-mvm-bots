@@ -246,7 +246,36 @@ and his sentry is the one he could not afford to upgrade, so it dies faster.
 Reverted, and the trade is worth remembering: an engineer's damage is his sentry
 plus himself, and this bought one with the other.
 
-Eight attempts, eight measurements, and the wave is still lost every time. What is
+Then the reproduction itself was checked, and it was the wrong question all along.
+
+Playing the real mission from wave 1 rather than jumping into wave 3: the bots
+lose **wave 1**, eight attempts out of eight, at 15 to 31 defender deaths each.
+Wave 3 is not the wall. This mission is beyond the team from its first wave, and
+Swagdoll reaches wave 3 because he is on the server.
+
+Two things were checked along the way and both corrected something believed here:
+
+- Every bot is at stock maximum health in every run on every map, which read like
+  a team that never upgrades. It is not: Mann vs Machine sells no maximum health
+  upgrade at all. `sm_dump_upgrades` lists the sixty three the game has and there
+  is no such line. Stock health is what a human team has too.
+- They do shop. The wave line carries `upgrades` now, and a first wave of this
+  mission has 28 upgrade steps bought across the team before it starts.
+- `--wave` does not grant the credits of the waves it skips, so a jumped wave is
+  played by an unupgraded team. That is sound for an A/B, where both arms are
+  equally poor, and worthless for "can they win this wave".
+
+Eight attempts at wave 3, eight measurements, and eight losses at wave 1 when the
+mission is played properly.
+
+What this item actually is: the bot team is below what an advanced Two Cities
+mission asks from its opening wave, and no single behaviour explains it. That is
+a programme rather than a bug, and the honest thing to tell the player is that
+the bots need him. The measurements above rule out the medic's charge, his
+patient, target priority, where the team waits, how spread out it stands, and
+whether the engineer shops before building. What is left is a lot of small things
+at once, which is what "the bots are not good enough yet" looks like from
+inside. What is
 left to try, in the order a measurement is cheapest:
 
 - Count what actually kills them by robot class and weapon on this wave rather
