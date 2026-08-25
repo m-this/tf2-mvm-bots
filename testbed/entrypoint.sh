@@ -8,8 +8,10 @@
 # SourceMod can be reinstalled under it.
 set -eu
 
-STAGE=/opt/mvmbots
-GAME="${STEAMAPPDIR}/${STEAMAPP}"
+# Defaulted rather than fixed, because run-native.sh sources this to write the
+# same server.cfg into a game tree on the host rather than in the image.
+STAGE="${STAGE:-/opt/mvmbots}"
+GAME="${GAME:-${STEAMAPPDIR}/${STEAMAPP}}"
 INTERVAL=30
 
 install_addons() {
@@ -119,7 +121,7 @@ install_server_cfg() {
 	cat >"$target" <<-CFG
 	// Managed by the mvm-bots test-bed. Edits here are replaced on restart.
 	hostname "MvM defender bots test-bed"
-	rcon_password "${SRCDS_RCONPW}"
+	rcon_password "${SRCDS_RCONPW:-testbed}"
 	sv_password ""
 	sv_lan 1
 
@@ -195,6 +197,14 @@ supervise() {
 		sleep "$INTERVAL"
 	done
 }
+
+# run-native.sh sources this for the installers above and runs the server itself,
+# so that the native test-bed and the container write the same server.cfg. Two
+# copies of that file would drift, and a difference between the two beds is the
+# one thing this is for.
+if [ -n "${TESTBED_DEFINE_ONLY:-}" ]; then
+	return 0
+fi
 
 supervise &
 

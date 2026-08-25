@@ -152,6 +152,38 @@ Six waves an arm is a small sample and the bots are not deterministic. A
 difference of one cleared wave is noise; only a large move in damage per wave is
 worth reading as anything.
 
+## Native Linux, which is where the crashes are
+
+Players report a native Linux server crashing far more often than the same mod
+under Docker or on Windows, and the container bed cannot see that: it restarts
+srcds by itself, so a crash there reads as a hiccup while the same crash
+natively ends the session.
+
+```sh
+testbed/seed-native.sh                 # once: copies the game out of the container
+testbed/run-native.sh --waves 6        # same flags as run.sh
+testbed/symbolise-core.sh core.1234    # a backtrace with names in it
+```
+
+It runs `srcds_linux` directly rather than through `srcds_run`, so a crash stays
+crashed and leaves a core instead of being restarted underneath the measurement.
+Cores are enabled by the script, land beside the binary, and are symbolised and
+removed at the end of a run unless `--keep-core`.
+
+It writes the same `server.cfg` as the container, by sourcing `entrypoint.sh`
+rather than by keeping a second copy: two copies of that file would drift, and a
+difference between the two beds is the one thing this is for.
+
+The game is a copy, about fifteen gigabytes, at `~/tf2-native` by default
+(`TESTBED_NATIVE_ROOT`). A copy and never a share, for the same reason the
+container copies: this installs plugins over `addons/`.
+
+Two things the host may not have. A 32-bit C++ runtime, which `seed-native.sh`
+takes from the image into the game's own `bin/` so the tree stays self-contained
+rather than needing `libstdc++6:i386` installed. And core dumps: the script
+raises the soft limit itself, but `/proc/sys/kernel/core_pattern` has to be a
+plain name or a path you can write, not a pipe to a crash handler.
+
 ## When the server crashes
 
 `run.sh` greps the container's log for `core dumped` on every poll and stops
