@@ -226,6 +226,11 @@ this file exists to find and briefly invented instead.
 - **`docker logs` retains history across container restarts.** One crash in the
   morning read as a crash in every run for the rest of the day until the check
   grew a `--since`.
+- **A run measured under paging measures the machine.** A session went from six
+  clean waves to four failed runs in a row with no code change: 200 MB free, 5 GB
+  swapped, swap-in at 20 MB/s. To a watchdog that measures frame time, a page
+  fault is an infinite loop. `run.sh` refuses to start below 1500 MB available
+  now; `TESTBED_MIN_FREE_MB=0` overrides it.
 - **A popfile the game refuses leaves the map's own mission running.** Three
   sessions of "Bavarian Botbash wave 3" were measured against Rottenburg's
   default intermediate mission. `run.sh` reads `tf_mvm_popfile` back now. The

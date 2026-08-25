@@ -121,6 +121,23 @@ if [ "$rebuild" = 1 ]; then
 	fi
 fi
 
+# A run measured under paging is not a measurement.
+#
+# A session once went from six clean waves to four failed runs in a row with no
+# code change between them: 200 MB free, 5 GB swapped out, and swap-in bursting
+# at 20 MB/s. A page fault that stalls the server is indistinguishable, to a
+# watchdog that measures frame time, from an infinite loop. So the numbers said
+# the build crashed and the machine was the answer.
+#
+# Checked rather than remembered. TESTBED_MIN_FREE_MB=0 turns it off.
+free_mb=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo 2>/dev/null || echo 99999)
+
+if [ "${TESTBED_MIN_FREE_MB:-1500}" -gt 0 ] && [ "$free_mb" -lt "${TESTBED_MIN_FREE_MB:-1500}" ]; then
+	say "only ${free_mb} MB of memory available, and a run under paging measures the machine"
+	say "free some up, or set TESTBED_MIN_FREE_MB=0 to run anyway"
+	exit 1
+fi
+
 say "starting the server on $map"
 $compose up -d
 
