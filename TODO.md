@@ -268,6 +268,30 @@ Two things were checked along the way and both corrected something believed here
 Eight attempts at wave 3, eight measurements, and eight losses at wave 1 when the
 mission is played properly.
 
+The teleporter is a real defect and neither order fixes it. Over four attempts at
+wave 1 there are 116 samples of an entrance standing and 33 of an exit, so most of
+the metal goes on the half that moves nobody. Two fixes were measured:
+
+| | entrance | exit | rides | held | deaths a wave |
+| --- | --- | --- | --- | --- | --- |
+| entrance first, as shipped | 116 | 33 | 11 | 217s | 32.2 |
+| replacing a lost exit mid wave | 31 | 29 | 4 | 166s | 26.5 |
+| exit first | 44 | 89 | 15 | 166s | 29.5 |
+
+The pair is complete far more often either way, and both hold the wave for less
+time. The engineer finishes one half per break on this map, whichever half he
+starts with, because the entrance is a walk to the far end of it. Replacing the
+exit mid wave takes him off his sentry, which is the same trade that lost when he
+skipped shopping to build: **anything that takes the engineer off his sentry
+during a wave shortens the hold.** That is now three measurements saying it.
+
+And a lesson about the measuring rather than the bots: four attempts cannot
+resolve a difference in how long a wave is held. The unchanged arm's own
+durations are 163, 189, 272 and 241 seconds. Differences of that size between
+arms were read here as signal in both directions before the spread was looked at.
+Only the state counts are trustworthy at this sample size: 16 attempts at wave 1
+across every arm, 16 losses, and a teleporter that is one ended.
+
 What this item actually is: the bot team is below what an advanced Two Cities
 mission asks from its opening wave, and no single behaviour explains it. That is
 a programme rather than a bug, and the honest thing to tell the player is that
