@@ -183,6 +183,19 @@ enum struct WaveCounters
 	//What the team bought at the station, which nothing here has ever counted
 	int upgradesBought;
 	int upgradeCreditsSpent;
+
+	/* The whole life of the wave's money
+	
+	dropped is what the wave paid out, picked up is what the team walked over, bonus is what the
+	game adds for leaving none of it, spent is what went over the counter at the station, and in
+	hand is what was still in their pockets when the wave ended. Dropped minus picked up expired on
+	the floor; picked up minus spent is money nobody got round to using. Those are two different
+	faults and the first version of this could tell neither. */
+	int creditsDropped;
+	int creditsAcquired;
+	int creditsBonus;
+	int creditsSpent;
+	int creditsInHand;
 	int selfDeathsByClass[view_as<int>(TFClass_Engineer) + 1];
 	/* Who killed what, on both sides
 
@@ -223,6 +236,11 @@ enum struct WaveCounters
 		this.dispensersLost = 0;
 		this.upgradesBought = 0;
 		this.upgradeCreditsSpent = 0;
+		this.creditsDropped = 0;
+		this.creditsAcquired = 0;
+		this.creditsBonus = 0;
+		this.creditsSpent = 0;
+		this.creditsInHand = 0;
 		this.damageDealt = 0;
 		this.damageToTanks = 0;
 		this.sentryDamage = 0;
@@ -565,6 +583,7 @@ public void OnGameFrame()
 	SampleEngineers();
 	SampleRepairs();
 	SampleTelemetry();
+	CollectWaveCredits();
 }
 
 static void ReportStall(float ms)
@@ -782,6 +801,8 @@ static void WriteWaveResult(const char[] result)
 		... "\"robot_kills\":%d,\"giant_kills\":%d,\"tank_kills\":%d,\"sentry_kills\":%d,"
 		... "\"defender_deaths\":%d,\"backstabs\":%d,\"buster_detonations\":%d,"
 		... "\"sentries_lost\":%d,\"dispensers_lost\":%d,\"upgrades\":%d,\"upgrade_credits\":%d,"
+		... "\"credits_dropped\":%d,\"credits_picked_up\":%d,\"credits_bonus\":%d,"
+		... "\"credits_spent\":%d,\"credits_in_hand\":%d,"
 		... "\"damage\":%d,\"tank_damage\":%d,\"sentry_damage\":%d,"
 		... "\"healing\":%d,\"ubers\":%d,"
 		... "\"damage_scout\":%d,\"damage_sniper\":%d,\"damage_soldier\":%d,"
@@ -818,6 +839,8 @@ static void WriteWaveResult(const char[] result)
 		g_Wave.robotKills, g_Wave.giantKills, g_Wave.tankKills, g_Wave.sentryKills,
 		g_Wave.defenderDeaths, g_Wave.backstabs, g_Wave.busterDetonations,
 		g_Wave.sentriesLost, g_Wave.dispensersLost, g_Wave.upgradesBought, g_Wave.upgradeCreditsSpent,
+		g_Wave.creditsDropped, g_Wave.creditsAcquired, g_Wave.creditsBonus,
+		g_Wave.creditsSpent, g_Wave.creditsInHand,
 		g_Wave.damageDealt, g_Wave.damageToTanks, g_Wave.sentryDamage,
 		g_Wave.healingDone, g_Wave.ubersDeployed,
 		g_Wave.damageByClass[view_as<int>(TFClass_Scout)],
@@ -1350,6 +1373,56 @@ static void SnapshotScoreboardHealing()
 	for (int i = 1; i <= MaxClients; i++)
 		g_iHealingAtWaveStart[i] = IsClientInGame(i) ? ScoreboardHealing(i) : 0;
 }
+
+/* What this wave paid out and how much of it the team actually picked up
+ *
+ * Money that is not walked over expires where it fell, and it is the whole upgrade budget: a team
+ * that leaves a third of it on the floor plays every later wave a third under-equipped. Nothing
+ * here has ever counted it, and the game keeps both halves of the number itself.
+ */
+//Everybody's balance at the last sample, so a fall in it can be read as money spent
+static int g_iCurrencyLastSeen[MAXPLAYERS + 1];
+
+static void CollectWaveCredits()
+{
+	int ent = FindEntityByClassname(MaxClients + 1, "tf_mann_vs_machine_stats");
+
+	if (ent == -1)
+		return;
+
+	g_Wave.creditsDropped = GetEntProp(ent, Prop_Send, "m_currentWaveStats", _, 0);
+	g_Wave.creditsAcquired = GetEntProp(ent, Prop_Send, "m_currentWaveStats", _, 1);
+	g_Wave.creditsBonus = GetEntProp(ent, Prop_Send, "m_currentWaveStats", _, 2);
+
+	/* What the team is holding, and what left their pockets since the last sample
+	
+	The station takes the money without saying how much, so it is read off the players: a fall in
+	somebody's balance between two samples is money spent, and the balance itself is money nobody
+	has used yet. A wave that ends with a thousand credits in hand is not the same problem as one
+	that ends with a thousand on the floor. */
+	int inHand = 0;
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || TF2_GetClientTeam(i) != TFTeam_Red)
+			continue;
+
+		if (!HasEntProp(i, Prop_Send, "m_nCurrency"))
+			continue;
+
+		int now = GetEntProp(i, Prop_Send, "m_nCurrency");
+
+		inHand += now;
+
+		if (g_iCurrencyLastSeen[i] > now)
+			g_Wave.creditsSpent += g_iCurrencyLastSeen[i] - now;
+
+		g_iCurrencyLastSeen[i] = now;
+	}
+
+	g_Wave.creditsInHand = inHand;
+}
+
 
 static void CollectScoreboardHealing()
 {
