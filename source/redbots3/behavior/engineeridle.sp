@@ -854,6 +854,18 @@ bool CanRepairFromRange(int actor, int sentry, float dist)
 	if (!TF2_IsRescueRangerEquipped(actor))
 		return false;
 	
+	/* A bolt repairs a building and does not reload one
+	
+	Only a hit with the wrench puts shells back in a sentry. A sentry at full health with an empty
+	magazine still answers yes to SentryNeedsMetal, so the engineer stood at range firing bolts into
+	something that was already whole and never gained a shell. Reported from play as Rescue Ranger
+	engineers refusing to reload, and measured on Coal Town before the fix: 21 of 126 samples of a
+	full health sentry had it under fifty shells, and some at none.
+	
+	So range repair is for damage and nothing else. Ammo is a walk. */
+	if (BaseEntity_GetHealth(sentry) >= TF2Util_GetEntityMaxHealth(sentry))
+		return false;
+	
 	//Close enough to swing at, and the wrench repairs faster
 	if (dist < 200.0)
 		return false;
