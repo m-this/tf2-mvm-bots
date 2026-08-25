@@ -131,6 +131,24 @@ way came back at the baseline. The arm that looked like a discovery had waves of
 Two arms of eight can see a wave lost sixteen times out of sixteen. They cannot
 see a change in how long it is held.
 
+### The band for Bavarian Botbash wave 1
+
+Twenty four attempts on the unchanged build, `mvm_rottenburg_advanced1` wave 1,
+six bots and the host, AUTO_BOTS. None of them cleared it.
+
+| | median | quartiles | range |
+| --- | --- | --- | --- |
+| held for | 160s | 154 to 192 | 84 to 286 |
+| defenders died | 24 | 22 to 31 | 14 to 47 |
+| robots killed | 58 | 52 to 64 | 25 to 98 |
+
+An arm whose median falls inside those quartiles has shown nothing. That is the
+band every change to this mission is read against, and building it is what made
+the earlier readings on this wave interpretable at all: an arm that was called a
+forty four per cent longer hold has a median of 254 seconds, which is outside the
+band, and a second arm of the same change built another way came back at 179,
+which is inside it. One of the two is wrong and neither is a result.
+
 ## Repairs
 
 ```

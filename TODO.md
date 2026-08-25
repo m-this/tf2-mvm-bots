@@ -318,6 +318,14 @@ The lesson is the one this file keeps having to learn: an arm that is not
 replicated is a story. Eight attempts is enough to see a wave lost sixteen times
 out of sixteen and not enough to see a change in how long it is held.
 
+There is a baseline band for this wave now, twenty four attempts on the
+unchanged build, and it is in `docs/testbed-metrics.md`: 160 seconds held with
+quartiles of 154 to 192, 24 deaths with quartiles of 22 to 31, 58 robots killed
+with quartiles of 52 to 64, and none of the twenty four cleared. Every future
+change to this mission is read against it, and anything whose median lands inside
+those quartiles has shown nothing. That is the tool this item needed from the
+start.
+
 What this item actually is: the bot team is below what an advanced Two Cities
 mission asks from its opening wave, and no single behaviour explains it. That is
 a programme rather than a bug, and the honest thing to tell the player is that

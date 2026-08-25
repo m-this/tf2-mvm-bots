@@ -41,21 +41,16 @@ spawn room is the start of the bomb's path. Standing on the ground beside it is 
 between opening fire as the gate drops and meeting the wave halfway up the map. */
 static bool PickTheFront(int actor)
 {
-	/* On a hard mission the nest is the front, and on an easy one the gate still is
+	/* The classes that shoot from a distance wait at the nest, the rest at the gate
 	
 	The gate is where the robots come out, and standing on it is how a defender meets a giant with
-	nothing behind him. Waiting at the nest instead starts the wave with a sentry, a dispenser and
-	the rest of the team in reach.
+	nothing behind him. Waiting beside the sentry instead starts the wave with a sentry, a dispenser
+	and the rest of the team in reach, and it is worth nothing to a Scout who has money to collect
+	or a Pyro who has to be within a few metres to do anything at all.
 	
-	Both were measured and the answer is not the same on both. Bavarian Botbash wave 3, three
-	attempts each: at the gate 62 robots killed and 160 seconds held, at the nest 72 and 180. Decoy
-	on its normal mission, two waves: at the gate both cleared with 206 robots killed, at the nest
-	one cleared with 165.
-	
-	Which is the difference between a wave you can walk into and one that walks over you. So the
-	rule is the mission: meet them at the gate while the team can afford to, and hold the nest when
-	it cannot. */
-	if (Feature(FEATURE_HOLD_THE_NEST) && IsHardMission() && PickTheNest(actor))
+	Holding the nest with the whole team was measured first and could not be told apart from the
+	gate: four waves an arm, and the difference sat inside each arm's own spread. */
+	if (Feature(FEATURE_HOLD_THE_NEST) && FightsAtRange(actor) && PickTheNest(actor))
 		return true;
 
 	int spawn = -1;
@@ -114,23 +109,24 @@ static bool PickTheFront(int actor)
 	return true;
 }
 
-//Advanced and above, which is where meeting the wave at its own gate stops paying
-static bool IsHardMission()
+/* Whether this one does its damage from where the nest is, or has to walk into the wave
+ *
+ * Asked for from play: the classes that fight at range belong around the engineer's nest, and the
+ * ones that have to close belong at the gate. The Scout collects money and the Pyro and the Spy
+ * work at arm's length, so all three are wasted standing behind a sentry. Everybody else shoots
+ * across the same ground the sentry covers.
+ *
+ * This replaced holding the nest with the whole team, which was measured and could not be told
+ * apart from the gate at four waves an arm. */
+static bool FightsAtRange(int actor)
 {
-	static eMissionDifficulty difficulty = MISSION_UNKNOWN;
-	static float asked;
-
-	//Asked once a wave rather than once a bot: it reads the popfile name off an entity every time
-	if (asked < GetGameTime() - 30.0)
+	switch (TF2_GetPlayerClass(actor))
 	{
-		difficulty = GetMissionDifficulty();
-		asked = GetGameTime();
-
-		LogMessage("MoveToFront: mission difficulty is %d, holding the nest is %s",
-			difficulty, difficulty == MISSION_ADVANCED || difficulty == MISSION_EXPERT ? "on" : "off");
+		case TFClass_Scout, TFClass_Pyro, TFClass_Spy:
+			return false;
 	}
 
-	return difficulty == MISSION_ADVANCED || difficulty == MISSION_EXPERT;
+	return true;
 }
 
 /* Ground beside a teammate's sentry, or false when the team has none up yet
