@@ -4,3 +4,7 @@
 *.db
 .beads-credential-key
 .beads/proxieddb/
+
+# The agent instructions live here and AGENTS.md is a symlink to them, so
+# this one overrides the global ignore of CLAUDE.md.
+!CLAUDE.md
