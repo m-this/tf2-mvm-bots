@@ -292,6 +292,26 @@ arms were read here as signal in both directions before the spread was looked at
 Only the state counts are trustworthy at this sample size: 16 attempts at wave 1
 across every arm, 16 losses, and a teleporter that is one ended.
 
+The lineup looked like the answer and then did not replicate, which is the most
+useful thing measured here.
+
+The map's lineup for Rottenburg names no Pyro, and wave 1 kills the team with
+rockets: 62 per cent of the deaths are robot Soldiers and 73 per cent are
+explosions. Giving the Scout's seat to a Pyro by hand, eight attempts against
+eight: the team held 254 seconds against 176 and killed 88 robots against 58,
+which reads as the largest effect anything produced all session.
+
+Then the same lineup was produced by a rule instead of by hand, so that the mod
+would field a Pyro whenever the coming wave is explosive, and eight more
+attempts came back at 179 seconds and 54 robots. That is the baseline, not the
+Pyro arm. Two of the three arms agree and the exciting one is the odd one out,
+and its own durations run from 88 to 282 seconds, so it was a lucky sample read
+as a discovery. The rule was reverted.
+
+The lesson is the one this file keeps having to learn: an arm that is not
+replicated is a story. Eight attempts is enough to see a wave lost sixteen times
+out of sixteen and not enough to see a change in how long it is held.
+
 What this item actually is: the bot team is below what an advanced Two Cities
 mission asks from its opening wave, and no single behaviour explains it. That is
 a programme rather than a bug, and the honest thing to tell the player is that
