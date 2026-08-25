@@ -140,67 +140,71 @@ dispensers standing. If it turns out to be the blueprint that bothers people, th
 fix is the engineer cancelling the placement when he stops walking to a spot, and
 the `ghost` lines are what would measure it.
 
-### 20. Bavarian Botbash wave 3 wipes the bot team. Reproduced, open
+### 20. Bavarian Botbash wave 3 wipes the bot team. Still lost, and four things were measured
 
 Swagdoll: "Bavarian Botbash Wave 3 is still basically impossible for me. That
 Giant Crit Heavy and his two Giant Medics keep wiping everything and I'm not good
 enough at Sniper to counter it."
 
-Reproduced with nobody on the server. Rottenburg, `mvm_rottenburg_advanced_bavarian_botbash`:
+Not solved. Six attempts at the wave with nobody on the server, in two
+configurations, and all six were lost. What follows is what was measured, what it
+ruled out, and the two changes that survived.
 
-| wave | result | deaths |
-| --- | --- | --- |
-| 1 | lost, lost, lost, then cleared | 7, 7, 11, 5 |
-| 3 | lost | 18 |
-| 3, second run | lost | 23 |
+**The first three sessions measured the wrong mission.** `tf_mvm_popfile
+mvm_rottenburg_advanced_bavarian_botbash` was refused, the server kept playing
+Rottenburg's own default, and nothing said so. The real names are in the game's
+VPK and there are two: `mvm_rottenburg_advanced1` and `_advanced2`.
 
-So the bots lose wave 1 of this mission three times out of four before they ever
-reach the wave that was reported. What killed them on wave 3: pyro 10, heavy 8,
-soldier 4, and half the deaths were bullet and half melee, which is a team being
-walked over at close range rather than shelled from a distance.
+```
+grep -ao 'mvm_rottenburg[a-z0-9_]*' tf/tf2_misc_dir.vpk
+```
 
-Three things were built to work on this, and they are the useful part of the item
-so far:
+`run.sh` reads the popfile back now and stops with the name it is actually
+playing, because everything downstream of a silent substitution is fiction.
 
-- `testbed/run.sh --wave 3` jumps straight to a wave with `tf_mvm_jump_to_wave`.
-  A wave 3 iteration is three minutes instead of forty, which is the difference
-  between measuring this and reading about it.
-- The aim trace names the robot: `giant soldier` rather than `robot`.
-- `Defenderbots_GetAttackTarget` publishes who each bot decided to shoot, which
-  is the decision rather than where the crosshair drifted. The bot samples carry
-  it as `picked`, with `(healed)` after it when something is healing that robot.
+**A second instrument was lying.** Three of four wave results in a run came out
+exactly 2047 characters long: SourceMod's `File.WriteLine` formats through a 2048
+byte buffer and the wave result had outgrown it. Truncated JSON is skipped by
+every reader, so a four wave run looked like a one wave run. It writes with
+`WriteString` now. Any measurement in this file taken on a long line before this
+was measuring fewer waves than it thought.
 
-What the instruments say, over three runs of wave 3 and 579 samples of it: the
-giants the bots meet are giant soldiers, and they do choose them. Not one sample
-has a giant heavy or a medic in it, ours or theirs. The bots lose the wave in
-147 to 173 seconds, to the ordinary demomen, heavies and pyros that come first.
+**The uber is not being wasted.** A `uber_held` line is written whenever a
+defender dies while a live medic holds a full charge. Over a whole wave 3 there
+were none, so the charge is not sitting in his pocket while the team dies.
 
-So for a bot team the reported moment never arrives. Swagdoll is on the server
-when he plays it, the team lives longer with him, and the giant heavy is what
-they meet when they get that far. That is the thing to say back to him, and it
-also means this item cannot be measured end to end until the bots can survive
-the first half of the wave.
+**The medic's patient churned, and fixing it changed nothing here.** He re-picked
+the biggest body every two seconds, and maximum health follows the upgrades the
+team buys, so the winner flipped between bodies a few points apart: 18 patient
+changes in one wave. A tie keeps the man he has now, `MEDIC_PATIENT_MARGIN`, and
+that is 7 changes. The beam is on somebody 27% of the time either way, so the
+churn was real and was not what keeps the beam off.
 
-One instrument caveat found here: on this mission three `wave_begin` lines came
-with one `wave_end`. A wave that is lost and restarted is not always closing its
-own record, which the wave counting in `run.sh` believes. Worth fixing before
-trusting a clear rate from this mission.
+**Where they wait for the wave is worth something on a hard mission and costs on
+an easy one.** `MoveToFront` sends everybody to the robots' own gate. Waiting
+beside the engineer's sentry instead, three attempts each on the real wave 3:
 
-One lead was followed and closed. The demoman takes a third of his own output
-back on Rottenburg: 3836 self-damage against 11010 dealt over a full mission, and
-he kills himself about once a run. A `selfhurt` line now names the weapon, and
-the answer is `tf_projectile_pipe` and `tf_projectile_rocket`, not the sticky
-trap. That is the same trade `EquipBestWeaponForThreat` already records for the
-soldier: handing him a shotgun inside his own blast was measured and lost, 16890
-damage to 10886 over six waves, because a rocket that hurts him also kills what
-is standing on him. So the self-damage is the price of the damage, and the
-demoman's case is the same shape. Not a lead.
+| | deaths | robots killed | held | distance to a sentry at wave start |
+| --- | --- | --- | --- | --- |
+| the gate | 22 | 36 | 135s | 823 |
+| the nest | 18 | 38 | 127s | 588 |
 
-Do not add a balancing knob for this. `CTFBotDefenderAttack_SelectTarget` already
-prefers the healer of whatever it picked, through `GetHealerOfPlayer`, so the
-idea of shooting the medic first is in there; what is not known is whether it
-fires when the medic is a giant behind a giant. That is the next measurement, and
-it wants a longer timeout than 1300s to see the end of the wave.
+On Decoy's own mission the same change unconditionally was worse: two waves
+cleared and 206 robots killed at the gate, one wave cleared and 165 at the nest.
+So the rule is the mission, `hold_the_nest`: meet them at the gate while the team
+can afford to, hold the nest when it cannot. Decoy with the rule in place is back
+to 206 robots and both waves cleared.
+
+What is still true after all of it: the wave is lost every time, at 18 to 23
+defender deaths an attempt. The bots do already shoot robot medics, 56 samples of
+it in one wave, so the idea this item started with is in the mod and working.
+Nobody has added a balancing knob and nobody should.
+
+The next thing to measure is the giant demoknights. The chosen-target counts for
+the wave are `demoman 148, medic 56, giant soldier 3`, which is a team spending
+the wave on the escort while the thing that kills them is a charge they never see
+coming. A defender who cannot outrun a demoknight has to shoot it before it
+arrives, and nothing in the target ranking knows that.
 
 ### 7. Bot seating for specific classes. Fixed and measured
 
