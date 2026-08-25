@@ -101,6 +101,16 @@ public Action CTFBotUpgrade_OnStart(BehaviorAction action, int actor, BehaviorAc
 	return action.Continue();
 }
 
+/* Why a shopping trip ended, and what was still in the wallet when it did
+ *
+ * The test-bed says the team finishes a wave holding a median of 3328 credits it never spent, and
+ * a trip can end three ways: the window ran out, the game refused a purchase, or the ranking ran
+ * out of things it was willing to buy. Those are three different faults and nothing said which. */
+static void LogUpgradeSessionEnd(int actor, const char[] why)
+{
+	LogMessage("Shopping: %N stopped, %s, %d credits left", actor, why, TF2_GetCurrency(actor));
+}
+
 public Action CTFBotUpgrade_Update(BehaviorAction action, int actor, float interval, ActionResult result)
 {
 	if (!TF2_IsInUpgradeZone(actor)) 
@@ -112,8 +122,7 @@ public Action CTFBotUpgrade_Update(BehaviorAction action, int actor, float inter
 		
 		SetPlayerReady(actor, true);
 		
-		if (redbots_manager_debug_actions.BoolValue)
-			PrintToChatAll("%N upgrade for long with %d credits left!", actor, TF2_GetCurrency(actor));
+		LogUpgradeSessionEnd(actor, "the window ran out");
 		
 		return GetUpgradePostAction(actor, action);
 	}
@@ -140,8 +149,7 @@ public Action CTFBotUpgrade_Update(BehaviorAction action, int actor, float inter
 			{
 				SetPlayerReady(actor, true);
 				
-				if (redbots_manager_debug_actions.BoolValue)
-					PrintToChatAll("%N was refused upgrade %d in slot %d", actor, info.GetInt("index"), info.GetInt("slot"));
+				LogUpgradeSessionEnd(actor, "the game refused one");
 				
 				delete info;
 				
@@ -150,9 +158,9 @@ public Action CTFBotUpgrade_Update(BehaviorAction action, int actor, float inter
 		}
 		else 
 		{
-			// g_flNextUpdate[actor] = 0.0;
-			
 			SetPlayerReady(actor, true);
+			
+			LogUpgradeSessionEnd(actor, "nothing left worth buying");
 			
 			delete info;
 			

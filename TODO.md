@@ -344,6 +344,31 @@ change to this mission is read against it, and anything whose median lands insid
 those quartiles has shown nothing. That is the tool this item needed from the
 start.
 
+Money was instrumented properly and then ruled out, and the ruling out included
+correcting a reading of my own.
+
+The first version counted what the wave paid and what the team picked up, and the
+field for credits spent was declared, printed and never filled. With the whole
+life of it counted, dropped, picked up, bonus, spent and still in hand:
+
+- The team collects 78 per cent of what a wave pays out, median over twelve
+  waves, as little as 54 per cent of one. That is about 200 credits a wave left
+  on the floor.
+- It ends a wave holding a median of 3328 credits, which looked like hoarding and
+  is not. Forty five shopping trips end with a median of 30 credits in the wallet
+  and a range of 0 to 905: they spend what they have. The 3328 is money collected
+  during the wave, and the wave is lost before the break that would spend it.
+- Thirty five of those forty five trips end on "nothing left worth buying" and
+  ten on the game refusing a purchase, which ends the whole trip rather than
+  trying the next thing on the list. That last one is worth fixing on its own
+  terms and is not worth thousands of credits.
+
+Two changes were measured against the 78 per cent and neither moved it: letting a
+bot walk to a pack within 400 units with a threat in sight, and steering the
+attack sidestep onto a pack within 600. Both came back at 79 per cent, and an
+early three wave read of one of them at 65 per cent was noise, which is the
+third time that has happened on this mission and the reason the band exists.
+
 What this item actually is: the bot team is below what an advanced Two Cities
 mission asks from its opening wave, and no single behaviour explains it. That is
 a programme rather than a bug, and the honest thing to tell the player is that
