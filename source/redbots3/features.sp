@@ -57,12 +57,16 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 static ConVar g_arrFeatureConVars[FEATURE_COUNT];
 static ConVar g_cvFeaturesActive;
 
-static ConVar MakeFeature(int id, const char[] description)
+static ConVar MakeFeature(int id, const char[] description, bool on = true)
 {
 	char name[64]; Format(name, sizeof(name), "sm_redbots_feature_%s", FEATURE_NAME[id]);
 
-	//Every feature ships on. A switch exists to turn something off and measure the difference
-	return CreateConVar(name, "1", description, FCVAR_NOTIFY);
+	/* A feature ships on once it has been measured, and off until then
+	
+	The switch exists to turn something off and measure the difference, and that is the whole point
+	of it: a behaviour that has not cleared the spread of the arm it was measured against is not
+	yet a behaviour this mod claims. See the rule in docs/testbed-metrics.md. */
+	return CreateConVar(name, on ? "1" : "0", description, FCVAR_NOTIFY);
 }
 
 void LoadFeatures()
@@ -101,7 +105,7 @@ void LoadFeatures()
 		"A bomb of his own close enough to hurt him stops the detonator. Off presses it anyway.");
 
 	g_arrFeatureConVars[FEATURE_HOLD_THE_NEST] = MakeFeature(FEATURE_HOLD_THE_NEST,
-		"Wait for the wave beside the engineer's sentry instead of at the robots' gate.");
+		"Wait for the wave beside the engineer's sentry instead of at the robots' gate.", false);
 
 	g_arrFeatureConVars[FEATURE_ATTACK_STRAFE] = MakeFeature(FEATURE_ATTACK_STRAFE,
 		"A bot that has arrived at its firing position keeps sidestepping instead of standing still.");
