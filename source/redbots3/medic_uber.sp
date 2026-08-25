@@ -125,6 +125,13 @@ void MedicProjectileShield(int actor, int patient)
 	if (CountEnemiesNearPosition(actor, where, SHIELD_FIGHT_RANGE) < 1)
 		return;
 
+	/* Said out loud, because a behaviour nobody can see fire is a behaviour nobody can measure
+	
+	The first arm of this could not be read: every number sat inside the baseline's spread, which
+	means either the shield does nothing or it never went up, and there was no way to tell those
+	apart. */
+	LogMessage("Shield: %N puts it up, rage %.0f", actor, TF2_GetRageMeter(actor));
+
 	VS_PressSpecialFireButton(actor);
 }
 
