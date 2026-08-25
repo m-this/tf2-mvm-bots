@@ -320,10 +320,11 @@ bool ShouldBuildTeleporter(int actor)
 		return false;
 
 	//The nest comes first and it is not finished
-	if (GetObjectOfType(actor, TFObject_Sentry) == INVALID_ENT_REFERENCE)
+	//What is in his hands counts: a carried building is one he has, not one he needs
+	if (HasObjectOfType(actor, TFObject_Sentry) == INVALID_ENT_REFERENCE)
 		return false;
 
-	if (GetObjectOfType(actor, TFObject_Dispenser) == INVALID_ENT_REFERENCE)
+	if (HasObjectOfType(actor, TFObject_Dispenser) == INVALID_ENT_REFERENCE)
 		return false;
 
 	if (m_aNestArea[actor] == NULL_AREA)
