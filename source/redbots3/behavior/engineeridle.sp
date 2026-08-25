@@ -134,7 +134,8 @@ static void ReportEngineerStall(int actor, const char[] where)
 static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, float interval, ActionResult result)
 {
 	int sentry    = GetObjectOfType(actor, TFObject_Sentry);
-	int dispenser = GetObjectOfType(actor, TFObject_Dispenser);
+	//Counting the one in his hands: a carried dispenser is not a reason to build a second
+	int dispenser = HasObjectOfType(actor, TFObject_Dispenser);
 	
 	bool stalled = sentry == INVALID_ENT_REFERENCE && GameRules_GetRoundState() == RoundState_RoundRunning;
 	

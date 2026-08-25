@@ -1936,8 +1936,26 @@ static void SampleDuplicateBuildings(float when, float clock)
 		{
 			int builder = GetEntPropEnt(entity, Prop_Send, "m_hBuilder");
 
-			if (builder < 1 || builder > MaxClients)
+			/* A building whose builder is gone, which the game's one-per-engineer limit cannot see
+			
+			A bot that is kicked to make room for a player, or replaced between waves, leaves its
+			buildings standing with nobody holding them. The next engineer builds his own, and what
+			a person sees is one engineer with two dispensers. Reported from play with a photograph
+			and one engineer on the team. */
+			if (builder < 1 || builder > MaxClients || !IsClientInGame(builder))
+			{
+				float at[3]; GetEntPropVector(entity, Prop_Send, "m_vecOrigin", at);
+				char line[ENGINEER_LINE_LENGTH];
+
+				FormatEx(line, sizeof(line),
+					"{\"event\":\"orphan\",\"map\":\"%s\",\"wave\":%d,\"t\":%.1f,\"clock\":%.1f,"
+					... "\"type\":\"%s\",\"at\":[%.0f,%.0f,%.0f],\"builder\":%d}",
+					g_sMap, g_iWave, when, clock, types[t], at[0], at[1], at[2], builder);
+
+				WriteLine(line);
+
 				continue;
+			}
 
 			if (HasEntProp(entity, Prop_Send, "m_bDisposableBuilding")
 				&& GetEntProp(entity, Prop_Send, "m_bDisposableBuilding") != 0)

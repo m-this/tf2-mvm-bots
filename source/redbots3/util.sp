@@ -470,6 +470,37 @@ void DetonateObjectOfType(int client, TFObjectType iType, TFObjectMode iMode = T
 	}
 }
 
+/* A building of this type he owns, counting the one in his hands
+ *
+ * The game takes a building out of the player's object list the moment he picks it up, so every
+ * question the mod asks about what an engineer has answered no while he was carrying it. What
+ * follows from that is a second one: the dispenser gate sees none, sends him to build, and when he
+ * finally puts the carried one down there are two dispensers and one engineer. Reported from play
+ * with a photograph.
+ *
+ * The carried one is his by any reading of the question, so it is counted here rather than at each
+ * of the twenty call sites that ask. */
+int HasObjectOfType(int client, TFObjectType iObjectType, TFObjectMode iObjectMode = TFObjectMode_None)
+{
+	int standing = GetObjectOfType(client, iObjectType, iObjectMode);
+
+	if (standing != INVALID_ENT_REFERENCE)
+		return standing;
+
+	int carried = TF2_GetCarriedObject(client);
+
+	if (carried == -1 || !IsValidEntity(carried))
+		return INVALID_ENT_REFERENCE;
+
+	if (TF2_GetObjectType(carried) != iObjectType)
+		return INVALID_ENT_REFERENCE;
+
+	if (iObjectType == TFObject_Teleporter && TF2_GetObjectMode(carried) != iObjectMode)
+		return INVALID_ENT_REFERENCE;
+
+	return carried;
+}
+
 int GetObjectOfType(int client, TFObjectType iObjectType, TFObjectMode iObjectMode = TFObjectMode_None)
 {
 	int iNumObjects = TF2Util_GetPlayerObjectCount(client);
