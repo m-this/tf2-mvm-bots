@@ -58,6 +58,20 @@ toolbox when the robots arrive is worse than a badly placed level three, so the 
 clock rather than on a promise that it finishes in time */
 #define NEST_RELOCATE_HAUL_TIME	20.0
 
+/* How long an engineer may walk around holding a building before he puts it down
+ *
+ * The carry had no clock at all. He only tries to place while he is within seventy units of the
+ * nest centre, so a centre he cannot reach, or a spot that keeps refusing the placement, leaves him
+ * holding it for the rest of the mission. Reported from play on Coal Town, mid wave and between
+ * waves both, and the mid wave one costs the team its sentry for the whole wave.
+ *
+ * Twenty five seconds is longer than any haul this mod starts on purpose and shorter than a wave.
+ * Down where he stands beats carried, which is the same answer the relocation timeout already
+ * gives: the ground under his feet is at worst ground he was already crossing. */
+#define CARRY_GIVE_UP_TIME	25.0
+
+static float m_ctCarryDeadline[MAXPLAYERS + 1];
+
 float m_ctSentryUnderFire[MAXPLAYERS + 1];
 int m_iSentryHealthLast[MAXPLAYERS + 1];
 
@@ -308,6 +322,31 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 	if (g_bGoingToGrabBuilding[actor])
 	{
 		int building = EntRefToEntIndex(m_hBuildingToGrab[actor]);
+		
+		/* The clock on the carry, started when he first has the thing in his hands
+		
+		Placing it needs him within seventy units of the nest centre, and nothing here says what to
+		do when he never gets there. */
+		if (!TF2_IsCarryingObject(actor))
+		{
+			m_ctCarryDeadline[actor] = 0.0;
+		}
+		else if (m_ctCarryDeadline[actor] <= 0.0)
+		{
+			m_ctCarryDeadline[actor] = GetGameTime() + CARRY_GIVE_UP_TIME;
+		}
+		else if (GetGameTime() > m_ctCarryDeadline[actor])
+		{
+			CNavArea here = TheNavMesh.GetNearestNavArea(GetAbsOrigin(actor), false, 500.0, false, true, TEAM_ANY);
+			
+			m_ctCarryDeadline[actor] = 0.0;
+			
+			LogBuildFailure(actor, "carry", "held it too long, putting it down here");
+			
+			//The nest is where he is now, so the placing branch below takes it the moment it runs
+			if (here != NULL_AREA)
+				m_aNestArea[actor] = here;
+		}
 		
 		if (building == INVALID_ENT_REFERENCE)
 		{
