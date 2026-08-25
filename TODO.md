@@ -229,7 +229,14 @@ changed nothing here because wave 3 has no tank in it at all. The reasoning stil
 holds for a wave that does, and it is worth doing when there is a tank wave to
 measure it on.
 
-Five attempts, five measurements, and the wave is still lost every time. What is
+Spacing was the sixth, and it is the first theory that fitted the deaths: they
+are shelled, so standing apart should cost the robots their splash. It worked as
+designed and lost anyway. Median distance to the nearest teammate went from 414
+units to 564, and deaths went from 18 to 22 with the same robots killed. Spread
+out, they lose the medic's beam, each other's fire and the sentry's cover, and a
+robot demoman kills them one at a time instead of two at once. Reverted.
+
+Six attempts, six measurements, and the wave is still lost every time. What is
 left to try, in the order a measurement is cheapest:
 
 - Count what actually kills them by robot class and weapon on this wave rather
