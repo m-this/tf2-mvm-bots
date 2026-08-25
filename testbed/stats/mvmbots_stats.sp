@@ -978,6 +978,41 @@ static void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 
 	g_Wave.defenderDeaths++;
 
+	/* A defender died while a charge sat in a medigun
+	
+	The stock rule fires the uber when the patient is under half health, and a giant with crits takes
+	a patient from whole to dead without ever being seen at half. So the charge is still there when
+	the body hits the floor, which is the shape of "the giant heavy keeps wiping everything" and is
+	invisible in a wave total that only counts ubers spent. */
+	for (int medic = 1; medic <= MaxClients; medic++)
+	{
+		if (!IsClientInGame(medic) || TF2_GetClientTeam(medic) != TFTeam_Red)
+			continue;
+
+		if (TF2_GetPlayerClass(medic) != TFClass_Medic || !IsPlayerAlive(medic))
+			continue;
+
+		int medigun = GetPlayerWeaponSlot(medic, 1);
+
+		if (medigun == -1 || !HasEntProp(medigun, Prop_Send, "m_flChargeLevel"))
+			continue;
+
+		float charge = GetEntPropFloat(medigun, Prop_Send, "m_flChargeLevel");
+
+		if (charge < 1.0)
+			continue;
+
+		char line[ENGINEER_LINE_LENGTH];
+		char who[MAX_NAME_LENGTH]; GetClientName(victim, who, sizeof(who));
+
+		FormatEx(line, sizeof(line),
+			"{\"event\":\"uber_held\",\"map\":\"%s\",\"wave\":%d,\"died\":\"%s\",\"class\":\"%s\","
+			... "\"charge\":%.2f}",
+			g_sMap, g_iWave, who, ClassName(TF2_GetPlayerClass(victim)), charge);
+
+		WriteLine(line);
+	}
+
 	/* What killed the defender
 
 	The robot's class is the answer most of the time. A sentry is not a class and neither is a
@@ -1393,7 +1428,14 @@ static void WriteLine(const char[] line)
 		return;
 	}
 
-	file.WriteLine("%s", line);
+	/* WriteString rather than WriteLine, because WriteLine formats through a 2048 byte buffer
+	
+	The wave result is the longest line this writes and it grew past that: three of four results in
+	a Bavarian Botbash run came out exactly 2047 characters long, which is not valid JSON, so every
+	reader skipped them and the run looked like it had played one wave. An instrument that drops the
+	measurement and says nothing is worse than no instrument. */
+	file.WriteString(line, false);
+	file.WriteString("\n", false);
 
 	delete file;
 }

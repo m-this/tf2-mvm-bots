@@ -41,6 +41,23 @@ spawn room is the start of the bomb's path. Standing on the ground beside it is 
 between opening fire as the gate drops and meeting the wave halfway up the map. */
 static bool PickTheFront(int actor)
 {
+	/* On a hard mission the nest is the front, and on an easy one the gate still is
+	
+	The gate is where the robots come out, and standing on it is how a defender meets a giant with
+	nothing behind him. Waiting at the nest instead starts the wave with a sentry, a dispenser and
+	the rest of the team in reach.
+	
+	Both were measured and the answer is not the same on both. Bavarian Botbash wave 3, three
+	attempts each: at the gate 62 robots killed and 160 seconds held, at the nest 72 and 180. Decoy
+	on its normal mission, two waves: at the gate both cleared with 206 robots killed, at the nest
+	one cleared with 165.
+	
+	Which is the difference between a wave you can walk into and one that walks over you. So the
+	rule is the mission: meet them at the gate while the team can afford to, and hold the nest when
+	it cannot. */
+	if (Feature(FEATURE_HOLD_THE_NEST) && IsHardMission() && PickTheNest(actor))
+		return true;
+
 	int spawn = -1;
 	
 	while ((spawn = FindEntityByClassname(spawn, "func_respawnroomvisualizer")) != -1)
@@ -94,6 +111,69 @@ static bool PickTheFront(int actor)
 	//A new goal is worth a path this frame rather than at the end of the old one's interval
 	m_flRepathTime[actor] = 0.0;
 	
+	return true;
+}
+
+//Advanced and above, which is where meeting the wave at its own gate stops paying
+static bool IsHardMission()
+{
+	static eMissionDifficulty difficulty = MISSION_UNKNOWN;
+	static float asked;
+
+	//Asked once a wave rather than once a bot: it reads the popfile name off an entity every time
+	if (asked < GetGameTime() - 30.0)
+	{
+		difficulty = GetMissionDifficulty();
+		asked = GetGameTime();
+
+		LogMessage("MoveToFront: mission difficulty is %d, holding the nest is %s",
+			difficulty, difficulty == MISSION_ADVANCED || difficulty == MISSION_EXPERT ? "on" : "off");
+	}
+
+	return difficulty == MISSION_ADVANCED || difficulty == MISSION_EXPERT;
+}
+
+/* Ground beside a teammate's sentry, or false when the team has none up yet
+ *
+ * The nearest one, because two engineers are two nests and the one to stand at is the one on the
+ * way to where this bot already is. */
+static bool PickTheNest(int actor)
+{
+	int best = -1;
+	float bestRange = 0.0;
+	float mine[3]; mine = WorldSpaceCenter(actor);
+
+	int sentry = -1;
+
+	while ((sentry = FindEntityByClassname(sentry, "obj_sentrygun")) != -1)
+	{
+		if (BaseEntity_GetTeamNumber(sentry) != GetClientTeam(actor))
+			continue;
+
+		if (GetEntProp(sentry, Prop_Send, "m_bPlacing") != 0 || GetEntProp(sentry, Prop_Send, "m_bCarried") != 0)
+			continue;
+
+		float range = GetVectorDistance(mine, WorldSpaceCenter(sentry));
+
+		if (best == -1 || range < bestRange)
+		{
+			best = sentry;
+			bestRange = range;
+		}
+	}
+
+	if (best == -1)
+		return false;
+
+	CNavArea area = TheNavMesh.GetNearestNavArea(WorldSpaceCenter(best), true, 1000.0, true, true, GetClientTeam(actor));
+
+	if (area == NULL_AREA)
+		return false;
+
+	CNavArea_GetRandomPoint(area, m_vecGoalArea[actor]);
+
+	m_flRepathTime[actor] = 0.0;
+
 	return true;
 }
 

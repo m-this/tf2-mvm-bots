@@ -1177,6 +1177,9 @@ action stops its update running and these two are not the part worth reimplement
 
 The charge is pressed rather than set: the deploy belongs to the game, and this only ever asks
 for it sooner than the game's own dying-patient rule would have. */
+//How much more health another body needs before it is worth breaking a beam for
+#define MEDIC_PATIENT_MARGIN	25
+
 /* Which teammate a medigun is worth the most on
  *
  * A medigun is worth what the body in front of it is worth, so it belongs on the biggest one: the
@@ -1189,11 +1192,14 @@ for it sooner than the game's own dying-patient rule would have. */
  * he had, so whoever he had stayed the nearest, so he never moved. The walking is the game's job
  * again and the game is good at it. This only has to answer who.
  */
-static int BiggestBody(int medic)
+static int BiggestBody(int medic, int current = -1)
 {
 	int best = -1;
 	int bestHealth = 0;
 	bool bestIsHeavy = false;
+	int currentHealth = 0;
+	bool currentIsHeavy = false;
+	bool currentStands = false;
 
 	for (int i = 1; i <= MaxClients; i++)
 	{
@@ -1215,6 +1221,13 @@ static int BiggestBody(int medic)
 		Maximum health picks the Heavy out most of the time, and most of the time is the problem: a
 		Soldier who has bought health and a Heavy who has not are a coin toss, and the beam moving
 		off the Heavy for that is the beam on the wrong man. */
+		if (i == current)
+		{
+			currentStands = true;
+			currentHealth = health;
+			currentIsHeavy = isHeavy;
+		}
+
 		if (best <= 0 || (isHeavy && !bestIsHeavy) || (isHeavy == bestIsHeavy && health > bestHealth))
 		{
 			best = i;
@@ -1223,8 +1236,25 @@ static int BiggestBody(int medic)
 		}
 	}
 
+	/* A patient he already has keeps the beam unless somebody is plainly worth more
+	
+	Maximum health follows the upgrades the team buys, and mid wave several bodies sit within a few
+	points of each other, so the winner of this ranking flips between them every time it is asked.
+	Measured on Bavarian Botbash wave 3: the beam was on somebody in 34 of 125 samples, and the
+	patient changed almost every ask. A switch costs the walk to the new one and the healing that
+	is not happening during it, so a tie keeps the man he has. */
+	if (currentStands && best > 0 && best != current)
+	{
+		bool betterClass = bestIsHeavy && !currentIsHeavy;
+		bool betterBody = bestIsHeavy == currentIsHeavy && bestHealth > currentHealth + MEDIC_PATIENT_MARGIN;
+
+		if (!betterClass && !betterBody)
+			return current;
+	}
+
 	return best;
 }
+
 
 /* How often the game is told who its patient should be
  *
@@ -1253,12 +1283,13 @@ static void PointMedicAtBiggestBody(BehaviorAction action, int actor)
 
 	m_ctNextPatientNudge[actor] = GetGameTime() + MEDIC_PATIENT_INTERVAL;
 
-	int want = BiggestBody(actor);
+	int have = action.GetHandleEntity(ACTION_HEAL_PATIENT_OFFSET);
+	int want = BiggestBody(actor, have);
 
 	if (want <= 0)
 		return;
 
-	if (action.GetHandleEntity(ACTION_HEAL_PATIENT_OFFSET) == want)
+	if (have == want)
 		return;
 
 	action.SetHandleEntity(ACTION_HEAL_PATIENT_OFFSET, want);

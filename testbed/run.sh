@@ -150,6 +150,20 @@ if [ -n "$mission" ]; then
 	say "loading mission $mission"
 	eval "$rcon 'tf_mvm_popfile $mission'" >/dev/null || true
 	sleep 15
+
+	# A popfile the game refused leaves the map's own mission running and says nothing about it.
+	# Three sessions of "Bavarian Botbash wave 3" were measured against Rottenburg's default
+	# intermediate mission because the name was wrong and nothing checked.
+	loaded=$(eval "$rcon 'tf_mvm_popfile'" 2>/dev/null | tr -d '\r')
+
+	case "$loaded" in
+	*"$mission"*) : ;;
+	*)
+		say "the server refused mission $mission and is playing: $loaded"
+		say "the names are in the game's own VPK: grep -ao 'mvm_<map>[a-z0-9_]*' tf/tf2_misc_dir.vpk"
+		exit 1
+		;;
+	esac
 fi
 
 # Let the server finish standing up before telling it to restart the round.

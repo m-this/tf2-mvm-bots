@@ -32,6 +32,7 @@ enum
 	FEATURE_MEDIC_POCKETS_BIGGEST,
 	FEATURE_DEMO_TANK_PIPES,
 	FEATURE_DEMO_STICKY_SELF_VETO,
+	FEATURE_HOLD_THE_NEST,
 	FEATURE_COUNT
 }
 
@@ -49,7 +50,8 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"soldier_closes_in",
 	"medic_pockets_biggest",
 	"demo_tank_pipes",
-	"demo_sticky_self_veto"
+	"demo_sticky_self_veto",
+	"hold_the_nest"
 };
 
 static ConVar g_arrFeatureConVars[FEATURE_COUNT];
@@ -97,6 +99,9 @@ void LoadFeatures()
 
 	g_arrFeatureConVars[FEATURE_DEMO_STICKY_SELF_VETO] = MakeFeature(FEATURE_DEMO_STICKY_SELF_VETO,
 		"A bomb of his own close enough to hurt him stops the detonator. Off presses it anyway.");
+
+	g_arrFeatureConVars[FEATURE_HOLD_THE_NEST] = MakeFeature(FEATURE_HOLD_THE_NEST,
+		"Wait for the wave beside the engineer's sentry instead of at the robots' gate.");
 
 	g_arrFeatureConVars[FEATURE_ATTACK_STRAFE] = MakeFeature(FEATURE_ATTACK_STRAFE,
 		"A bot that has arrived at its firing position keeps sidestepping instead of standing still.");
