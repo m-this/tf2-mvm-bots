@@ -178,6 +178,18 @@ The game is a copy, about fifteen gigabytes, at `~/tf2-native` by default
 (`TESTBED_NATIVE_ROOT`). A copy and never a share, for the same reason the
 container copies: this installs plugins over `addons/`.
 
+`TESTBED_NATIVE_ROOT` is also how to point this at the install that is actually
+crashing rather than at a copy of the container's. tf2-archipelago's launcher
+keeps its server at `<install root>/tf-dedicated`, so:
+
+```sh
+TESTBED_NATIVE_ROOT=~/path/to/tf2ap/tf-dedicated testbed/run-native.sh --waves 12
+```
+
+That runs the mission against the same tree, the same plugins and the same
+machine that produces the crash, which is the half of this that cannot be done
+from here.
+
 Two things the host may not have. A 32-bit C++ runtime, which `seed-native.sh`
 takes from the image into the game's own `bin/` so the tree stays self-contained
 rather than needing `libstdc++6:i386` installed. And core dumps: the script
