@@ -240,6 +240,21 @@ static int FindTeammateWhoWasNotThere(int actor)
 		if (TF2_GetClientTeam(i) != myTeam)
 			continue;
 
+		/* A human teammate is never the disguised one
+		
+		Every robot in this mode is a fake client, so a real player on RED cannot be an enemy Spy,
+		and frisking him for it is noise he can see: reported from play as the team calling a player
+		out as a Spy and shooting at him while he was trying to play one.
+		
+		It costs the one case where a human is on BLU through the mod's own join-blue command and
+		has disguised as a defender. That is a curiosity, and being unstabbable in it is a smaller
+		price than a Spy player being shot by his own team every wave. */
+		if (!IsFakeClient(i))
+		{
+			m_bSpyCheckSeen[actor][i] = true;
+			continue;
+		}
+
 		if (m_bSpyCheckSeen[actor][i])
 			continue;
 
