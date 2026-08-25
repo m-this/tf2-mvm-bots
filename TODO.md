@@ -208,7 +208,28 @@ the medic, three attempts: 18 deaths, 39 robots, 119 seconds, against 18, 38 and
 127 without it. No effect, and nothing proved the rule ever fired, so it was
 reverted rather than shipped as a switch nobody has evidence for.
 
-Four attempts, four measurements, and the wave is still lost every time. What is
+Two more theories were measured on the real mission and both were wrong.
+
+The engineer spends the wave failing to build. On the real wave 3 he is inside
+`DefenderBuildSentrygun` for 24 samples, walking between spots three thousand
+units apart, and his sentry is up for half the wave; across the container's life
+17 build attempts produced 8 sentries and no give-ups. `PickBuildArea` ranks
+spots against the bomb and the bomb moves up the map, and the idle action asks it
+again every one to two seconds while he has no sentry.
+
+Holding the nest for the wave instead made it worse: sentry uptime 50% to 29%,
+deaths 18 to 22, and the engineer walked further rather than less. The re-picking
+is finding him a spot he can actually reach, so the churn is a symptom of spots
+that refuse him rather than the cause of the walking.
+
+`IsTankWave` reading live wave icons was the other theory: the game clears icons
+as a wave is beaten, so the answer can flip mid-wave, and Rottenburg keeps its
+two conditional nests at opposite ends of the map. Caching it for the wave
+changed nothing here because wave 3 has no tank in it at all. The reasoning still
+holds for a wave that does, and it is worth doing when there is a tank wave to
+measure it on.
+
+Five attempts, five measurements, and the wave is still lost every time. What is
 left to try, in the order a measurement is cheapest:
 
 - Count what actually kills them by robot class and weapon on this wave rather
