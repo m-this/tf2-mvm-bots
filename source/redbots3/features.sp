@@ -110,7 +110,7 @@ void LoadFeatures()
 		"Wait for the wave beside the engineer's sentry instead of at the robots' gate.", false);
 
 	g_arrFeatureConVars[FEATURE_MEDIC_SHIELD] = MakeFeature(FEATURE_MEDIC_SHIELD,
-		"Let the medic put up the projectile shield, and buy the rage that fills it.", false);
+		"Let the medic put up the projectile shield, and buy the rage that fills it.");
 
 	g_arrFeatureConVars[FEATURE_ATTACK_STRAFE] = MakeFeature(FEATURE_ATTACK_STRAFE,
 		"A bot that has arrived at its firing position keeps sidestepping instead of standing still.");
