@@ -195,6 +195,12 @@ So the rule is the mission, `hold_the_nest`: meet them at the gate while the tea
 can afford to, hold the nest when it cannot. Decoy with the rule in place is back
 to 206 robots and both waves cleared.
 
+It ships **off**, because it does not clear the bar this file now holds
+everything to. Read with the spread beside it, the nest arm's own quartiles are
+13 to 23 deaths and they contain the gate arm's median of 22. Four waves an arm
+cannot see a difference this size. The switch is there and the measurement that
+would settle it is sixteen waves an arm against the baseline band below.
+
 What is still true after all of it: the wave is lost every time, at 18 to 23
 defender deaths an attempt. The bots do already shoot robot medics, 56 samples of
 it in one wave, so the idea this item started with is in the mod and working.
