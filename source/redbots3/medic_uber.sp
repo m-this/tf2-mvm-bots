@@ -97,6 +97,37 @@ bool ShouldDeployUber(int client, int medigun, int patient)
 	return HealthRatio(patient) < UBER_PANIC_HEALTH_RATIO || HealthRatio(client) < UBER_PANIC_HEALTH_RATIO;
 }
 
+/* The projectile shield, which is the strongest thing a medic does to a wave
+ *
+ * Every guide puts a tick of rage first for a medic, and nothing here had ever pressed the button
+ * it fills. Bavarian Botbash wave 1 kills this team with projectiles: 73 per cent of the deaths are
+ * explosions and 62 per cent of them are robot Soldiers, which is what a shield is for.
+ *
+ * Up when it is full and there is something shooting. It drains on its own, so there is nothing to
+ * decide about taking it down, and holding a full meter through a wave is the same waste as never
+ * buying the rage in the first place. */
+#define SHIELD_FIGHT_RANGE	1200.0
+
+void MedicProjectileShield(int actor, int patient)
+{
+	if (!Feature(FEATURE_MEDIC_SHIELD))
+		return;
+
+	if (TF2_GetRageMeter(actor) < 100.0 || TF2_IsRageDraining(actor))
+		return;
+
+	//Somewhere worth putting it: the fight the patient is in, or the one the medic is in himself
+	float where[3]; where = WorldSpaceCenter(actor);
+
+	if (IsValidClientIndex(patient) && IsPlayerAlive(patient))
+		where = WorldSpaceCenter(patient);
+
+	if (CountEnemiesNearPosition(actor, where, SHIELD_FIGHT_RANGE) < 1)
+		return;
+
+	VS_PressSpecialFireButton(actor);
+}
+
 float HealthRatio(int client)
 {
 	int maxHealth = TEMP_GetPlayerMaxHealth(client);

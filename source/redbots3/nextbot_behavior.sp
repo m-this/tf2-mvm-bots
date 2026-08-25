@@ -1297,6 +1297,8 @@ static void PointMedicAtBiggestBody(BehaviorAction action, int actor)
 
 void MedicUberAndResist(int actor, int medigun, int patient)
 {
+	MedicProjectileShield(actor, patient);
+
 	if (ShouldDeployUber(actor, medigun, patient))
 		VS_PressAltFireButton(actor);
 	

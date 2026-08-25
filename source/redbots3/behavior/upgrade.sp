@@ -564,7 +564,7 @@ static bool IsUpgradeWasted(int client, const char[] attribute)
 	Three hundred credits for that, ranked at the top of the Medic's list, every wave. It goes back
 	the moment something deploys it, and that is the TODO rather than this. */
 	if (StrEqual(attribute, "generate rage on heal"))
-		return true;
+		return !Feature(FEATURE_MEDIC_SHIELD);
 
 	/* Afterburn, which the wiki calls useless and a bot has even less use for
 
