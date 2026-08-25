@@ -133,11 +133,20 @@ static void ReportEngineerStall(int actor, const char[] where)
 
 static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, float interval, ActionResult result)
 {
-	int sentry    = GetObjectOfType(actor, TFObject_Sentry);
-	//Counting the one in his hands: a carried dispenser is not a reason to build a second
+	/* Counting what is in his hands, for both
+	
+	A carried building is not a reason to build a second one, and answering that question wrong is
+	what a play-test filmed: the engineer stood holding a sentry, scrolling through his weapons and
+	opening and cancelling the build menu, over and over. Two paths were undoing each other every
+	frame. The carry logic equips the wrench and presses fire to put it down; the gate below saw no
+	sentry, suspended for the build action, and that equips the toolbox and reopens the menu. */
+	int sentry    = HasObjectOfType(actor, TFObject_Sentry);
 	int dispenser = HasObjectOfType(actor, TFObject_Dispenser);
 	
-	bool stalled = sentry == INVALID_ENT_REFERENCE && GameRules_GetRoundState() == RoundState_RoundRunning;
+	//Standing, for the question of whether the nest is up: one in his hands is not defending anything
+	int sentryStanding = GetObjectOfType(actor, TFObject_Sentry);
+	
+	bool stalled = sentryStanding == INVALID_ENT_REFERENCE && GameRules_GetRoundState() == RoundState_RoundRunning;
 	
 	bool bShouldAdvance = CTFBotMvMEngineerIdle_ShouldAdvanceNestSpot(actor);
 
