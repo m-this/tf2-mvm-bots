@@ -382,6 +382,9 @@ stock void LogBuildFailure(int actor, const char[] what, const char[] why)
 		return;
 	
 	PrintToServer("[defenderbots] %s failed for %N at %.1f: %s", what, actor, GetGameTime(), why);
+
+	//The console is a stream nobody can count per run; the log is a file with the run in it
+	LogMessage("Build: %s for %N at %.1f: %s", what, actor, GetGameTime(), why);
 }
 
 /* Whether the toolbox in his hands is set to build the thing this action came here to build
