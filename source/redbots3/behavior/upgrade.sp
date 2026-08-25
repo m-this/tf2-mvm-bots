@@ -49,6 +49,14 @@ thing would otherwise buy nothing at all. */
 static int m_iSessionWallet[MAXPLAYERS + 1];
 static int m_iSpentOnUpgrade[MAXPLAYERS + 1][MAX_UPGRADES];
 
+/* What the game refused this trip, so the next choice is a different one
+ *
+ * A refusal used to end the whole shopping trip, on the reasoning that the ranking would pick the
+ * same line again and be refused until the window ran out. It would, and the answer is to remember
+ * the refusal rather than to stop shopping: ten of forty five trips measured on Bavarian Botbash
+ * ended this way, with money still in the wallet and a list still worth walking. */
+static bool m_bRefusedUpgrade[MAXPLAYERS + 1][MAX_UPGRADES];
+
 //What one more step of this upgrade would take the bot past, or false when it would not
 static bool WithinAttributeShare(int client, int index, int cost)
 {
@@ -69,6 +77,9 @@ public Action CTFBotUpgrade_OnStart(BehaviorAction action, int actor, BehaviorAc
 	
 	//The wallet this trip is measured against, and nothing spent out of it yet
 	m_iSessionWallet[actor] = TF2_GetCurrency(actor);
+
+	for (int i = 0; i < MAX_UPGRADES; i++)
+		m_bRefusedUpgrade[actor][i] = false;
 	
 	for (int index = 0; index < MAX_UPGRADES; index++)
 		m_iSpentOnUpgrade[actor][index] = 0;
@@ -147,13 +158,13 @@ public Action CTFBotUpgrade_Update(BehaviorAction action, int actor, float inter
 			refused until the window runs out, with the wave waiting on a bot that cannot spend */
 			if (!purchased)
 			{
-				SetPlayerReady(actor, true);
+				//Remembered rather than given up on: the next interval picks the next thing down
+				int refused = info.GetInt("index");
 				
-				LogUpgradeSessionEnd(actor, "the game refused one");
+				if (refused >= 0 && refused < MAX_UPGRADES)
+					m_bRefusedUpgrade[actor][refused] = true;
 				
-				delete info;
-				
-				return GetUpgradePostAction(actor, action);
+				LogUpgradeSessionEnd(actor, "the game refused one, trying the next");
 			}
 		}
 		else 
@@ -1016,6 +1027,13 @@ JSONObject CTFBotPurchaseUpgrades_ChooseUpgrade(int actor)
 		CEconItemAttributeDefinition attr = CEIAD_GetAttributeDefinitionByName(attrib);
 		if (attr.Address == Address_Null)
 			continue;
+		
+		//Already refused this trip, so asking again spends the window on the same no
+		if (m_bRefusedUpgrade[actor][info.GetInt("index")])
+		{
+			delete info;
+			continue;
+		}
 		
 		int iAttribIndex = attr.GetIndex();
 		if (!CanUpgradeWithAttrib(actor, info.GetInt("slot"), iAttribIndex, upgrades.Address))
