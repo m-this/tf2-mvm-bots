@@ -100,6 +100,16 @@ install_addons || { say "no sourcemod under $game/addons"; exit 1; }
 install_server_cfg
 say "installed the bots and the statistics plugin"
 
+# A player's server runs tf2-archipelago's plugin beside the bots, and this bed
+# did not, so nothing here could ever see a fault that needs both.
+if [ -n "${TESTBED_ARCHIPELAGO_SMX:-}" ]; then
+	[ -f "$TESTBED_ARCHIPELAGO_SMX" ] || { say "no plugin at $TESTBED_ARCHIPELAGO_SMX"; exit 1; }
+	cp -u "$TESTBED_ARCHIPELAGO_SMX" "$game/addons/sourcemod/plugins/"
+	say "and tf2-archipelago, which a player's server also runs"
+else
+	rm -f "$game/addons/sourcemod/plugins/tf2_archipelago.smx"
+fi
+
 rm -f "$stats"
 
 # Cores land in the working directory, which is where the server runs, and the
