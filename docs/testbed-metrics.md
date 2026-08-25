@@ -189,5 +189,13 @@ this file exists to find and briefly invented instead.
 - **`docker logs` retains history across container restarts.** One crash in the
   morning read as a crash in every run for the rest of the day until the check
   grew a `--since`.
+- **A popfile the game refuses leaves the map's own mission running.** Three
+  sessions of "Bavarian Botbash wave 3" were measured against Rottenburg's
+  default intermediate mission. `run.sh` reads `tf_mvm_popfile` back now. The
+  real names are in the VPK: `grep -ao 'mvm_<map>[a-z0-9_]*' tf/tf2_misc_dir.vpk`.
+- **`File.WriteLine` formats through a 2048 byte buffer.** The wave result
+  outgrew it and came out at exactly 2047 characters, which is not JSON, so
+  every reader skipped it and a four wave run read as one wave. `WriteString`
+  has no such buffer.
 - **Do not edit a shell script while it is running.** `sh` resumes at a byte
   offset; the tail of the old file becomes a new command.
