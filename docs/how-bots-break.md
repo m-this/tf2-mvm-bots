@@ -281,3 +281,18 @@ finished nest and a sniper on his perch do not trip it.
 
 It fixes nothing. It makes silent failures loud, which is the part that was
 missing.
+
+## An OnEnd that asks the result why
+
+`ActionResult.GetReason` inside an `OnEnd` callback throws, and a thrown native
+takes the whole callback with it, so everything after it is dead code that says
+nothing. It cost a session: the sentry build action looked like it was ending
+without ever reaching its own logging, and the logging was there and never ran.
+
+Sixteen build attempts in one run said `started` and nothing else. With the
+`GetReason` call removed and the same line logging only what is certainly true,
+every attempt reports: about half end holding a sentry and about half end with
+nothing.
+
+If a callback in this mod prints nothing at all, suspect a native that threw
+before the print rather than a callback that is not being called.

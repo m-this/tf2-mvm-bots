@@ -250,4 +250,13 @@ public void CTFBotMvMEngineerBuildSentrygun_OnEnd(BehaviorAction action, int act
 	g_arrPluginBot[actor].bPathing = false;
 	
 	UpdateLookAroundForEnemies(actor, true);
+	
+	/* Every way out of this action, including the ones nobody wrote a branch for
+	
+	The Done branches above name why they gave up, and a session produced far more starts than
+	endings that said anything. Asking the result for its reason here printed nothing at all, which
+	is what a thrown native looks like from the outside: it takes the callback with it. So this says
+	only what is certainly true, which is that the attempt is over and whether it left a sentry. */
+	LogBuildFailure(actor, "sentry",
+		GetObjectOfType(actor, TFObject_Sentry) != INVALID_ENT_REFERENCE ? "ended with a sentry" : "ended with nothing");
 }
