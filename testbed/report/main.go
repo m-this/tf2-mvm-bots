@@ -389,6 +389,39 @@ func compare(now, then summary) {
 	fmt.Printf("  backstabbed       %d -> %d\n", then.causeBy["backstab"], now.causeBy["backstab"])
 }
 
+/* How much a wave of this mission varies on its own, so a difference can be read
+ *
+ * Every total above is a sum over waves, and a sum hides its spread. A change was called a
+ * forty four per cent longer hold here on eight waves against eight, and the same change built a
+ * second way came back at the baseline: the arm that looked like a discovery had waves of 88 and
+ * 282 seconds in it and the difference was inside its own scatter.
+ *
+ * So the per-wave spread is printed beside the middle of it. A difference between two arms that
+ * does not clear the quartiles of either is a story, not a result.
+ */
+func spread(label string, waves []wave, pick func(wave) int) {
+	if len(waves) < 4 {
+		return
+	}
+
+	values := make([]int, 0, len(waves))
+	for _, w := range waves {
+		values = append(values, pick(w))
+	}
+	sort.Ints(values)
+
+	n := len(values)
+	fmt.Printf("    %-16s median %5d   quartiles %d to %d   range %d to %d   over %d waves\n",
+		label, values[n/2], values[n/4], values[(3*n)/4], values[0], values[n-1], n)
+}
+
+func printSpread(waves []wave) {
+	fmt.Printf("\n  how much one wave varies from the next\n")
+	spread("held for", waves, func(w wave) int { return int(w.Duration) })
+	spread("defenders died", waves, func(w wave) int { return w.DefenderDeaths })
+	spread("robots killed", waves, func(w wave) int { return w.RobotKills })
+}
+
 func main() {
 	args := os.Args[1:]
 
@@ -416,6 +449,8 @@ func main() {
 		printStanding(bots, buildings)
 		printBreak(bots)
 	}
+
+	printSpread(after)
 
 	if len(args) == 1 {
 		return

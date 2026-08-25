@@ -112,6 +112,25 @@ figure beside it said 777 units for a whole break.
 Read it with `TESTBED_BOT_MANAGER_MODE=2`. That is AUTO_BOTS, which is what
 tf2-archipelago runs, and the freeze does not show in READY_BOTS.
 
+## How much one wave varies from the next
+
+Every total in the report is a sum over waves, and a sum hides its spread. The
+report prints the per-wave median with its quartiles and range beside it, and the
+rule is simple: **a difference between two arms that does not clear the quartiles
+of either is a story, not a result.**
+
+This was learned the expensive way. A lineup change was read as a forty four per
+cent longer hold, eight waves against eight, and the same change built a second
+way came back at the baseline. The arm that looked like a discovery had waves of
+88 and 282 seconds in it:
+
+```
+    held for         median   255   quartiles 178 to 274   range 88 to 282
+```
+
+Two arms of eight can see a wave lost sixteen times out of sixteen. They cannot
+see a change in how long it is held.
+
 ## Repairs
 
 ```
