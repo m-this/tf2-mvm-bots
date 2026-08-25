@@ -326,6 +326,16 @@ baseline's quartiles. No detectable effect, so `hold_the_nest` stays off and the
 switch stays there. It is the first change on this mission that could be called
 either way with confidence rather than argued about.
 
+Also asked for from play: a Spy for the big waves. Sixteen attempts with the
+Scout's seat given to one, against the same band: 160 seconds held and 25 deaths,
+both unchanged, and 44 robots killed against a baseline of 58 whose quartiles are
+52 to 64. Outside the band and worse.
+
+The Spy is the top damage dealer on the team while he is doing it, 72102 across
+those waves against the Heavy's 62041, and the team still kills a quarter fewer
+robots. The seat he took collects the money, and money is upgrades. A class that
+does damage is not the same as a seat that is worth having.
+
 There is a baseline band for this wave now, twenty four attempts on the
 unchanged build, and it is in `docs/testbed-metrics.md`: 160 seconds held with
 quartiles of 154 to 192, 24 deaths with quartiles of 22 to 31, 58 robots killed
