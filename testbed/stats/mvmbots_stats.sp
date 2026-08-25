@@ -1891,7 +1891,8 @@ static void WriteBuildingTelemetry(int owner, int building, float when, float cl
 	FormatEx(line, sizeof(line),
 		"{\"event\":\"building\",\"map\":\"%s\",\"wave\":%d,\"t\":%.1f,\"clock\":%.1f,\"owner\":\"%s\","
 		... "\"type\":\"%s\",\"mode\":%d,\"level\":%d,\"hp\":%d,\"maxhp\":%d,\"at\":[%.0f,%.0f,%.0f],"
-		... "\"disposable\":%d,\"kills\":%d,\"enemies_seen\":%d,\"teammates_near\":%d,\"sapped\":%d}",
+		... "\"disposable\":%d,\"kills\":%d,\"enemies_seen\":%d,\"teammates_near\":%d,\"sapped\":%d,"
+		... "\"shells\":%d}",
 		g_sMap, g_iWave, when, clock, ownerName, class,
 		HasEntProp(building, Prop_Send, "m_iObjectMode") ? GetEntProp(building, Prop_Send, "m_iObjectMode") : 0,
 		GetEntProp(building, Prop_Send, "m_iUpgradeLevel"),
@@ -1899,7 +1900,13 @@ static void WriteBuildingTelemetry(int owner, int building, float when, float cl
 		at[0], at[1], at[2], disposable ? 1 : 0, kills,
 		EnemiesServedBy(building, eye, SENTRY_SERVE_RANGE),
 		TeammatesServedBy(at, DISPENSER_SERVE_RANGE),
-		GetEntProp(building, Prop_Send, "m_bHasSapper") != 0 ? 1 : 0);
+		GetEntProp(building, Prop_Send, "m_bHasSapper") != 0 ? 1 : 0,
+		/* What a sentry has left to fire, which nothing here counted
+		
+		A player reported Rescue Ranger engineers refusing to reload their sentry. A bolt repairs a
+		building and does not reload one, so a sentry at full health with an empty magazine is a
+		state the mod can sit in forever, and no number here could see it. */
+		HasEntProp(building, Prop_Send, "m_iAmmoShells") ? GetEntProp(building, Prop_Send, "m_iAmmoShells") : -1);
 
 	WriteLine(line);
 }
