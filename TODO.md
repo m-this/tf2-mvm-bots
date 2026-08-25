@@ -318,6 +318,14 @@ The lesson is the one this file keeps having to learn: an arm that is not
 replicated is a story. Eight attempts is enough to see a wave lost sixteen times
 out of sixteen and not enough to see a change in how long it is held.
 
+Asked for from play and measured against that band: the classes that fight at
+range wait at the engineer's nest and the ones that have to close wait at the
+gate, rather than the whole team doing one or the other. Sixteen attempts: 166
+seconds held, 25 deaths, 56 robots killed, every one of them inside the
+baseline's quartiles. No detectable effect, so `hold_the_nest` stays off and the
+switch stays there. It is the first change on this mission that could be called
+either way with confidence rather than argued about.
+
 There is a baseline band for this wave now, twenty four attempts on the
 unchanged build, and it is in `docs/testbed-metrics.md`: 160 seconds held with
 quartiles of 154 to 192, 24 deaths with quartiles of 22 to 31, 58 robots killed
