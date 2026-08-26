@@ -37,14 +37,19 @@ public Plugin myinfo =
 	url = "https://github.com/m-this/tf2-mvm-bots"
 };
 
-/* How many upgrade indexes to offer before giving up on a class
+/* How many upgrade indexes to offer before giving up on a subject
  *
- * The probe does not know which upgrades this bot's class and weapon accept, and asking the item
- * schema for that is a much larger plugin. So it offers them in order and watches the credits: the
- * game turns down one it does not want by not charging for it, which is the same test the mod's own
- * purchase path makes. The cap is here because every loop needs one, not because 40 is meaningful.
+ * The probe does not know which upgrades this subject's class and weapons accept, and asking the
+ * item schema for that is a much larger plugin. So it offers them in order and watches the credits:
+ * the game turns down one it does not want by not charging for it, which is the same test the mod's
+ * own purchase path makes at upgrade.sp:1157.
+ *
+ * Eighty rather than a round forty, because forty was wrong. The mod's own notes in
+ * source/redbots3/tf_upgrades.sp record that sm_dump_upgrades walked CMannVsMachineUpgradeManager
+ * and printed sixty three, and the player-attached upgrades sit past the weapon ones. A cap under
+ * the real count does not report a refusal, it reports a refusal that never asked the question.
  */
-#define PROBE_UPGRADE_LIMIT	40
+#define PROBE_UPGRADE_LIMIT	80
 
 //Long enough for the station's trigger to touch the subject it was just teleported into
 #define STATION_SETTLE		0.5
@@ -190,6 +195,27 @@ static int Credits(int client)
 		: -1;
 }
 
+/* Opening and closing the session the station opens
+ *
+ * The game does not accept a bare MVM_Upgrade. The station opens a session first and closes it
+ * after, and a purchase outside one is refused without a word: the credits simply do not move,
+ * which reads exactly like an upgrade the class cannot take. That cost three runs here, with the
+ * subject standing in the zone holding eighteen hundred credits and every one of eighty upgrades
+ * turned down across four slots.
+ *
+ * The defender mod has always done this (KV_MvM_UpgradesBegin in behavior/upgrade.sp), which is
+ * why its bots buy and this probe did not.
+ *
+ * Note the spelling. The session is MvM_UpgradesBegin and MvM_UpgradesDone, the purchase is
+ * MVM_Upgrade. The game is inconsistent about the capital V and it does not forgive it.
+ */
+static void SendSession(int client, const char[] name)
+{
+	KeyValues kv = new KeyValues(name);
+	FakeClientCommandKeyValues(client, kv);
+	delete kv;
+}
+
 //The station's own command, which is how a bot buys and how a human buys. A negative count sells.
 static void SendUpgrade(int client, int slot, int index, int count)
 {
@@ -315,13 +341,25 @@ static Action Timer_BuyAndSell(Handle timer, any userid)
 		SetEntProp(client, Prop_Send, "m_nCurrency", started + g_Bundle);
 	int held = Credits(client);
 
+	SendSession(client, "MvM_UpgradesBegin");
+
 	int slot = 0, index = 0;
 	int spent = BuyAnything(client, slot, index);
 	if (spent <= 0)
 	{
+		SendSession(client, "MvM_UpgradesDone");
 		TeleportEntity(client, g_Back, NULL_VECTOR, NULL_VECTOR);
-		Result("%N bought nothing: %d credits in the zone and no upgrade accepted. Nothing to sell.",
-			client, held);
+		/* Why it bought nothing, because the sentence on its own is not a finding.
+		 *
+		 * A subject with no weapons can only take the upgrades the game attaches to the player,
+		 * and one that is not really wearing a class cannot take those either. Saying which slots
+		 * hold a weapon turns "no upgrade accepted" from a dead end into either a fact about the
+		 * sale or a fact about the subject. */
+		char slots[64];
+		FormatEx(slots, sizeof(slots), "%d/%d/%d",
+			GetPlayerWeaponSlot(client, 0), GetPlayerWeaponSlot(client, 1), GetPlayerWeaponSlot(client, 2));
+		Result("%N bought nothing: %d credits in the zone, class %d, weapons in slots 0/1/2 are %s, and none of %d upgrades was accepted. Nothing to sell.",
+			client, held, view_as<int>(TF2_GetPlayerClass(client)), slots, PROBE_UPGRADE_LIMIT);
 		return Plugin_Stop;
 	}
 
@@ -330,6 +368,7 @@ static Action Timer_BuyAndSell(Handle timer, any userid)
 	int afterSell = Credits(client);
 	int returned = afterSell - afterBuy;
 
+	SendSession(client, "MvM_UpgradesDone");
 	TeleportEntity(client, g_Back, NULL_VECTOR, NULL_VECTOR);
 
 	// One line, the same shape as the statistics plugin's, so two probes diff against each other.
