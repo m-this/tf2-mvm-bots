@@ -20,3 +20,6 @@
 {"id":"int-0cab8d67a910695d59bcfbcf74c28e0d","kind":"field_change","created_at":"2026-08-26T07:27:07.400646322Z","actor":"omae-beads","issue_id":"mvm-zx0","extra":{"field":"priority","new_value":"2","old_value":"1"}}
 {"id":"int-e6412e21c5cb6884614b69d36f6ef8d0","kind":"field_change","created_at":"2026-08-26T07:29:02.419334773Z","actor":"omae-beads","issue_id":"mvm-gwq","extra":{"field":"priority","new_value":"0","old_value":"1"}}
 {"id":"int-6abf2e20b116c9a2ed5034d89cf32d56","kind":"field_change","created_at":"2026-08-26T08:05:20.572231827Z","actor":"omae-beads","issue_id":"mvm-1oj","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}
+{"id":"int-7b6267b8280c48b85ef2b16306e80bd6","kind":"field_change","created_at":"2026-08-26T08:06:19.872752539Z","actor":"omae-beads","issue_id":"mvm-ph0","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}
+{"id":"int-6f21cbf1e288b3089990d1e75bd0fbc1","kind":"field_change","created_at":"2026-08-26T08:07:29.633007415Z","actor":"omae-beads","issue_id":"mvm-e5r","extra":{"field":"priority","new_value":"1","old_value":"2"}}
+{"id":"int-3ada02da7d2e072703a2cf6adb1d5783","kind":"field_change","created_at":"2026-08-26T08:07:51.206552556Z","actor":"omae-beads","issue_id":"mvm-6dc","extra":{"field":"priority","new_value":"1","old_value":"2"}}
