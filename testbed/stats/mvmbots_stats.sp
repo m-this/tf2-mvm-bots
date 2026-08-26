@@ -2008,10 +2008,34 @@ static void SampleDuplicateBuildings(float when, float clock)
 				char name[MAX_NAME_LENGTH]; GetClientName(i, name, sizeof(name));
 				char line[ENGINEER_LINE_LENGTH];
 
+				/* And what the mod's own question answers for the same client
+				
+				held and built come from walking the entities by m_hBuilder. Everything in the mod
+				asks TF2Util_GetPlayerObject instead, and nothing has ever compared the two. If the
+				list is short the gates cannot see the second building, refuse nothing, and the
+				engineer is free to build again: that would put the fix in GetObjectOfType rather
+				than in any caller. If the two agree, the list is fine and the second was built in
+				a frame where the first was not in it yet. */
+				int listed = 0;
+				int objects = TF2Util_GetPlayerObjectCount(i);
+
+				for (int o = 0; o < objects; o++)
+				{
+					int owned = TF2Util_GetPlayerObject(i, o);
+
+					if (owned == -1 || !IsValidEntity(owned))
+						continue;
+
+					char owning[64]; GetEntityClassname(owned, owning, sizeof(owning));
+
+					if (StrEqual(owning, types[t]))
+						listed++;
+				}
+
 				FormatEx(line, sizeof(line),
 					"{\"event\":\"duplicate\",\"map\":\"%s\",\"wave\":%d,\"t\":%.1f,\"clock\":%.1f,"
-					... "\"owner\":\"%s\",\"type\":\"%s\",\"mode\":%d,\"held\":%d,\"built\":%d}",
-					g_sMap, g_iWave, when, clock, name, types[t], mode, held[i][mode], built[i][mode]);
+					... "\"owner\":\"%s\",\"type\":\"%s\",\"mode\":%d,\"held\":%d,\"built\":%d,\"listed\":%d}",
+					g_sMap, g_iWave, when, clock, name, types[t], mode, held[i][mode], built[i][mode], listed);
 
 				WriteLine(line);
 			}
