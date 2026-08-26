@@ -119,7 +119,18 @@ public Action CTFBotUpgrade_OnStart(BehaviorAction action, int actor, BehaviorAc
  * out of things it was willing to buy. Those are three different faults and nothing said which. */
 static void LogUpgradeSessionEnd(int actor, const char[] why)
 {
-	LogMessage("Shopping: %N stopped, %s, %d credits left", actor, why, TF2_GetCurrency(actor));
+	/* And what the wave looked like while he was spending
+	
+	A resistance is ranked at 210 when the coming wave deals that damage and 25 when it does not,
+	so the three answers below decide whether a resistance was ever worth buying on this trip.
+	Reported from play as "the bots really need to buy resistance upgrades", and the ranking was
+	already there and already ahead of most of the table: what nobody could see was whether
+	WaveHasClassIcon had anything to read. tf_objective_resource carries the wave bar, and a trip
+	that shops before the game has filled it in sees an empty wave and prices every resistance at
+	nothing. */
+	LogMessage("Shopping: %N stopped, %s, %d credits left, wave deals blast=%d bullet=%d fire=%d",
+		actor, why, TF2_GetCurrency(actor),
+		WaveHasExplosiveRobots(), WaveHasBulletRobots(), WaveHasFireRobots());
 }
 
 public Action CTFBotUpgrade_Update(BehaviorAction action, int actor, float interval, ActionResult result)
