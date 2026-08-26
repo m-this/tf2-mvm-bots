@@ -96,8 +96,12 @@ void LoadFeatures()
 	g_arrFeatureConVars[FEATURE_WAVE_RESISTANCES] = MakeFeature(FEATURE_WAVE_RESISTANCES,
 		"Buy the resistance the coming wave's robots call for, rather than ranking resistances last.");
 
+	/* Measured and switched off: six waves of Decoy, defender deaths per wave
+	   [0,3,5,7,9,10] without it against [11,12,14,15,15,17] with it. The two
+	   spreads do not touch, so the worst wave without the mini beat the best
+	   wave with it. Sentries lost doubled, 7 against 14. See mvm-8ws. */
 	g_arrFeatureConVars[FEATURE_ENGINEER_DISPOSABLE] = MakeFeature(FEATURE_ENGINEER_DISPOSABLE,
-		"The engineer buys the disposable sentry and stands a mini beside his nest.");
+		"The engineer buys the disposable sentry and stands a mini beside his nest.", false);
 
 	g_arrFeatureConVars[FEATURE_SOLDIER_CLOSES_IN] = MakeFeature(FEATURE_SOLDIER_CLOSES_IN,
 		"A rocket is fought at a grenade's distance rather than twelve hundred units out.");
