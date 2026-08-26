@@ -25,3 +25,4 @@
 {"id":"int-3ada02da7d2e072703a2cf6adb1d5783","kind":"field_change","created_at":"2026-08-26T08:07:51.206552556Z","actor":"omae-beads","issue_id":"mvm-6dc","extra":{"field":"priority","new_value":"1","old_value":"2"}}
 {"id":"int-f67fd150496ac0af7f9c7a788436c05e","kind":"field_change","created_at":"2026-08-26T08:33:36.317149228Z","actor":"m-this","issue_id":"mvm-d7j","extra":{"field":"status","new_value":"blocked","old_value":"open"}}
 {"id":"int-a35ab87cd62594b0ef7fa96419035db1","kind":"field_change","created_at":"2026-08-26T08:42:29.632381777Z","actor":"omae-beads","issue_id":"mvm-y7e","extra":{"field":"status","new_value":"deferred","old_value":"open"}}
+{"id":"int-ea2876411dd024cd19085591ea7a05bf","kind":"field_change","created_at":"2026-08-26T15:30:20.426165212Z","actor":"m-this","issue_id":"mvm-oh7","extra":{"field":"status","new_value":"open","old_value":"closed"}}
