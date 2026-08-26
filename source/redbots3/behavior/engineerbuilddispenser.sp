@@ -48,6 +48,17 @@ there. Eight of them, which is a look from every side at forty five degrees. */
 #define DISPENSER_TRY_POINTS	8
 #define DISPENSER_TRY_TIME		2.0
 
+/* How long one build press is given to land before another is allowed
+
+The press puts the building down on the tick after it, so asking the game whether a dispenser
+exists in the same frame asks a question it has not answered yet. It answered "none", and the
+action pressed fire again: two dispensers standing, one engineer, and the test-bed counting
+held:2 built:2 listed:2 eighteen times in four waves.
+
+Long enough for the game to act and short enough that a press the game refused is retried while
+the engineer is still looking at the spot. */
+#define DISPENSER_PRESS_SETTLE	0.3
+
 /* How long he may spend on the whole business before he goes back to the wave
 
 The readiness gate holds a wave until the engineer's nest is finished, and a nest is not finished
@@ -62,6 +73,8 @@ arrive. */
 static float m_ctDispenserReachDeadline[MAXPLAYERS + 1];
 static float m_ctDispenserGiveUpTime[MAXPLAYERS + 1];
 static float m_ctDispenserTryDeadline[MAXPLAYERS + 1];
+//When the last build press is allowed to have landed, so the next frame is not another press
+static float m_ctDispenserPressed[MAXPLAYERS + 1];
 static int m_iDispenserTry[MAXPLAYERS + 1];
 static float m_vDispenserSpot[MAXPLAYERS + 1][3];
 static float m_vDispenserStand[MAXPLAYERS + 1][3];
@@ -83,6 +96,7 @@ public Action CTFBotMvMEngineerBuildDispenser_OnStart(BehaviorAction action, int
 	
 	m_ctDispenserGiveUpTime[actor] = GetGameTime() + DISPENSER_BUILD_TIME;
 	m_ctDispenserTryDeadline[actor] = GetGameTime() + DISPENSER_TRY_TIME;
+	m_ctDispenserPressed[actor] = 0.0;
 	m_iDispenserTry[actor] = 0;
 	
 	//Once, here, because the Update runs every tick and a path computation does not belong there
@@ -225,16 +239,28 @@ public Action CTFBotMvMEngineerBuildDispenser_Update(BehaviorAction action, int 
 		}
 	}
 	
-	VS_PressFireButton(actor);
+	/* Asked before the press, not after it
 	
+	It used to press and then ask in the same frame, which is a frame too early: the answer was
+	always "no dispenser", so the next tick pressed again and put a second one down. */
 	int dispenser = GetObjectOfType(actor, TFObject_Dispenser);
 	
-	if (dispenser == INVALID_ENT_REFERENCE)
+	if (dispenser != INVALID_ENT_REFERENCE)
+	{
+		SetPlayerReady(actor, true);
+		
+		return action.Done("Built a dispenser");
+	}
+	
+	//A press already given its chance is not given another until the game has had its tick
+	if (GetGameTime() < m_ctDispenserPressed[actor])
 		return action.Continue();
 	
-	SetPlayerReady(actor, true);
+	m_ctDispenserPressed[actor] = GetGameTime() + DISPENSER_PRESS_SETTLE;
 	
-	return action.Done("Built a dispenser");
+	VS_PressFireButton(actor);
+	
+	return action.Continue();
 }
 
 /* One build's reach short of the spot, on the side the try asks for, and on ground he can stand on

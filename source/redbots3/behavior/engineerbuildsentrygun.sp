@@ -23,6 +23,9 @@ bad ground, and the answer to that is to stand somewhere else. Re-scoring the ne
 refusal, which is what this did, threw away a good spot for a bad reason and cost a full pass over
 the nav mesh every time it happened. */
 #define SENTRY_TRY_POINTS	8
+//Long enough for the game to act on a press, short enough to retry one it refused
+#define SENTRY_PRESS_SETTLE		0.3
+
 #define SENTRY_TRY_TIME		1.5
 
 /* How long the walk and the whole business may take
@@ -45,6 +48,8 @@ idle action, which scores a nest again and tries afresh. */
 static float m_ctSentryReachDeadline[MAXPLAYERS + 1];
 static float m_ctSentryGiveUpTime[MAXPLAYERS + 1];
 static float m_ctSentryTryDeadline[MAXPLAYERS + 1];
+//When the last build press is allowed to have landed, so the next frame is not another press
+static float m_ctSentryPressed[MAXPLAYERS + 1];
 static int m_iSentryTry[MAXPLAYERS + 1];
 static float m_vSentrySpot[MAXPLAYERS + 1][3];
 static float m_vSentryStand[MAXPLAYERS + 1][3];
@@ -66,6 +71,7 @@ public Action CTFBotMvMEngineerBuildSentrygun_OnStart(BehaviorAction action, int
 	
 	m_ctSentryGiveUpTime[actor] = GetGameTime() + SENTRY_BUILD_TIME;
 	m_ctSentryTryDeadline[actor] = GetGameTime() + SENTRY_TRY_TIME;
+	m_ctSentryPressed[actor] = 0.0;
 	m_iSentryTry[actor] = 0;
 	
 	if (GameRules_GetRoundState() == RoundState_BetweenRounds)
@@ -184,7 +190,19 @@ public Action CTFBotMvMEngineerBuildSentrygun_Update(BehaviorAction action, int 
 		if (objBeingBuilt == -1)
 			return action.Continue();
 		
-		VS_PressFireButton(actor);
+		/* One press, then a tick for the game to act on it
+		
+		The check at the end of this function runs in the same frame as this press, so it asks
+		whether a sentry exists before the game has put one down. It answered no, the action
+		carried on, and the toolbox re-armed: another press, another building. Measured on the
+		dispenser, which has the same shape and which the test-bed caught standing twice under one
+		engineer. */
+		if (GetGameTime() >= m_ctSentryPressed[actor])
+		{
+			m_ctSentryPressed[actor] = GetGameTime() + SENTRY_PRESS_SETTLE;
+			
+			VS_PressFireButton(actor);
+		}
 		
 		/* The game says no from here, so try looking at it from the next side round
 		
