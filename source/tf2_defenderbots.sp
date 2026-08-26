@@ -319,7 +319,7 @@ public void OnPluginStart()
 	redbots_manager_team_composition = CreateConVar("sm_redbots_manager_team_composition", "", "The classes the bots fill RED with, in order, comma-separated. Overrides the lineup mode and the blacklist. Example: engineer,medic,heavyweapons,soldier,demoman", FCVAR_NOTIFY);
 	redbots_manager_kick_bots = CreateConVar("sm_redbots_manager_kick_bots", "0", "Kick bots on wave failure/completion. A kicked bot is replaced by a new one that owns nothing, so this throws away every upgrade the team bought.", FCVAR_NOTIFY);
 	redbots_manager_min_players = CreateConVar("sm_redbots_manager_min_players", "3", "Minimum players for normal missions. Other difficulties are adjusted based on this value. Set to -1 to disable entirely.", FCVAR_NOTIFY, true, -1.0, true, float(MAXPLAYERS));
-	redbots_manager_defender_team_size = CreateConVar("sm_redbots_manager_defender_team_size", "6", _, FCVAR_NOTIFY);
+	redbots_manager_defender_team_size = CreateConVar("sm_redbots_manager_defender_team_size", "6", "How many seats RED holds. Mann vs Machine has its own limit and this is clamped to it.", FCVAR_NOTIFY, true, 1.0, true, float(MAXPLAYERS));
 	redbots_manager_ready_cooldown = CreateConVar("sm_redbots_manager_ready_cooldown", "30.0", _, FCVAR_NOTIFY, true, 0.0);
 	redbots_manager_keep_bot_upgrades = CreateConVar("sm_redbots_manager_keep_bot_upgrades", "1", "Let bots that survive a failed wave keep what they bought, instead of refunding it and making them shop again from nothing.", FCVAR_NOTIFY);
 	redbots_manager_bot_upgrade_interval = CreateConVar("sm_redbots_manager_bot_upgrade_interval", "0.1", _, FCVAR_NOTIFY);
@@ -350,6 +350,7 @@ public void OnPluginStart()
 	redbots_manager_bot_rtd_variance = CreateConVar("sm_redbots_manager_bot_rtd_variance", "15.0", _, FCVAR_NOTIFY);
 #endif
 	
+	HookConVarChange(redbots_manager_defender_team_size, ConVarChanged_DefenderTeamSize);
 	HookConVarChange(redbots_manager_mode, ConVarChanged_ManagerMode);
 	HookConVarChange(redbots_manager_bot_lineup_mode, ConVarChanged_BotLineupMode);
 	
@@ -2624,6 +2625,46 @@ bool IsBotClassBlacklisted(const char[] class)
 	}
 
 	return false;
+}
+
+/* Ask the game for the seats first, and settle for what it gives.
+
+Reported as "i tried changing the number to 12 but then it stops adding bots", which left a player
+with fewer bots at twelve than at six. Nothing here ever touched tf_mvm_defenders_team_size, so the
+game kept refusing RED past its own number while this asked for twelve, and the bots went nowhere.
+
+Mann vs Machine is built around six: the upgrade station, the ready panel and the scoreboard all
+assume it. Whether the game accepts more is the game's answer and not ours, so this asks and then
+reads back rather than assuming either way. What it reads back is the ceiling, and this convar is
+clamped to it so every place that reads the number gets one the game will honour.
+
+Failing loudly at seven beats spawning nothing at twelve. */
+public void ConVarChanged_DefenderTeamSize(ConVar convar, const char[] before, const char[] after)
+{
+	int wanted = convar.IntValue;
+
+	ConVar gameSize = FindConVar("tf_mvm_defenders_team_size");
+
+	if (gameSize == null)
+	{
+		LogMessage("Team size: the game has no tf_mvm_defenders_team_size, so %d is taken as given", wanted);
+		return;
+	}
+
+	if (gameSize.IntValue != wanted)
+		gameSize.SetInt(wanted);
+
+	int allowed = gameSize.IntValue;
+
+	if (allowed == wanted)
+		return;
+
+	LogMessage("Team size: asked the game for %d, it allows %d. Clamping, or no bot would be added at all",
+		wanted, allowed);
+	PrintToChatAll("%s RED holds %d, not %d: the game refused the rest.", PLUGIN_PREFIX, allowed, wanted);
+
+	//The hook fires again on this write, and the second pass returns at the equality above
+	convar.SetInt(allowed);
 }
 
 void AddRandomDefenderBots(int amount)
