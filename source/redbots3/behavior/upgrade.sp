@@ -773,7 +773,15 @@ static int ClassUpgradePriority(TFClassType pclass, int slot, const char[] attri
 
 			behavior/engineerbuilddisposable.sp stands it beside the real one now, on ground that
 			can see what the real one sees, so the upgrade buys what it is supposed to buy. */
-			if (StrEqual(attribute, "engy disposable sentries")) return 310;
+			/* Off, this is not bought at all rather than bought late
+			
+			Two players have now reported the mini as the wrong purchase, and a third report was
+			"3 sentries with 2 engineers, THIS IS NOT POSSIBLE" — which it is, and this line is
+			how. At 310 it outranks building health at 260 and metal capacity at 210, so it is
+			bought before the nest is durable. Ranking it lower would still buy it on a rich wave,
+			and the objection is to buying it, so the switch refuses it outright. See mvm-8ws. */
+			if (StrEqual(attribute, "engy disposable sentries"))
+				return Feature(FEATURE_ENGINEER_DISPOSABLE) ? 310 : -10;
 			
 			if (StrEqual(attribute, "engy building health bonus")) return 260;
 			if (StrEqual(attribute, "metal regen")) return 220;

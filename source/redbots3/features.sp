@@ -27,6 +27,7 @@ enum
 	FEATURE_NEST_ZONES,
 	FEATURE_READY_WHEN_PREPARED,
 	FEATURE_WAVE_RESISTANCES,
+	FEATURE_ENGINEER_DISPOSABLE,
 	FEATURE_ATTACK_STRAFE,
 	FEATURE_SOLDIER_CLOSES_IN,
 	FEATURE_MEDIC_POCKETS_BIGGEST,
@@ -47,6 +48,7 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"nest_zones",
 	"ready_when_prepared",
 	"wave_resistances",
+	"engineer_disposable",
 	"attack_strafe",
 	"soldier_closes_in",
 	"medic_pockets_biggest",
@@ -93,6 +95,9 @@ void LoadFeatures()
 
 	g_arrFeatureConVars[FEATURE_WAVE_RESISTANCES] = MakeFeature(FEATURE_WAVE_RESISTANCES,
 		"Buy the resistance the coming wave's robots call for, rather than ranking resistances last.");
+
+	g_arrFeatureConVars[FEATURE_ENGINEER_DISPOSABLE] = MakeFeature(FEATURE_ENGINEER_DISPOSABLE,
+		"The engineer buys the disposable sentry and stands a mini beside his nest.");
 
 	g_arrFeatureConVars[FEATURE_SOLDIER_CLOSES_IN] = MakeFeature(FEATURE_SOLDIER_CLOSES_IN,
 		"A rocket is fought at a grenade's distance rather than twelve hundred units out.");
