@@ -2422,6 +2422,31 @@ public Action Command_DumpCredits(int client, int args)
 	return Plugin_Handled;
 }
 
+/* Take a bot's buildings down before it leaves the server
+
+A sentry outlives the engineer that placed it, and the mod holds hooks on both. Kicking the owner
+and leaving the building standing is the shape of crash a reseat can cause and an ordinary wave
+cannot, so every path that removes a bot mid-mission goes through here first.
+
+Everything it owns, not only the sentry: a dispenser and both ends of a teleporter are the same
+question */
+static void ClearBuildingsBeforeKick(int client)
+{
+	for (int i = TF2Util_GetPlayerObjectCount(client) - 1; i >= 0; i--)
+	{
+		int building = TF2Util_GetPlayerObject(client, i);
+
+		if (IsValidEntity(building))
+			RemoveEntity(building);
+	}
+
+	//The one the game already took out of that list, because he was carrying it
+	int carried = TF2_GetCarriedObject(client);
+
+	if (carried != -1 && IsValidEntity(carried))
+		RemoveEntity(carried);
+}
+
 /* Send the whole team back through the join path, and say how many went
 
 A lineup change kicks only the bots the new list has no seat for, which is right and is nobody at
@@ -2439,6 +2464,7 @@ int RecycleDefenderBots()
 		if (IsClientInGame(i) && IsDefenderBot(i) && TF2_GetClientTeam(i) == TFTeam_Red)
 		{
 			kicked++;
+			ClearBuildingsBeforeKick(i);
 			KickClient(i, "BotManager3: the team changed");
 		}
 	}
@@ -2530,6 +2556,11 @@ int ReseatDefenderBots()
 	for (int i = 0; i < bots.Length && kicked < missing; i++)
 	{
 		int client = bots.Get(i);
+
+		//Rechecked rather than trusted: the list was taken before the first kick
+		if (!IsClientInGame(client))
+			continue;
+
 		int class = view_as<int>(TF2_GetPlayerClass(client));
 
 		if (spare[class] < 1)
@@ -2537,6 +2568,7 @@ int ReseatDefenderBots()
 
 		spare[class]--;
 		kicked++;
+		ClearBuildingsBeforeKick(client);
 		KickClient(client, "BotManager3: the lineup changed");
 	}
 
