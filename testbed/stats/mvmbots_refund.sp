@@ -63,6 +63,9 @@ public Plugin myinfo =
  */
 #define PROBE_ATTRIB_LIMIT	20
 
+//Not a slot the game has, so it cannot collide with -1 meaning the player
+#define PROBE_ANY_SLOT		-99
+
 //Weapon slots to try, in the order the station lists them. -1 is the player, which is where resistances live.
 static const int ProbeSlots[] = {-1, 0, 1, 2};
 
@@ -88,7 +91,7 @@ public void OnPluginStart()
 	BuildPath(Path_SM, g_ResultPath, sizeof(g_ResultPath), "logs/mvmbots_refund.jsonl");
 
 	RegServerCmd("mvmbots_refund_probe", Command_Probe,
-		"Buy and sell an upgrade. Arguments: credits to write on first (0 for none), then host or bot.");
+		"Buy and sell an upgrade. Arguments: credits to write on first (0 for none), host or bot, and a slot (-1 player, 0-2 weapons, any).");
 }
 
 /* The bot to experiment on
@@ -303,10 +306,16 @@ static void SendUpgrade(int client, int slot, int index, int count)
  * back so the sale can name the same one: selling a different upgrade would answer a different
  * question.
  */
-static int BuyAnything(int client, int &slotOut, int &indexOut)
+static int BuyAnything(int client, int &slotOut, int &indexOut, int onlySlot)
 {
 	for (int s = 0; s < sizeof(ProbeSlots); s++)
 	{
+		// A run can name the slot it cares about. The first upgrade any subject accepts is a
+		// player one, so left to itself this never tests a weapon, and a weapon upgrade lives on
+		// a different entity and is refunded down a different path.
+		if (onlySlot != PROBE_ANY_SLOT && ProbeSlots[s] != onlySlot)
+			continue;
+
 		for (int index = 0; index < PROBE_UPGRADE_LIMIT; index++)
 		{
 			int before = Credits(client);
@@ -328,6 +337,7 @@ static int BuyAnything(int client, int &slotOut, int &indexOut)
 static bool g_Running;
 static int g_Bundle;
 static bool g_OnHost;
+static int g_OnlySlot;
 static float g_Back[3];
 
 public Action Command_Probe(int argc)
@@ -358,6 +368,14 @@ public Action Command_Probe(int argc)
 	{
 		PrintToServer("[refund-probe] this server has no m_nCurrency. Nothing done.");
 		return Plugin_Handled;
+	}
+
+	g_OnlySlot = PROBE_ANY_SLOT;
+	if (argc >= 3)
+	{
+		char arg[8]; GetCmdArg(3, arg, sizeof(arg));
+		if (!StrEqual(arg, "any", false))
+			g_OnlySlot = StringToInt(arg);
 	}
 
 	g_Bundle = 0;
@@ -418,7 +436,7 @@ static Action Timer_BuyAndSell(Handle timer, any userid)
 	int nBefore = Attribs(client, defsBefore, valuesBefore);
 
 	int slot = 0, index = 0;
-	int spent = BuyAnything(client, slot, index);
+	int spent = BuyAnything(client, slot, index, g_OnlySlot);
 	if (spent <= 0)
 	{
 		SendSession(client, "MvM_UpgradesDone");
@@ -432,8 +450,8 @@ static Action Timer_BuyAndSell(Handle timer, any userid)
 		char slots[64];
 		FormatEx(slots, sizeof(slots), "%d/%d/%d",
 			GetPlayerWeaponSlot(client, 0), GetPlayerWeaponSlot(client, 1), GetPlayerWeaponSlot(client, 2));
-		Result("%N bought nothing: %d credits in the zone, class %d, weapons in slots 0/1/2 are %s, and none of %d upgrades was accepted. Nothing to sell.",
-			client, held, view_as<int>(TF2_GetPlayerClass(client)), slots, PROBE_UPGRADE_LIMIT);
+		Result("%N bought nothing in slot %d: %d credits in the zone, class %d, weapons in slots 0/1/2 are %s, and none of %d upgrades was accepted. Nothing to sell.",
+			client, g_OnlySlot, held, view_as<int>(TF2_GetPlayerClass(client)), slots, PROBE_UPGRADE_LIMIT);
 		return Plugin_Stop;
 	}
 
