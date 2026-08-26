@@ -359,7 +359,11 @@ static Action Timer_PlayerSpawn(Handle timer, int data)
 		
 		//Bots don't get their credits set when joining red because CTFGameRules::GetTeamAssignmentOverride ignores bot players
 		//Set their credits manually to what they should have like human players
-		TF2_SetCurrency(data, GetStartingCurrency(g_iPopulationManager) + GetAcquiredCreditsOfAllWaves());
+		//
+		//The third term is Archipelago's. The first two come from the game's own record of the
+		//wave, which never saw a Cash Bundle: without it a bot that rejoins or changes class
+		//comes back with every bundle it was paid missing. Zero on a server without the plugin.
+		SetCurrencyWithBundles(data, GetStartingCurrency(g_iPopulationManager) + GetAcquiredCreditsOfAllWaves());
 		
 		//Set the bot's field-of-view to 90
 		//Its vision FOV will update in CTFBotMainAction::Update based on the property m_iFOV
