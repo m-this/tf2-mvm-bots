@@ -129,6 +129,7 @@ say "starting srcds on $map, port $TESTBED_PORT"
 	cd "$TESTBED_NATIVE_ROOT"
 	exec env LD_LIBRARY_PATH=".:bin:$TESTBED_NATIVE_ROOT/bin:${LD_LIBRARY_PATH:-}" \
 		./srcds_linux -game tf -console -usercon -norestart \
+		${TESTBED_SRCDS_EXTRA:-} \
 		+fps_max 120 -tickrate 66 -ip 0 \
 		-port "$TESTBED_PORT" +maxplayers 32 +map "$map" \
 		+rcon_password "$TESTBED_RCONPW" +sv_setsteamaccount 0 \
