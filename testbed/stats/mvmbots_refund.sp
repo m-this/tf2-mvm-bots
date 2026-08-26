@@ -24,6 +24,7 @@
 
 #include <sourcemod>
 #include <tf2_stocks>
+#include <tf2attributes>
 
 #pragma semicolon 1
 #pragma newdecls required
@@ -53,6 +54,14 @@ public Plugin myinfo =
 
 //Long enough for the station's trigger to touch the subject it was just teleported into
 #define STATION_SETTLE		0.5
+
+/* How many attributes to read off one entity
+ *
+ * An upgrade is an attribute, so whether a sale took is answerable by reading the attributes before
+ * the buy and after the sale rather than by reading the balance. A player carries a handful; twenty
+ * is the include's own default and there is no reason to want more.
+ */
+#define PROBE_ATTRIB_LIMIT	20
 
 //Weapon slots to try, in the order the station lists them. -1 is the player, which is where resistances live.
 static const int ProbeSlots[] = {-1, 0, 1, 2};
@@ -184,6 +193,66 @@ static int ProbeSubject()
 			continue;
 
 		return client;
+	}
+	return -1;
+}
+
+/* The attributes on an entity, so the same list can be taken twice and compared
+ *
+ * This is the measurement the balance could not make. The credits coming back says the game
+ * accepted the sale; it does not say the upgrade came off. A sale that refunds and leaves the
+ * attribute in place is the reported bug and passes every test of the balance.
+ */
+static int Attribs(int entity, int[] defs, float[] values)
+{
+	int count = TF2Attrib_ListDefIndices(entity, defs, PROBE_ATTRIB_LIMIT);
+	if (count > PROBE_ATTRIB_LIMIT)
+		count = PROBE_ATTRIB_LIMIT;
+
+	for (int i = 0; i < count; i++)
+	{
+		Address attrib = TF2Attrib_GetByDefIndex(entity, defs[i]);
+		values[i] = attrib == Address_Null ? 0.0 : TF2Attrib_GetValue(attrib);
+	}
+	return count;
+}
+
+//The value of one attribute on an entity, or zero when it is not there at all
+static float AttribValue(int entity, int def)
+{
+	Address attrib = TF2Attrib_GetByDefIndex(entity, def);
+	return attrib == Address_Null ? 0.0 : TF2Attrib_GetValue(attrib);
+}
+
+/* The attribute the buy put on, found by taking the list twice
+ *
+ * Naming it from the upgrade index would mean reading CMannVsMachineUpgradeManager, which is the
+ * mod's gamedata and not this plugin's. Comparing before with after needs none of that: whatever
+ * appeared, or changed value, is what was bought.
+ */
+static int BoughtAttrib(const int[] before, int nBefore, const float[] valuesBefore,
+	const int[] after, int nAfter, const float[] valuesAfter, float &wanted)
+{
+	for (int i = 0; i < nAfter; i++)
+	{
+		bool seen = false;
+		for (int j = 0; j < nBefore; j++)
+		{
+			if (before[j] != after[i])
+				continue;
+			seen = true;
+			if (valuesBefore[j] != valuesAfter[i])
+			{
+				wanted = valuesAfter[i];
+				return after[i];
+			}
+			break;
+		}
+		if (!seen)
+		{
+			wanted = valuesAfter[i];
+			return after[i];
+		}
 	}
 	return -1;
 }
@@ -343,6 +412,11 @@ static Action Timer_BuyAndSell(Handle timer, any userid)
 
 	SendSession(client, "MvM_UpgradesBegin");
 
+	// The player carries the slot -1 upgrades. A weapon upgrade lands on the weapon, so the
+	// entity that is read has to be the one the upgrade was bought for, decided after the buy.
+	int defsBefore[PROBE_ATTRIB_LIMIT]; float valuesBefore[PROBE_ATTRIB_LIMIT];
+	int nBefore = Attribs(client, defsBefore, valuesBefore);
+
 	int slot = 0, index = 0;
 	int spent = BuyAnything(client, slot, index);
 	if (spent <= 0)
@@ -364,24 +438,58 @@ static Action Timer_BuyAndSell(Handle timer, any userid)
 	}
 
 	int afterBuy = Credits(client);
+
+	/* Which entity the upgrade landed on
+	 *
+	 * A slot -1 upgrade is attached to the player. Anything else is attached to the weapon in that
+	 * slot, and reading the player for it would report every sale as clean because the attribute
+	 * was never there to begin with. */
+	int carrier = slot == -1 ? client : GetPlayerWeaponSlot(client, slot);
+	if (carrier == -1)
+		carrier = client;
+
+	int defsAfter[PROBE_ATTRIB_LIMIT]; float valuesAfter[PROBE_ATTRIB_LIMIT];
+	int nAfter = Attribs(carrier, defsAfter, valuesAfter);
+
+	float bought = 0.0;
+	int attrib = carrier == client
+		? BoughtAttrib(defsBefore, nBefore, valuesBefore, defsAfter, nAfter, valuesAfter, bought)
+		: -1;
+	// A weapon carrier has no before-list of its own, so the attribute is whatever it now holds
+	// that the player does not. One entry is enough: the buy applied exactly one upgrade.
+	if (carrier != client && nAfter > 0)
+	{
+		attrib = defsAfter[0];
+		bought = valuesAfter[0];
+	}
+
 	SendUpgrade(client, slot, index, -1);
 	int afterSell = Credits(client);
 	int returned = afterSell - afterBuy;
+
+	float left = attrib == -1 ? 0.0 : AttribValue(carrier, attrib);
+	// The upgrade came off when the attribute is gone, or back to what it was worth before.
+	bool removed = attrib == -1 ? false : (left != bought);
 
 	SendSession(client, "MvM_UpgradesDone");
 	TeleportEntity(client, g_Back, NULL_VECTOR, NULL_VECTOR);
 
 	// One line, the same shape as the statistics plugin's, so two probes diff against each other.
-	Result("{\"subject\":\"%s\",\"bundle\":%d,\"started\":%d,\"held\":%d,\"slot\":%d,\"upgrade\":%d,\"spent\":%d,\"after_buy\":%d,\"after_sell\":%d,\"returned\":%d,\"sale_took\":%s}",
+	Result("{\"subject\":\"%s\",\"bundle\":%d,\"started\":%d,\"held\":%d,\"slot\":%d,\"upgrade\":%d,\"spent\":%d,\"after_buy\":%d,\"after_sell\":%d,\"returned\":%d,\"credits_back\":%s,\"attrib\":%d,\"attrib_bought\":%.3f,\"attrib_after_sell\":%.3f,\"upgrade_removed\":%s}",
 		g_OnHost ? "host" : "bot", g_Bundle, started, held, slot, index, spent, afterBuy, afterSell, returned,
-		returned == spent ? "true" : "false");
+		returned == spent ? "true" : "false", attrib, bought, left, removed ? "true" : "false");
 
-	if (returned == spent)
-		Result("the sale came back in full.");
-	else if (returned == 0)
-		Result("the sale returned nothing: the upgrade stayed bought and the credits stayed spent.");
+	if (attrib == -1)
+		Result("the buy put no attribute anywhere this probe can read, so the sale cannot be judged.");
+	else if (returned == spent && removed)
+		Result("the sale took: the credits came back and the upgrade came off.");
+	else if (returned == spent && !removed)
+		Result("THE REPORTED BUG: the credits came back and the upgrade stayed on at %.3f.", left);
+	else if (returned == 0 && !removed)
+		Result("the sale did nothing at all: no credits back and the upgrade still on.");
 	else
-		Result("the sale returned %d of %d, which is neither answer and wants looking at.", returned, spent);
+		Result("the sale returned %d of %d and the upgrade is %s, which is neither answer and wants looking at.",
+			returned, spent, removed ? "off" : "on");
 
 	return Plugin_Stop;
 }
