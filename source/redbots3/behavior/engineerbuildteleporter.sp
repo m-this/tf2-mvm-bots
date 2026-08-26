@@ -47,6 +47,19 @@ between the two: far enough out not to be inside his own sentry, a build's reach
 the exit goes. */
 #define TELEPORTER_EXIT_RADIUS		150.0
 
+/* And the sentry is the thing sentry busters are sent to kill
+
+150 is a build-validity radius: far enough out not to be inside his own sentry. It answers where
+he can physically place the exit and never asks where it should be. BUSTER_BLAST_RANGE is 400, so
+the exit sat at well under half the reach of the one robot whose whole job is to detonate on the
+nest, and a single buster took the sentry and the team's forward spawn together.
+
+The safe ring is tried first, all the way round. The tight ring is still there behind it, because
+a map with no room at 500 units should still get an exit rather than none: an exit that dies with
+the sentry beats an engineer who gives up. */
+#define TELEPORTER_EXIT_RADIUS_SAFE	(BUSTER_BLAST_RANGE + 100.0)
+#define TELEPORTER_EXIT_RINGS		2
+
 #define TELEPORTER_TRY_POINTS		8
 #define TELEPORTER_TRY_TIME			1.5
 
@@ -195,7 +208,7 @@ public Action CTFBotMvMEngineerBuildTeleporter_Update(BehaviorAction action, int
 		{
 			m_iTeleporterTry[actor]++;
 
-			if (m_iTeleporterTry[actor] >= TELEPORTER_TRY_POINTS || !TeleporterStandPoint(actor))
+			if (m_iTeleporterTry[actor] >= TeleporterTryLimit(actor) || !TeleporterStandPoint(actor))
 			{
 				//The exit goes down here, and an entrance nowhere near the spawn door goes nowhere
 				if (m_nTeleporterMode[actor] != TFObjectMode_Exit)
@@ -229,6 +242,18 @@ walk along it, reading the points sampled off it when the action started. The ex
 all, only a nest, so the spot walks round the nest and the man stands between the two.
 
 False when this attempt has nowhere left to put anything, which is the caller's cue to stop. */
+/* How many placements he will try before he gives up.
+
+The exit walks two rings rather than one, so it gets two rounds of the same eight angles. Every
+other case has one spot or one route and is unchanged. */
+static int TeleporterTryLimit(int actor)
+{
+	if (!m_bTeleporterNamedSpot[actor] && m_nTeleporterMode[actor] == TFObjectMode_Exit)
+		return TELEPORTER_TRY_POINTS * TELEPORTER_EXIT_RINGS;
+
+	return TELEPORTER_TRY_POINTS;
+}
+
 static bool TeleporterStandPoint(int actor)
 {
 	int attempt = m_iTeleporterTry[actor];
@@ -245,12 +270,17 @@ static bool TeleporterStandPoint(int actor)
 	{
 		float nest[3]; nest = m_vTeleporterNest[actor];
 
-		//Both on the same ray out of the nest, so he stands a build's reach short of the spot
-		BuildStandPoint(nest, GetAbsOrigin(actor), attempt,
-			TELEPORTER_TRY_POINTS, TELEPORTER_EXIT_RADIUS, m_vTeleporterSpot[actor]);
+		//The safe ring first, the whole way round, then the tight one
+		float radius = attempt < TELEPORTER_TRY_POINTS
+			? TELEPORTER_EXIT_RADIUS_SAFE : TELEPORTER_EXIT_RADIUS;
+		int angle = attempt % TELEPORTER_TRY_POINTS;
 
-		BuildStandPoint(nest, GetAbsOrigin(actor), attempt,
-			TELEPORTER_TRY_POINTS, TELEPORTER_EXIT_RADIUS - TELEPORTER_BUILD_REACH, m_vTeleporterStand[actor]);
+		//Both on the same ray out of the nest, so he stands a build's reach short of the spot
+		BuildStandPoint(nest, GetAbsOrigin(actor), angle,
+			TELEPORTER_TRY_POINTS, radius, m_vTeleporterSpot[actor]);
+
+		BuildStandPoint(nest, GetAbsOrigin(actor), angle,
+			TELEPORTER_TRY_POINTS, radius - TELEPORTER_BUILD_REACH, m_vTeleporterStand[actor]);
 
 		return true;
 	}
