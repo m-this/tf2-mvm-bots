@@ -46,11 +46,33 @@ public Plugin myinfo =
  */
 #define PROBE_UPGRADE_LIMIT	40
 
+//Long enough for the station's trigger to touch the subject it was just teleported into
+#define STATION_SETTLE		0.5
+
 //Weapon slots to try, in the order the station lists them. -1 is the player, which is where resistances live.
 static const int ProbeSlots[] = {-1, 0, 1, 2};
 
+/* Results go to a file, not to the console
+ *
+ * The probe finishes on a timer, so its answer is written after the rcon command that started it
+ * has already replied. srcds stops echoing its console once it takes it over, which is the same
+ * reason the test-bed asks rcon whether the server is up rather than reading the log. A file is
+ * the only place a result survives to be read.
+ */
+static char g_ResultPath[PLATFORM_MAX_PATH];
+
+static void Result(const char[] format, any ...)
+{
+	char line[512];
+	VFormat(line, sizeof(line), format, 2);
+	PrintToServer("[refund-probe] %s", line);
+	LogToFileEx(g_ResultPath, "%s", line);
+}
+
 public void OnPluginStart()
 {
+	BuildPath(Path_SM, g_ResultPath, sizeof(g_ResultPath), "logs/mvmbots_refund.jsonl");
+
 	RegServerCmd("mvmbots_refund_probe", Command_Probe,
 		"Buy and sell an upgrade. Arguments: credits to write on first (0 for none), then host or bot.");
 }
@@ -94,23 +116,41 @@ static int ProbeHost()
 /* Standing in the upgrade station, because the game checks
  *
  * MvM refuses a purchase from somebody who is not inside a func_upgradestation, and the host never
- * walks anywhere. That is why it accepted nothing at 400 credits on the first run: not a refusal
- * worth reporting, just a body in the wrong place.
+ * walks anywhere. That is why it accepted nothing at 400 credits: not a refusal worth reporting,
+ * just a body in the wrong place.
  *
- * The position is put back afterwards. A probe that leaves the host somewhere else has changed the
- * run it was measuring.
+ * Two things here are not obvious and both cost a run to find.
+ *
+ * A func_upgradestation is a brush, and a brush entity keeps its origin at the world origin unless
+ * the mapper moved it. Teleporting to m_vecOrigin therefore drops the subject at 0,0,0, which on
+ * most maps is somewhere under the floor. The centre of its bounding box is the position that
+ * means what the name suggests.
+ *
+ * And the game does not decide you are in the zone when you arrive. The trigger sets
+ * m_bInUpgradeZone when it next touches you, which is the following tick at the earliest, so a
+ * purchase sent in the same frame as the teleport is always refused. Everything after the move
+ * happens on a timer for that reason.
  */
-static bool MoveToStation(int client, float back[3])
+static bool StationCentre(float centre[3])
 {
 	int station = FindEntityByClassname(-1, "func_upgradestation");
 	if (station == -1)
 		return false;
 
-	float centre[3];
-	GetEntPropVector(client, Prop_Data, "m_vecAbsOrigin", back);
+	float mins[3], maxs[3];
 	GetEntPropVector(station, Prop_Send, "m_vecOrigin", centre);
-	TeleportEntity(client, centre, NULL_VECTOR, NULL_VECTOR);
+	GetEntPropVector(station, Prop_Send, "m_vecMins", mins);
+	GetEntPropVector(station, Prop_Send, "m_vecMaxs", maxs);
+	for (int i = 0; i < 3; i++)
+		centre[i] += (mins[i] + maxs[i]) / 2.0;
+
 	return true;
+}
+
+static bool InUpgradeZone(int client)
+{
+	return HasEntProp(client, Prop_Send, "m_bInUpgradeZone")
+		&& GetEntProp(client, Prop_Send, "m_bInUpgradeZone") != 0;
 }
 
 static int ProbeSubject()
@@ -188,8 +228,20 @@ static int BuyAnything(int client, int &slotOut, int &indexOut)
 	return 0;
 }
 
+/* One probe at a time, because the subject is teleported and two at once would fight over where it
+ * stands. A second call while one is in flight is refused rather than queued. */
+static bool g_Running;
+static int g_Bundle;
+static bool g_OnHost;
+static float g_Back[3];
+
 public Action Command_Probe(int argc)
 {
+	if (g_Running)
+	{
+		PrintToServer("[refund-probe] one is already in flight. Nothing done.");
+		return Plugin_Handled;
+	}
 	if (GameRules_GetRoundState() != RoundState_BetweenRounds)
 	{
 		PrintToServer("[refund-probe] not between waves, so the upgrade station is shut. Nothing done.");
@@ -199,48 +251,78 @@ public Action Command_Probe(int argc)
 	char who[16] = "bot";
 	if (argc >= 2)
 		GetCmdArg(2, who, sizeof(who));
+	g_OnHost = StrEqual(who, "host", false);
 
-	bool onHost = StrEqual(who, "host", false);
-	int client = onHost ? ProbeHost() : ProbeSubject();
+	int client = g_OnHost ? ProbeHost() : ProbeSubject();
 	if (client == -1)
 	{
-		PrintToServer("[refund-probe] no %s alive to experiment on. Nothing done.", onHost ? "host" : "defender bot");
+		PrintToServer("[refund-probe] no %s alive to experiment on. Nothing done.", g_OnHost ? "host" : "defender bot");
 		return Plugin_Handled;
 	}
-
-	float back[3];
-	bool moved = MoveToStation(client, back);
-	if (!moved)
-		PrintToServer("[refund-probe] no func_upgradestation on this map, so a refusal here means nothing.");
 	if (Credits(client) == -1)
 	{
 		PrintToServer("[refund-probe] this server has no m_nCurrency. Nothing done.");
 		return Plugin_Handled;
 	}
 
-	int bundle = 0;
+	g_Bundle = 0;
 	if (argc >= 1)
 	{
 		char arg[16]; GetCmdArg(1, arg, sizeof(arg));
-		bundle = StringToInt(arg);
+		g_Bundle = StringToInt(arg);
+	}
+
+	float centre[3];
+	if (!StationCentre(centre))
+	{
+		PrintToServer("[refund-probe] no func_upgradestation on this map, so a refusal here would mean nothing. Nothing done.");
+		return Plugin_Handled;
+	}
+
+	GetEntPropVector(client, Prop_Data, "m_vecAbsOrigin", g_Back);
+	TeleportEntity(client, centre, NULL_VECTOR, NULL_VECTOR);
+	PrintToServer("[refund-probe] %N moved to the station at %.0f %.0f %.0f, buying next tick.",
+		client, centre[0], centre[1], centre[2]);
+
+	g_Running = true;
+	CreateTimer(STATION_SETTLE, Timer_BuyAndSell, GetClientUserId(client));
+	return Plugin_Handled;
+}
+
+static Action Timer_BuyAndSell(Handle timer, any userid)
+{
+	g_Running = false;
+
+	int client = GetClientOfUserId(userid);
+	if (client <= 0 || !IsClientInGame(client) || !IsPlayerAlive(client))
+	{
+		Result("the subject left before it could buy. Nothing done.");
+		return Plugin_Stop;
+	}
+
+	if (!InUpgradeZone(client))
+	{
+		TeleportEntity(client, g_Back, NULL_VECTOR, NULL_VECTOR);
+		Result("%N is standing in the station and the game still says it is not in the zone. A refusal here says nothing about selling.",
+			client);
+		return Plugin_Stop;
 	}
 
 	int started = Credits(client);
 	// The bundle, written exactly the way tf2-archipelago writes one: on top of the balance, with
 	// the game's record of the wave left saying what it said before.
-	if (bundle > 0)
-		SetEntProp(client, Prop_Send, "m_nCurrency", started + bundle);
+	if (g_Bundle > 0)
+		SetEntProp(client, Prop_Send, "m_nCurrency", started + g_Bundle);
 	int held = Credits(client);
 
 	int slot = 0, index = 0;
 	int spent = BuyAnything(client, slot, index);
 	if (spent <= 0)
 	{
-		if (moved)
-			TeleportEntity(client, back, NULL_VECTOR, NULL_VECTOR);
-		PrintToServer("[refund-probe] %N bought nothing: %d credits and no upgrade accepted. Nothing to sell.",
+		TeleportEntity(client, g_Back, NULL_VECTOR, NULL_VECTOR);
+		Result("%N bought nothing: %d credits in the zone and no upgrade accepted. Nothing to sell.",
 			client, held);
-		return Plugin_Handled;
+		return Plugin_Stop;
 	}
 
 	int afterBuy = Credits(client);
@@ -248,20 +330,19 @@ public Action Command_Probe(int argc)
 	int afterSell = Credits(client);
 	int returned = afterSell - afterBuy;
 
-	if (moved)
-		TeleportEntity(client, back, NULL_VECTOR, NULL_VECTOR);
+	TeleportEntity(client, g_Back, NULL_VECTOR, NULL_VECTOR);
 
 	// One line, the same shape as the statistics plugin's, so two probes diff against each other.
-	PrintToServer("[refund-probe] {\"subject\":\"%s\",\"bundle\":%d,\"started\":%d,\"held\":%d,\"slot\":%d,\"upgrade\":%d,\"spent\":%d,\"after_buy\":%d,\"after_sell\":%d,\"returned\":%d,\"sale_took\":%s}",
-		onHost ? "host" : "bot", bundle, started, held, slot, index, spent, afterBuy, afterSell, returned,
+	Result("{\"subject\":\"%s\",\"bundle\":%d,\"started\":%d,\"held\":%d,\"slot\":%d,\"upgrade\":%d,\"spent\":%d,\"after_buy\":%d,\"after_sell\":%d,\"returned\":%d,\"sale_took\":%s}",
+		g_OnHost ? "host" : "bot", g_Bundle, started, held, slot, index, spent, afterBuy, afterSell, returned,
 		returned == spent ? "true" : "false");
 
 	if (returned == spent)
-		PrintToServer("[refund-probe] the sale came back in full.");
+		Result("the sale came back in full.");
 	else if (returned == 0)
-		PrintToServer("[refund-probe] the sale returned nothing: the upgrade stayed bought and the credits stayed spent.");
+		Result("the sale returned nothing: the upgrade stayed bought and the credits stayed spent.");
 	else
-		PrintToServer("[refund-probe] the sale returned %d of %d, which is neither answer and wants looking at.", returned, spent);
+		Result("the sale returned %d of %d, which is neither answer and wants looking at.", returned, spent);
 
-	return Plugin_Handled;
+	return Plugin_Stop;
 }
