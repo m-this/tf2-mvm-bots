@@ -253,6 +253,23 @@ while [ "$results" -lt "$waves" ]; do
 
 	if [ "${crashes:-0}" -gt 0 ]; then
 		say "the game server has crashed ${crashes} time(s): that is a bug in what is being measured, not a slow wave"
+
+		# Which kind, because the two lead opposite ways: the watchdog means
+		# something took too long, a bare segfault means something is corrupt.
+		# An evening went on telling them apart by hand.
+		if $compose logs --since "$((now - start + 5))s" srcds 2>&1 | grep -q 'WatchdogHandler called'; then
+			say "the engine watchdog killed it: a frame took too long, so look for what was slow"
+			$compose logs --since "$((now - start + 5))s" srcds 2>&1 |
+				grep -iE 'stuck:|WatchDog!' | tail -3 | sed 's/^/  /'
+		else
+			say "a segfault, with no watchdog before it: look for what is corrupt"
+		fi
+
+		# The core is the whole answer and finding it was the slow part.
+		core=$($compose exec -T srcds sh -c 'ls -t /home/steam/tf-dedicated/core.* 2>/dev/null | head -1' | tr -d '\r')
+		if [ -n "$core" ]; then
+			say "docker cp $($compose ps -q srcds):$core /tmp/ && $here/symbolise-core.sh /tmp/$(basename "$core")"
+		fi
 		say "docker compose -f $here/compose.yml logs srcds | grep -i 'core dumped'"
 		break
 	fi
