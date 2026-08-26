@@ -52,7 +52,7 @@ static const int ProbeSlots[] = {-1, 0, 1, 2};
 public void OnPluginStart()
 {
 	RegServerCmd("mvmbots_refund_probe", Command_Probe,
-		"Buy and sell an upgrade on a defender bot. One argument: credits to write on first, 0 for none.");
+		"Buy and sell an upgrade. Arguments: credits to write on first (0 for none), then host or bot.");
 }
 
 /* The bot to experiment on
@@ -61,6 +61,58 @@ public void OnPluginStart()
  * RED too and it is a statue with no money and no loadout, so it is skipped by name rather than by
  * guessing from its state.
  */
+/* The test-bed host, which is the only body on this server holding money the game itself issued
+ *
+ * Every credit a defender bot has was written onto m_nCurrency from outside: the mod pays them with
+ * TF2_SetCurrency, which is SetEntProp on that same property, which is what tf2-archipelago does for
+ * a Cash Bundle. So a bot cannot be the control leg of this experiment. There is no game-recorded
+ * money on one to compare against.
+ *
+ * The host joined the way a player joins and the game handed it the mission's starting currency. It
+ * is a statue with no AI, which is a problem solved below rather than here.
+ */
+static int ProbeHost()
+{
+	char host[MAX_NAME_LENGTH];
+	ConVar hostName = FindConVar("mvmbots_host_name");
+	if (hostName != null)
+		hostName.GetString(host, sizeof(host));
+	if (host[0] == '\0')
+		return -1;
+
+	for (int client = 1; client <= MaxClients; client++)
+	{
+		if (!IsClientInGame(client) || !IsPlayerAlive(client))
+			continue;
+		char name[MAX_NAME_LENGTH]; GetClientName(client, name, sizeof(name));
+		if (StrEqual(name, host))
+			return client;
+	}
+	return -1;
+}
+
+/* Standing in the upgrade station, because the game checks
+ *
+ * MvM refuses a purchase from somebody who is not inside a func_upgradestation, and the host never
+ * walks anywhere. That is why it accepted nothing at 400 credits on the first run: not a refusal
+ * worth reporting, just a body in the wrong place.
+ *
+ * The position is put back afterwards. A probe that leaves the host somewhere else has changed the
+ * run it was measuring.
+ */
+static bool MoveToStation(int client, float back[3])
+{
+	int station = FindEntityByClassname(-1, "func_upgradestation");
+	if (station == -1)
+		return false;
+
+	float centre[3];
+	GetEntPropVector(client, Prop_Data, "m_vecAbsOrigin", back);
+	GetEntPropVector(station, Prop_Send, "m_vecOrigin", centre);
+	TeleportEntity(client, centre, NULL_VECTOR, NULL_VECTOR);
+	return true;
+}
+
 static int ProbeSubject()
 {
 	/* Looked up here rather than at plugin start, because at plugin start it does not exist yet.
@@ -144,12 +196,22 @@ public Action Command_Probe(int argc)
 		return Plugin_Handled;
 	}
 
-	int client = ProbeSubject();
+	char who[16] = "bot";
+	if (argc >= 2)
+		GetCmdArg(2, who, sizeof(who));
+
+	bool onHost = StrEqual(who, "host", false);
+	int client = onHost ? ProbeHost() : ProbeSubject();
 	if (client == -1)
 	{
-		PrintToServer("[refund-probe] no defender bot alive to experiment on. Nothing done.");
+		PrintToServer("[refund-probe] no %s alive to experiment on. Nothing done.", onHost ? "host" : "defender bot");
 		return Plugin_Handled;
 	}
+
+	float back[3];
+	bool moved = MoveToStation(client, back);
+	if (!moved)
+		PrintToServer("[refund-probe] no func_upgradestation on this map, so a refusal here means nothing.");
 	if (Credits(client) == -1)
 	{
 		PrintToServer("[refund-probe] this server has no m_nCurrency. Nothing done.");
@@ -174,6 +236,8 @@ public Action Command_Probe(int argc)
 	int spent = BuyAnything(client, slot, index);
 	if (spent <= 0)
 	{
+		if (moved)
+			TeleportEntity(client, back, NULL_VECTOR, NULL_VECTOR);
 		PrintToServer("[refund-probe] %N bought nothing: %d credits and no upgrade accepted. Nothing to sell.",
 			client, held);
 		return Plugin_Handled;
@@ -184,9 +248,12 @@ public Action Command_Probe(int argc)
 	int afterSell = Credits(client);
 	int returned = afterSell - afterBuy;
 
+	if (moved)
+		TeleportEntity(client, back, NULL_VECTOR, NULL_VECTOR);
+
 	// One line, the same shape as the statistics plugin's, so two probes diff against each other.
-	PrintToServer("[refund-probe] {\"bundle\":%d,\"started\":%d,\"held\":%d,\"slot\":%d,\"upgrade\":%d,\"spent\":%d,\"after_buy\":%d,\"after_sell\":%d,\"returned\":%d,\"sale_took\":%s}",
-		bundle, started, held, slot, index, spent, afterBuy, afterSell, returned,
+	PrintToServer("[refund-probe] {\"subject\":\"%s\",\"bundle\":%d,\"started\":%d,\"held\":%d,\"slot\":%d,\"upgrade\":%d,\"spent\":%d,\"after_buy\":%d,\"after_sell\":%d,\"returned\":%d,\"sale_took\":%s}",
+		onHost ? "host" : "bot", bundle, started, held, slot, index, spent, afterBuy, afterSell, returned,
 		returned == spent ? "true" : "false");
 
 	if (returned == spent)
