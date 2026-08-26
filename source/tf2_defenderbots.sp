@@ -273,7 +273,10 @@ public Plugin myinfo =
 	name = "Defender TFBots",
 	author = "Officer Spy",
 	description = "TFBots that play Mann vs. Machine",
-	version = "1.5.5",
+	/* This fork's version, not upstream's. The tags here restarted at v2.0.0 because the fork is
+	far enough from 1.5.5 that the old number said nothing about what is running. Leaving myinfo on
+	1.5.5 meant `sm plugins list` and every play-test report named a build nobody could identify. */
+	version = "2.15.0",
 	url = "https://github.com/OfficerSpy/TF2-MvM-Defender-TFBots"
 };
 
