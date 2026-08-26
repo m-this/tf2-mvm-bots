@@ -35,6 +35,9 @@ static void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast
 static void Event_MvmWaveFailed(Event event, const char[] name, bool dontBroadcast)
 {
 	OpenTheBreak();
+
+	//A lineup retyped mid-wave was held until now
+	Reseat_OnBreak();
 	
 	m_iWaveFailCounterTick++;
 	
@@ -86,6 +89,9 @@ static void OpenTheBreak()
 static void Event_MvmWaveComplete(Event event, const char[] name, bool dontBroadcast)
 {
 	OpenTheBreak();
+
+	//A lineup retyped mid-wave was held until now
+	Reseat_OnBreak();
 
 	/* Before anything below sends the engineers off to shop
 	The upgrade session is what tears their buildings down, and it needs this answer to know whether

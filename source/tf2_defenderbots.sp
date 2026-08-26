@@ -276,7 +276,7 @@ public Plugin myinfo =
 	/* This fork's version, not upstream's. The tags here restarted at v2.0.0 because the fork is
 	far enough from 1.5.5 that the old number said nothing about what is running. Leaving myinfo on
 	1.5.5 meant `sm plugins list` and every play-test report named a build nobody could identify. */
-	version = "2.17.1",
+	version = "2.18.0",
 	url = "https://github.com/OfficerSpy/TF2-MvM-Defender-TFBots"
 };
 
@@ -353,6 +353,7 @@ public void OnPluginStart()
 	HookConVarChange(redbots_manager_defender_team_size, ConVarChanged_DefenderTeamSize);
 	HookConVarChange(redbots_manager_mode, ConVarChanged_ManagerMode);
 	HookConVarChange(redbots_manager_bot_lineup_mode, ConVarChanged_BotLineupMode);
+	HookConVarChange(redbots_manager_team_composition, ConVarChanged_TeamComposition);
 	
 	RegConsoleCmd("sm_votebots", Command_Votebots);
 	RegConsoleCmd("sm_vb", Command_Votebots);
@@ -377,6 +378,8 @@ public void OnPluginStart()
 	
 	RegAdminCmd("sm_addbots", Command_AddBots, ADMFLAG_GENERIC);
 	RegAdminCmd("sm_purgebots", Command_RemoveAllBots, ADMFLAG_GENERIC);
+	RegAdminCmd("sm_redbots_reseat", Command_ReseatBots, ADMFLAG_GENERIC, "Reload the loadout file and rebuild RED from the current lineup");
+	RegAdminCmd("sm_dump_credits", Command_DumpCredits, ADMFLAG_GENERIC, "What every player on RED is holding");
 	RegAdminCmd("sm_botmanager_stop", Command_StopManagingBots, ADMFLAG_GENERIC);
 	RegAdminCmd("sm_view_bot_upgrades", Command_ViewBotUpgrades, ADMFLAG_GENERIC);
 	//Not RegAdminCmd: it prints where the caller is standing and changes nothing, and needing
@@ -585,6 +588,7 @@ public void OnMapStart()
 	g_flNextReadyTime = 0.0;
 	g_bBotClassesLocked = false;
 	g_bAllowBotTeamRedo = false;
+	Reseat_OnMapStart();
 	
 	ResetMapHintNests();
 	
@@ -2381,6 +2385,211 @@ int CollectMissingTeamComposition(ArrayList classes, ArrayList seats, int count)
 	}
 
 	return collected;
+}
+
+/* A reseat waiting for the break, because the composition was retyped mid-wave
+
+Kicking a bot in the middle of a wave loses whatever it was doing and drops its buildings, and the
+replacement walks in from spawn with the bomb halfway home. The break is where a lineup change is
+free */
+static bool m_bReseatPending;
+
+//A whole-team recycle waiting for the same break, asked for by sm_redbots_reseat
+static bool m_bRecyclePending;
+
+/* What every bot on RED is holding, so a lineup change can be checked for losing it
+
+A bot that changes class leaves and comes back, and the join path is what decides its balance. This
+prints the number that path arrived at, next to the wave accounting it should match, because reading
+SetCurrencyWithBundles is not the same as knowing what it produced */
+public Action Command_DumpCredits(int client, int args)
+{
+	int earned = GetStartingCurrency(g_iPopulationManager) + GetAcquiredCreditsOfAllWaves();
+
+	ReplyToCommand(client, "[SM] starting plus acquired is %d, before anything Archipelago paid", earned);
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || TF2_GetClientTeam(i) != TFTeam_Red)
+			continue;
+
+		char name[MAX_NAME_LENGTH]; GetClientName(i, name, sizeof(name));
+
+		ReplyToCommand(client, "[SM] %-20s %-14s %6d credits%s", name, g_sRawPlayerClassNames[view_as<int>(TF2_GetPlayerClass(i))],
+			TF2_GetCurrency(i), IsDefenderBot(i) ? "" : " (human)");
+	}
+
+	return Plugin_Handled;
+}
+
+/* Send the whole team back through the join path, and say how many went
+
+A lineup change kicks only the bots the new list has no seat for, which is right and is nobody at
+all when the classes did not move. A loadout change moves no class and still has to reach every bot,
+because a weapon is handed out on the way in and never again.
+
+So this is the blunt one: everybody out, and the fill timer builds the team again from the
+composition and the loadout file as they now stand */
+int RecycleDefenderBots()
+{
+	int kicked = 0;
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (IsClientInGame(i) && IsDefenderBot(i) && TF2_GetClientTeam(i) == TFTeam_Red)
+		{
+			kicked++;
+			KickClient(i, "BotManager3: the team changed");
+		}
+	}
+
+	return kicked;
+}
+
+/* Reload the loadout file and put the team back together with it
+
+The launcher rewrites configs/defenderbots/loadout.cfg and then calls this, which is the whole of
+applying a loadout change to a running server. Nothing else reads that file between map changes */
+public Action Command_ReseatBots(int client, int args)
+{
+	Config_LoadServerLoadout();
+
+	if (GameRules_GetRoundState() == RoundState_RoundRunning)
+	{
+		m_bRecyclePending = true;
+		ReplyToCommand(client, "%s The new team takes effect when this wave ends.", PLUGIN_PREFIX);
+		PrintToChatAll("%s The new team takes effect when this wave ends.", PLUGIN_PREFIX);
+		return Plugin_Handled;
+	}
+
+	int kicked = RecycleDefenderBots();
+	LogMessage("Reseat: the team was retyped, recycled %d bot(s)", kicked);
+	ReplyToCommand(client, "%s Rebuilding %d bot(s) from the new team.", PLUGIN_PREFIX, kicked);
+
+	if (kicked > 0)
+		PrintToChatAll("%s Rebuilding %d bot(s) from the new team...", PLUGIN_PREFIX, kicked);
+
+	return Plugin_Handled;
+}
+
+/* Kick the bots the lineup no longer asks for, and say how many went
+
+CollectMissingTeamComposition only ever names seats nobody holds, so a full RED is already the team
+it wants whatever the convar now says. Retyping the composition mid-mission therefore did nothing at
+all. Kicking the surplus is what makes the next top-up converge on the new list.
+
+Exactly as many bots go as the new list has seats nobody holds, so the team size never dips further
+than the refill covers, and a list that names classes RED already fields kicks nobody.
+
+A kicked bot comes back through the join path, where the seat, the loadout and
+SetCurrencyWithBundles already live. Nothing here changes a class or refunds anything */
+int ReseatDefenderBots()
+{
+	char list[128]; GetWantedTeamComposition(list, sizeof(list));
+
+	if (list[0] == '\0')
+		return 0;
+
+	char wanted[MAXPLAYERS + 1][TF2_CLASS_MAX_NAME_LENGTH];
+	int total = ExplodeString(list, ",", wanted, sizeof(wanted), sizeof(wanted[]));
+
+	//Bots of a class the list no longer asks for, and the clients holding them
+	int spare[view_as<int>(TFClass_Engineer) + 1];
+	ArrayList bots = new ArrayList();
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (IsClientInGame(i) && IsDefenderBot(i) && TF2_GetClientTeam(i) == TFTeam_Red)
+		{
+			spare[view_as<int>(TF2_GetPlayerClass(i))]++;
+			bots.Push(i);
+		}
+	}
+
+	//Seats the list names that nobody holds, which is what there is room to kick
+	int missing = 0;
+
+	for (int i = 0; i < total; i++)
+	{
+		TrimString(wanted[i]);
+
+		TFClassType class = TF2_GetClassIndexFromString(wanted[i]);
+
+		//A blank or a typo leaves the seat to the lineup mode, so it asks for nobody in particular
+		if (class == TFClass_Unknown)
+			continue;
+
+		if (spare[view_as<int>(class)] > 0)
+			spare[view_as<int>(class)]--;
+		else
+			missing++;
+	}
+
+	int kicked = 0;
+
+	for (int i = 0; i < bots.Length && kicked < missing; i++)
+	{
+		int client = bots.Get(i);
+		int class = view_as<int>(TF2_GetPlayerClass(client));
+
+		if (spare[class] < 1)
+			continue;
+
+		spare[class]--;
+		kicked++;
+		KickClient(client, "BotManager3: the lineup changed");
+	}
+
+	delete bots;
+
+	if (kicked > 0)
+	{
+		LogMessage("Reseat: the lineup wants %d seat(s) nobody holds, kicked %d bot(s) for them", missing, kicked);
+		PrintToChatAll("%s Changing %d bot(s) to match the new lineup...", PLUGIN_PREFIX, kicked);
+	}
+
+	return kicked;
+}
+
+public void ConVarChanged_TeamComposition(ConVar convar, const char[] before, const char[] after)
+{
+	if (StrEqual(before, after))
+		return;
+
+	if (GameRules_GetRoundState() == RoundState_RoundRunning)
+	{
+		m_bReseatPending = true;
+		LogMessage("Reseat: the lineup changed mid-wave, holding it until the break");
+		PrintToChatAll("%s The new lineup takes effect when this wave ends.", PLUGIN_PREFIX);
+		return;
+	}
+
+	ReseatDefenderBots();
+}
+
+//The break has opened, so a lineup change that arrived mid-wave can happen now
+void Reseat_OnBreak()
+{
+	if (m_bRecyclePending)
+	{
+		m_bRecyclePending = false;
+		m_bReseatPending = false;
+		LogMessage("Reseat: recycled %d bot(s) held from mid-wave", RecycleDefenderBots());
+		return;
+	}
+
+	if (!m_bReseatPending)
+		return;
+
+	m_bReseatPending = false;
+	ReseatDefenderBots();
+}
+
+//The round the pending reseat was waiting on ended with the map, and the bots it meant are gone
+static void Reseat_OnMapStart()
+{
+	m_bReseatPending = false;
+	m_bRecyclePending = false;
 }
 
 /* Fill the empty seats from the named team, and say how many it filled
