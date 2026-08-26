@@ -250,6 +250,7 @@ ConVar tf_bot_health_search_near_range;
 Address g_pMannVsMachineUpgrades;
 #endif
 
+#include "redbots3/archipelago.sp"
 #include "redbots3/features.sp"
 #include "redbots3/util.sp"
 #include "redbots3/weapon_tuning.sp"
@@ -276,8 +277,29 @@ public Plugin myinfo =
 	url = "https://github.com/OfficerSpy/TF2-MvM-Defender-TFBots"
 };
 
+/* The Archipelago plugin can come and go while this one runs, so its native is looked for again
+whenever any plugin registers or drops a library rather than once at startup. */
+public void OnLibraryAdded(const char[] name)
+{
+	if (StrEqual(name, "tf2_archipelago"))
+		Archipelago_Recheck();
+}
+
+public void OnLibraryRemoved(const char[] name)
+{
+	if (StrEqual(name, "tf2_archipelago"))
+		Archipelago_Recheck();
+}
+
+public void OnAllPluginsLoaded()
+{
+	Archipelago_Recheck();
+}
+
 public void OnPluginStart()
 {
+	Archipelago_Init();
+	
 #if defined TESTING_ONLY
 	BuildPath(Path_SM, g_sPlayerPrefPath, PLATFORM_MAX_PATH, "data/testing/db_botpref.txt");
 	PrintToServer("[BOTS MANAGER] DEBUG BUILD: FOR DEV USE ONLY");
@@ -451,6 +473,13 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	CreateNative("Defenderbots_PathFailures", Native_PathFailures);
 	CreateNative("Defenderbots_RangeRepairStalls", Native_RangeRepairStalls);
 	CreateNative("Defenderbots_GetAttackTarget", Native_GetAttackTarget);
+	
+	/* The one native this plugin asks for rather than offers, and it is allowed to be missing
+	
+	Without this line an unresolved native does not fail at the call, it fails the whole plugin
+	load: a server that has never heard of Archipelago would get no defender bots at all. The
+	runtime check in archipelago.sp only ever runs on a plugin that loaded. */
+	MarkNativeAsOptional("TF2AP_GetBundleCredits");
 	
 	RegPluginLibrary("tf2_defenderbots");
 	
