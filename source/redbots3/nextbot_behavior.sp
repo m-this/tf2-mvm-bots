@@ -823,6 +823,20 @@ static bool IsDefenderPrepared(int client)
 	return !ShouldBuildTeleporter(client);
 }
 
+/* Readying a bot, and ending whatever is stopping it saying so
+
+A taunt holds the ready. The command goes out every frame while the flag disagrees, so a short
+taunt only delays it, but a looping taunt never ends on its own and the wave waits on a bot doing
+a dance. Between rounds a taunt is worth nothing to anybody, so it loses to the ready rather than
+the other way round. */
+static void ReadyDefender(int actor, bool state)
+{
+	if (state && TF2_IsPlayerInCondition(actor, TFCond_Taunting))
+		TF2_RemoveCondition(actor, TFCond_Taunting);
+	
+	SetPlayerReady(actor, state);
+}
+
 static void UpdateDefenderReadiness(int actor)
 {
 	if (!Feature(FEATURE_READY_WHEN_PREPARED))
@@ -849,7 +863,7 @@ static void UpdateDefenderReadiness(int actor)
 	{
 		m_ctReadyDeadline[actor] = 0.0;
 		
-		SetPlayerReady(actor, AnyHumanReadyOnRed());
+		ReadyDefender(actor, AnyHumanReadyOnRed());
 		
 		return;
 	}
@@ -866,7 +880,7 @@ static void UpdateDefenderReadiness(int actor)
 	if (GetGameTime() > m_ctReadyDeadline[actor])
 	{
 		if (!IsPlayerReady(actor))
-			SetPlayerReady(actor, true);
+			ReadyDefender(actor, true);
 		
 		return;
 	}
@@ -874,7 +888,7 @@ static void UpdateDefenderReadiness(int actor)
 	if (IsDefenderPrepared(actor))
 		return;
 
-	SetPlayerReady(actor, false);
+	ReadyDefender(actor, false);
 }
 
 /* Whether leaving the fight to find a pack is worth what the walk costs the team
@@ -978,6 +992,16 @@ public Action CTFBotTacticalMonitor_Update(BehaviorAction action, int actor, flo
 	if (g_bIsDefenderBot[actor] == false)
 		return Plugin_Continue;
 	
+	/* Before the returns below, not after them
+	
+	UpdateDefenderReadiness says of itself that it takes the ready away "every frame, wherever it
+	came from", and the upgrade-zone branch below returns before it ever ran. A bot shopping at
+	the station therefore had no readiness of its own: only the upgrade action's own exits set it,
+	and the human-mirror never applied. Reported as an engineer beside spawn who never pressed F4
+	while a player on RED had. The station is next to spawn on Decoy, which is where that bot was
+	standing. */
+	UpdateDefenderReadiness(actor);
+	
 	if (TF2_IsInUpgradeZone(actor) && ActionsManager.LookupEntityActionByName(actor, "DefenderUpgrade") != INVALID_ACTION)
 	{
 		TFClassType iClass = TF2_GetPlayerClass(actor);
@@ -1008,7 +1032,6 @@ public Action CTFBotTacticalMonitor_Update(BehaviorAction action, int actor, flo
 		}
 	}
 	
-	UpdateDefenderReadiness(actor);
 	UpdateStuckWatchdog(actor);
 
 	if (GameRules_GetRoundState() == RoundState_RoundRunning)
