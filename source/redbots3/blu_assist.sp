@@ -27,9 +27,7 @@ of numbers says which arm produced it.
 
 See docs/testbed-metrics.md: none of this ships on until a run says it helped. */
 
-ConVar redbots_manager_blu_damage_scale;
 ConVar redbots_manager_blu_health_scale;
-ConVar redbots_manager_blu_speed_scale;
 
 //The team size the scales are written against, which is the team every MvM wave is tuned for
 #define BLU_ASSIST_FULL_TEAM 6.0
@@ -37,24 +35,12 @@ ConVar redbots_manager_blu_speed_scale;
 //Counts the robots a bend has been applied to this map, for the sampled log line below
 static int m_iBluAssistSeen;
 
-//The same, for hits a robot landed on a defender
-static int m_iBluAssistHits;
-
 void BluAssist_Init()
 {
 	m_iBluAssistSeen = 0;
-	m_iBluAssistHits = 0;
-
-	redbots_manager_blu_damage_scale = CreateConVar("sm_redbots_manager_blu_damage_scale", "1.0",
-		"What a robot's damage is multiplied by when one human is on RED. Rises to 1.0 at six. 1.0 is off.",
-		FCVAR_NOTIFY, true, 0.1, true, 1.0);
 
 	redbots_manager_blu_health_scale = CreateConVar("sm_redbots_manager_blu_health_scale", "1.0",
 		"What a robot's health is multiplied by when one human is on RED. Rises to 1.0 at six. 1.0 is off.",
-		FCVAR_NOTIFY, true, 0.1, true, 1.0);
-
-	redbots_manager_blu_speed_scale = CreateConVar("sm_redbots_manager_blu_speed_scale", "1.0",
-		"What a robot's speed is multiplied by when one human is on RED. Rises to 1.0 at six. 1.0 is off.",
 		FCVAR_NOTIFY, true, 0.1, true, 1.0);
 }
 
@@ -95,19 +81,9 @@ static float BluAssistScale(ConVar convar)
 	return atOne + (1.0 - atOne) * ((humans - 1.0) / (BLU_ASSIST_FULL_TEAM - 1.0));
 }
 
-float BluAssist_DamageScale()
-{
-	return BluAssistScale(redbots_manager_blu_damage_scale);
-}
-
 float BluAssist_HealthScale()
 {
 	return BluAssistScale(redbots_manager_blu_health_scale);
-}
-
-float BluAssist_SpeedScale()
-{
-	return BluAssistScale(redbots_manager_blu_speed_scale);
 }
 
 /* Add what the three levers are set to, for the line that says what was
@@ -117,23 +93,10 @@ Nothing is added when all three are off, which is every run until somebody sets
 one, so the string reads exactly as it did before this existed */
 void BluAssist_Describe(char[] buffer, int maxlength)
 {
-	ConVar levers[3]; levers[0] = redbots_manager_blu_damage_scale;
-	levers[1] = redbots_manager_blu_health_scale;
-	levers[2] = redbots_manager_blu_speed_scale;
+	if (redbots_manager_blu_health_scale == null || redbots_manager_blu_health_scale.FloatValue >= 1.0)
+		return;
 
-	static const char names[3][] = { "blu_damage", "blu_health", "blu_speed" };
-
-	for (int i = 0; i < 3; i++)
-	{
-		if (levers[i] == null || levers[i].FloatValue >= 1.0)
-			continue;
-
-		if (buffer[0] != '\0')
-			StrCat(buffer, maxlength, ",");
-
-		char entry[32]; Format(entry, sizeof(entry), "%s=%.2f", names[i], levers[i].FloatValue);
-		StrCat(buffer, maxlength, entry);
-	}
+	Format(buffer, maxlength, "blu_health=%.2f", redbots_manager_blu_health_scale.FloatValue);
 }
 
 /* Scale a robot's health and speed as it spawns
@@ -154,7 +117,7 @@ A giant scales the same way a common does. The alternative is a lever per robot 
 three more numbers to measure before anybody knows whether the first three matter */
 void BluAssist_OnRobotSpawn(int client)
 {
-	if (BluAssist_HealthScale() >= 1.0 && BluAssist_SpeedScale() >= 1.0)
+	if (BluAssist_HealthScale() >= 1.0)
 		return;
 
 	RequestFrame(BluAssistApplyToRobot, GetClientUserId(client));
@@ -186,12 +149,7 @@ static void BluAssistApplyToRobot(int userid)
 		SetEntityHealth(client, wanted);
 	}
 
-	float speed = BluAssist_SpeedScale();
-
-	if (speed < 1.0)
-		BluAssistBendAttrib(client, "move speed bonus", 1.0, 0.0, speed);
-
-	BluAssistSay(client, health, speed);
+	BluAssistSay(client, health);
 }
 
 /* Write down what a bend actually did to one robot in every BLU_ASSIST_SAMPLE
@@ -204,21 +162,16 @@ Sampled rather than every robot: a wave brings them by the hundred and a line pe
 nobody reads. */
 #define BLU_ASSIST_SAMPLE	25
 
-static void BluAssistSay(int client, float health, float speed)
+static void BluAssistSay(int client, float health)
 {
-	if (health >= 1.0 && speed >= 1.0)
+	if (health >= 1.0)
 		return;
 
 	if (++m_iBluAssistSeen % BLU_ASSIST_SAMPLE != 0)
 		return;
 
-	Address moveAttrib = TF2Attrib_GetByName(client, "move speed bonus");
-
-	LogMessage("BluAssist: robot %d of the wave, health %d of %d wanted x%.2f, move speed bonus %.2f wanted x%.2f, on the ground %.0f",
-		m_iBluAssistSeen,
-		GetClientHealth(client), GetEntProp(client, Prop_Data, "m_iMaxHealth"), health,
-		moveAttrib == Address_Null ? 1.0 : TF2Attrib_GetValue(moveAttrib), speed,
-		GetEntPropFloat(client, Prop_Data, "m_flMaxspeed"));
+	LogMessage("BluAssist: robot %d of the wave, health %d of %d, wanted x%.2f",
+		m_iBluAssistSeen, GetClientHealth(client), GetEntProp(client, Prop_Data, "m_iMaxHealth"), health);
 }
 
 /* Bend an attribute the popfile may already have set, from its neutral value when it has not
@@ -233,32 +186,3 @@ static void BluAssistBendAttrib(int client, const char[] name, float neutral, fl
 	TF2Attrib_SetByName(client, name, current * scale + delta);
 }
 
-/* What a robot's hit takes off a defender
-
-Hooked on the defender rather than on the robot: a player is hooked once when he joins and the
-robots arrive by the hundred. */
-public Action BluAssist_TakeDamage(int victim, int &attacker, int &inflictor, float &damage, int &damagetype)
-{
-	if (attacker <= 0 || attacker > MaxClients || !IsClientInGame(attacker))
-		return Plugin_Continue;
-
-	if (TF2_GetClientTeam(attacker) != TFTeam_Blue)
-		return Plugin_Continue;
-
-	float scale = BluAssist_DamageScale();
-
-	if (scale >= 1.0)
-		return Plugin_Continue;
-
-	float before = damage;
-
-	damage *= scale;
-
-	/* Same sampling as the spawn bends, and for the same reason: a wave outcome cannot tell a
-	   damage lever that is not applying from one that is applying and not enough. */
-	if (++m_iBluAssistHits % BLU_ASSIST_SAMPLE == 0)
-		LogMessage("BluAssist: hit %d of the wave, %.0f became %.0f, wanted x%.2f",
-			m_iBluAssistHits, before, damage, scale);
-
-	return Plugin_Changed;
-}
