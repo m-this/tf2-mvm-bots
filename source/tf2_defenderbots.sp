@@ -217,6 +217,9 @@ ConVar redbots_manager_engineer_nest_depth;
 ConVar redbots_manager_engineer_nest_relocate;
 ConVar redbots_manager_engineer_nest_relocate_score_gain_min;
 ConVar redbots_manager_bot_use_upgrades;
+ConVar redbots_manager_spawn_nav_recovery;
+ConVar redbots_manager_spawn_nav_recovery_radius;
+ConVar redbots_manager_spawn_nav_recovery_time;
 ConVar redbots_manager_bot_hats;
 ConVar redbots_manager_bot_hat_effects;
 ConVar redbots_manager_bot_buyback_chance;
@@ -330,6 +333,9 @@ public void OnPluginStart()
 	redbots_manager_engineer_nest_relocate = CreateConVar("sm_redbots_manager_engineer_nest_relocate", "0", "Let engineers move their nest between waves when a better spot opens up. Crashes the server, see TODO item 10.", FCVAR_NOTIFY);
 	redbots_manager_engineer_nest_relocate_score_gain_min = CreateConVar("sm_redbots_manager_engineer_nest_relocate_score_gain_min", "40.0", "How much better a nest spot has to score than the one an engineer holds before he moves to it between waves. 0 makes him move for any improvement at all.", FCVAR_NOTIFY, true, 0.0, true, 200.0);
 	redbots_manager_bot_use_upgrades = CreateConVar("sm_redbots_manager_bot_use_upgrades", "1", "Enable bots to buy upgrades.", FCVAR_NOTIFY);
+	redbots_manager_spawn_nav_recovery = CreateConVar("sm_redbots_spawn_nav_recovery", "1", "Recover prepared defender bots that cannot leave spawn.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	redbots_manager_spawn_nav_recovery_radius = CreateConVar("sm_redbots_spawn_nav_recovery_radius", "512.0", "Distance outside a RED spawn brush that still counts as spawn for navigation recovery.", FCVAR_NOTIFY, true, 0.0, true, 4096.0);
+	redbots_manager_spawn_nav_recovery_time = CreateConVar("sm_redbots_spawn_nav_recovery_time", "12.0", "Maximum seconds a prepared defender may remain in or near spawn before recovery.", FCVAR_NOTIFY, true, 1.0, true, 120.0);
 	redbots_manager_bot_hats = CreateConVar("sm_redbots_manager_bot_hats", "1", "Give every defender bot a random hat its class can wear. Looks only.", FCVAR_NOTIFY);
 	redbots_manager_bot_hat_effects = CreateConVar("sm_redbots_manager_bot_hat_effects", "0", "Put a random unusual effect on that hat. Needs the hats above.", FCVAR_NOTIFY);
 	redbots_manager_bot_buyback_chance = CreateConVar("sm_redbots_manager_bot_buyback_chance", "5", "Chance for bots to buyback into the game.", FCVAR_NOTIFY);
@@ -391,6 +397,8 @@ public void OnPluginStart()
 	RegAdminCmd("sm_dump_nest", Command_DumpNest, ADMFLAG_GENERIC);
 	RegAdminCmd("sm_dump_medic", Command_DumpMedic, ADMFLAG_GENERIC);
 	RegAdminCmd("sm_dump_front", Command_DumpFront, ADMFLAG_GENERIC);
+	RegAdminCmd("sm_dump_spawn_nav", Command_DumpSpawnNav, ADMFLAG_GENERIC);
+	RegAdminCmd("sm_recover_spawn_bots", Command_RecoverSpawnBots, ADMFLAG_GENERIC);
 	
 	AddCommandListener(Listener_TournamentPlayerReadystate, "tournament_player_readystate");
 	
@@ -616,6 +624,7 @@ public void OnClientDisconnect(int client)
 		CreateTimer(0.1, Timer_RefillDefenderTeam, _, TIMER_FLAG_NO_MAPCHANGE);
 	
 	g_bIsDefenderBot[client] = false;
+	ResetSpawnExitWatch(client);
 	
 	g_bChoosingBotClasses[client] = false;
 	
@@ -661,6 +670,7 @@ public void OnClientPutInServer(int client)
 	g_bHasBoughtUpgrades[client] = false;
 	
 	ResetNextBot(client);
+	ResetSpawnExitWatch(client);
 	
 #if defined IDLEBOT_AIMING
 	BotAim(client).Reset();
@@ -686,6 +696,8 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 	
 	if (IsPlayerAlive(client))
 	{
+		WatchDefenderSpawnExit(client);
+
 		if (g_arrExtraButtons[client].iPress != 0)
 		{
 			if (g_arrExtraButtons[client].iPress & IN_BACK)
