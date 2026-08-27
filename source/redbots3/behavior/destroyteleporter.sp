@@ -30,7 +30,7 @@ public Action CTFBotDestroyTeleporter_Update(BehaviorAction action, int actor, f
 	if (m_flRepathTime[actor] <= GetGameTime())
 	{
 		m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(1.0, 2.0);
-		m_pPath[actor].ComputeToTarget(myBot, m_iTeleporterTarget[actor]);
+		RepathToTarget(actor, myBot, m_iTeleporterTarget[actor]);
 	}
 	
 	m_pPath[actor].Update(myBot);

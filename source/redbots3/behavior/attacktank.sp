@@ -96,6 +96,7 @@ public Action CTFBotAttackTank_Update(BehaviorAction action, int actor, float in
 		if (m_flRepathTime[actor] <= GetGameTime())
 		{
 			m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(0.5, 1.0);
+			//Its own arguments: a tank is a moving hull, and the goal is wanted even when the path fails
 			m_pPath[actor].ComputeToPos(myBot, GetAbsOrigin(m_iTankTarget[actor]), 0.0, true);
 		}
 		

@@ -1,0 +1,111 @@
+[test-bed] found a Team Fortress 2 install in tf2-archipelago_tf2game
+mvmbots-testbed_tf2game already has something in it, leaving it alone
+mvmbots-testbed_tf2game already has the game
+[test-bed] stopping the server while the mod is rebuilt
+ Container mvmbots-testbed-srcds-1 Stopping 
+ Container mvmbots-testbed-srcds-1 Stopped 
+[test-bed] building
+[test-bed] starting the server on mvm_rottenburg
+ Container mvmbots-testbed-srcds-1 Starting 
+ Container mvmbots-testbed-srcds-1 Started 
+[test-bed] waiting for the server to answer rcon (the first run downloads the game)
+[test-bed] loading mission mvm_rottenburg_advanced1
+[test-bed] waiting for the server to settle before restarting the round
+[test-bed] watching for 1 wave results, giving up after 900s
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 1 of 1 waves finished
+[test-bed] wrote results/blu-band/dmg5-4.jsonl
+
+results/blu-band/dmg5-4.jsonl
+  waves played      1
+  cleared           0 (0%)
+  robots killed     71, of them 2 giants
+  defenders died    22
+  sentries lost     2
+  buildings took    695, engineer put back 360 (52%)
+  damage dealt      22261
+  of it, sentries   2416 (11%)
+  damage to tanks   0
+  healing done      3243, 0 ubers
+  healing by class  scout 2465  engineer 553  medic 225
+  scoreboard says   2532   (the event sum says 3243, which is a -711 gap)
+  damage by class   heavy 8573  soldier 4681  demoman 4067  engineer 3262  scout 1095  medic 583
+  kills by class    heavy 31  soldier 16  demoman 12  engineer 9  scout 3
+  giants by class   heavy 2
+  killed us         soldier 18  demoman 2  scout 2
+  died to           explosion 20  other 2
+  demoman damage    pipes 2804, stickies 1263, bottle 0
+  soldier damage    rockets 4681, everything else 0
+  jars thrown       8
+  projectiles       soldier 58 fired, 37 hit (63%);  demoman 38 fired, 26 hit (68%)
+  hurt themselves   demoman 538  soldier 153  engineer 48
+  killed themselves nothing
+
+  what the bots were doing (191 samples)
+    Ernie            heavy     DefenderAttack 62%, DefenderCampBomb 31%, ScenarioMonitor 2%
+                               primary 100%, hurt 8% of the time
+    Fred             demoman   DefenderAttack 93%, ScenarioMonitor 3%, DefenderGotoUpgrade 3%
+                               primary 63%/secondary 36%, hurt 13% of the time
+    George           engineer  DefenderEngineerIdle 53%, DefenderBuildSentrygun 31%, DefenderGetHealth 6%
+                               primary 71%/secondary 15%/melee 12%, hurt 6% of the time
+    Toby             medic     Heal 75%, DefenderMedicRevive 12%, DefenderAttackUber 6%
+                               beam on somebody 57% of the time, trigger held 81% (70% of that connected)
+                               primary 15%/secondary 81%/melee 3%, hurt 12% of the time
+    Uri              soldier   DefenderAttack 83%, ScenarioMonitor 6%, DefenderGotoUpgrade 3%
+                               primary 96%/secondary 3%, hurt 13% of the time
+    Walt             scout     DefenderCollectMoney 51%, DefenderAttack 29%, ScenarioMonitor 12%
+                               primary 48%/secondary 51%, hurt 16% of the time
+
+  what the buildings were worth (68 samples)
+    George dispenser             level 3, saw a robot 27% of samples (0.3 at a time), 2.5 teammates in range
+    George sentry                level 3, saw a robot 15% of samples (0.2 at a time), 1.0 teammates in range
+    George teleporter entrance   level 3, saw a robot 3% of samples (0.1 at a time), 0.1 teammates in range
+
+  how close the buildings got to the spots mvm_rottenburg names
+    George dispenser              wave 1: 78
+    George sentry                 wave 1: 510!
+    (median units from the nearest authored spot; ! is off it, !! is nowhere near it)
+
+  how close the nearest robot was
+    demoman   median 807, closest tenth under 333, point blank 0% of samples
+    engineer  median 1249, closest tenth under 606, point blank 0% of samples
+    heavy     median 752, closest tenth under 162, point blank 9% of samples
+    medic     median 872, closest tenth under 179, point blank 9% of samples
+    scout     median 700, closest tenth under 177, point blank 6% of samples
+    soldier   median 854, closest tenth under 346, point blank 3% of samples
+
+  where they stood while a wave was running
+    Ernie            heavy     stood still 21% of the time, longest 15s at 1220 -1870 -561, 20759 units walked per wave
+                               trigger held in 57% of samples, 42% of those into the world (aimed at world 61%, entity_medigun_shield 8%, giant soldier 8%)
+    Fred             demoman   stood still 10% of the time, longest 5s at 1405 -1850 -549, 25990 units walked per wave
+                               trigger held in 28% of samples, 100% of those into the world (aimed at world 89%, func_respawnroomvisualizer 6%, teammate 3%)
+    George           engineer  stood still 23% of the time, longest 20s at 1554 -1140 -518, 28716 units walked per wave
+                               asked to walk in 76% of samples, 26% of those with no path at all, 17% of those without moving
+                               trigger held in 40% of samples, 25% of those into the world (aimed at world 54%, soldier 16%, own_sentrygun 12%)
+                               wrench out 4 samples, 0% of them stopped out of reach of his own buildings
+    Toby             medic     stood still 6% of the time, longest 5s at 1090 -2004 -559, 20820 units walked per wave
+                               trigger held in 87% of samples, 18% of those into the world (aimed at teammate 43%, world 28%, entity_medigun_shield 18%)
+    Uri              soldier   stood still 14% of the time, longest 5s at 1222 -1864 -561, 20051 units walked per wave
+                               trigger held in 28% of samples, 75% of those into the world (aimed at world 75%, func_respawnroomvisualizer 13%, entity_medigun_shield 6%)
+    Walt             scout     stood still 6% of the time, longest 5s at 1388 -2058 -492, 27263 units walked per wave
+                               trigger held in 34% of samples, 70% of those into the world (aimed at world 80%, soldier 10%, func_respawnroomvisualizer 6%)
+
+  between waves
+    Ernie            heavy     no behaviour in 0% of samples, longest 0s, 0 units walked
+    Fred             demoman   no behaviour in 0% of samples, longest 0s, 0 units walked
+    George           engineer  no behaviour in 0% of samples, longest 0s, 0 units walked
+    Toby             medic     no behaviour in 0% of samples, longest 0s, 0 units walked
+    Uri              soldier   no behaviour in 0% of samples, longest 0s, 0 units walked
+    Walt             scout     no behaviour in 0% of samples, longest 0s, 0 units walked
+
+  how much one wave varies from the next

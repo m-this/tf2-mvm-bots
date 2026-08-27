@@ -91,7 +91,7 @@ public Action CTFBotGuardPoint_Update(BehaviorAction action, int actor, float in
 			if (m_flRepathTime[actor] <= GetGameTime())
 			{
 				m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(0.5, 1.0);
-				m_pPath[actor].ComputeToTarget(myBot, nearest);
+				RepathToTarget(actor, myBot, nearest);
 			}
 			
 			m_pPath[actor].Update(myBot);
@@ -106,7 +106,7 @@ public Action CTFBotGuardPoint_Update(BehaviorAction action, int actor, float in
 		if (m_flRepathTime[actor] <= GetGameTime())
 		{
 			m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(1.0, 2.0);
-			m_pPath[actor].ComputeToPos(myBot, m_vecPointDefendArea[actor]);
+			RepathToPos(actor, myBot, m_vecPointDefendArea[actor]);
 		}
 		
 		m_pPath[actor].Update(myBot);

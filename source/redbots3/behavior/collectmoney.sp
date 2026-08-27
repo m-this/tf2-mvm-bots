@@ -32,7 +32,7 @@ public Action CTFBotCollectMoney_Update(BehaviorAction action, int actor, float 
 	if (m_flRepathTime[actor] <= GetGameTime())
 	{
 		m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(1.0, 2.0);
-		m_pPath[actor].ComputeToPos(myBot, WorldSpaceCenter(m_iCurrencyPack[actor]));
+		RepathToPos(actor, myBot, WorldSpaceCenter(m_iCurrencyPack[actor]));
 	}
 	
 	m_pPath[actor].Update(myBot);

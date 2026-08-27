@@ -126,7 +126,7 @@ static Action CTFBotSpyLurkMvM_Update(BehaviorAction action, int actor, float in
 				if (m_flRepathTime[actor] <= GetGameTime())
 				{
 					m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(0.9, 1.0);
-					m_pPath[actor].ComputeToPos(myBot, bombPosition);
+					RepathToPos(actor, myBot, bombPosition);
 				}
 				
 				m_pPath[actor].Update(myBot);

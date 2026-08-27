@@ -67,7 +67,7 @@ public Action CTFBotEvadeBuster_Update(BehaviorAction action, int actor, float i
 	if (m_flRepathTime[actor] <= GetGameTime())
 	{
 		m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(0.3, 0.4);
-		m_pPath[actor].ComputeToPos(myBot, escape);
+		RepathToPos(actor, myBot, escape);
 	}
 
 	m_pPath[actor].Update(myBot);

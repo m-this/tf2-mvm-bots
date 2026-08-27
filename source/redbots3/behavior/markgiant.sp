@@ -88,7 +88,7 @@ public Action CTFBotMarkGiant_Update(BehaviorAction action, int actor, float int
 	if (m_flRepathTime[actor] <= GetGameTime())
 	{
 		m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(1.0, 2.0);
-		m_pPath[actor].ComputeToTarget(myBot, m_iTarget[actor]);
+		RepathToTarget(actor, myBot, m_iTarget[actor]);
 	}
 	
 	m_pPath[actor].Update(myBot);

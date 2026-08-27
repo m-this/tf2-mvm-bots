@@ -197,12 +197,27 @@ static void NudgeTowardsGoal(int client, INextBot myBot, const float goal[3])
  */
 void RepathToTarget(int actor, INextBot myBot, int target)
 {
-	NotePathResult(actor, m_pPath[actor].ComputeToTarget(myBot, target));
+	NotePathResult(actor, m_pPath[actor].ComputeToTarget(myBot, target, PathLengthCap()));
 }
 
 void RepathToPos(int actor, INextBot myBot, const float goal[3])
 {
-	NotePathResult(actor, m_pPath[actor].ComputeToPos(myBot, goal));
+	NotePathResult(actor, m_pPath[actor].ComputeToPos(myBot, goal, PathLengthCap()));
+}
+
+/* How far a path search may walk before it gives up, and 0.0 for no limit
+
+NavAreaBuildPath searches until it reaches the goal or runs out of mesh, so a goal it cannot reach
+costs the whole map every time it is asked. Six bots asking in one frame is the 1833 ms frame
+Mannhattan produced and Decoy never did.
+
+The number is generous on purpose. It is not a leash on where a bot may go: it is the point past
+which the search has plainly failed, and every real route on these maps is far inside it. */
+#define PATH_LENGTH_CAP	6000.0
+
+static float PathLengthCap()
+{
+	return Feature(FEATURE_PATH_LENGTH_CAP) ? PATH_LENGTH_CAP : 0.0;
 }
 
 static void NotePathResult(int actor, bool built)
@@ -324,9 +339,9 @@ void PluginBot_SimulateFrame(int client)
 				bool built;
 				
 				if (shouldPathToVec)
-					built = m_pPath[client].ComputeToPos(myBot, g_arrPluginBot[client].vecPathGoal);
+					built = m_pPath[client].ComputeToPos(myBot, g_arrPluginBot[client].vecPathGoal, PathLengthCap());
 				else
-					built = m_pPath[client].ComputeToTarget(myBot, g_arrPluginBot[client].iPathGoalEntity);
+					built = m_pPath[client].ComputeToTarget(myBot, g_arrPluginBot[client].iPathGoalEntity, PathLengthCap());
 				
 				//An empty path is a failure the same as a refusal, and it is the shape seen in play
 				bool failed = !built || m_pPath[client].GetLength() <= 0.0;

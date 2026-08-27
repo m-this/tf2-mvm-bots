@@ -65,7 +65,7 @@ public Action CTFBotMedicRevive_Update(BehaviorAction action, int actor, float i
 	if (m_flRepathTime[actor] <= GetGameTime())
 	{
 		m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(0.9, 1.2);
-		m_pPath[actor].ComputeToPos(myBot, markerPos);
+		RepathToPos(actor, myBot, markerPos);
 	}
 	
 	m_pPath[actor].Update(myBot);

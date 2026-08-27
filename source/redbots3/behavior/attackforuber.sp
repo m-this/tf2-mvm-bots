@@ -77,7 +77,7 @@ public Action CTFBotAttackUber_Update(BehaviorAction action, int actor, float in
 	if (m_flRepathTime[actor] <= GetGameTime())
 	{
 		m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(0.3, 1.0);
-		m_pPath[actor].ComputeToTarget(myBot, target);
+		RepathToTarget(actor, myBot, target);
 	}
 	
 	m_pPath[actor].Update(myBot);

@@ -250,7 +250,7 @@ public Action CTFBotMoveToFront_Update(BehaviorAction action, int actor, float i
 	if (m_flRepathTime[actor] <= GetGameTime())
 	{
 		m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(3.0, 4.0);
-		m_pPath[actor].ComputeToPos(myBot, m_vecGoalArea[actor]);
+		RepathToPos(actor, myBot, m_vecGoalArea[actor]);
 	}
 	
 	m_pPath[actor].Update(myBot);

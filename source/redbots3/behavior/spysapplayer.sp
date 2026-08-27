@@ -62,7 +62,7 @@ public Action CTFBotSpySapPlayers_Update(BehaviorAction action, int actor, float
 	if (m_flRepathTime[actor] <= GetGameTime())
 	{
 		m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(0.3, 0.4);
-		m_pPath[actor].ComputeToTarget(myBot, m_iPlayerSapTarget[actor]);
+		RepathToTarget(actor, myBot, m_iPlayerSapTarget[actor]);
 	}
 	
 	m_pPath[actor].Update(myBot);

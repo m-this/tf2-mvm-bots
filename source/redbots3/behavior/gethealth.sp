@@ -114,7 +114,7 @@ public Action CTFBotGetHealth_Update(BehaviorAction action, int actor, float int
 		if (m_flRepathTime[actor] <= GetGameTime())
 		{
 			m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(0.9, 1.0);
-			m_pPath[actor].ComputeToPos(myBot, WorldSpaceCenter(m_iHealthPack[actor]));
+			RepathToPos(actor, myBot, WorldSpaceCenter(m_iHealthPack[actor]));
 		}
 		
 		m_pPath[actor].Update(myBot);

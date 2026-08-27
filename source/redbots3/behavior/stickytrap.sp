@@ -128,7 +128,7 @@ public Action CTFBotStickyTrap_Update(BehaviorAction action, int actor, float in
 		if (m_flRepathTime[actor] <= GetGameTime())
 		{
 			m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(0.3, 0.4);
-			m_pPath[actor].ComputeToPos(myBot, m_vStickyTrapSpot[actor]);
+			RepathToPos(actor, myBot, m_vStickyTrapSpot[actor]);
 		}
 
 		m_pPath[actor].Update(myBot);

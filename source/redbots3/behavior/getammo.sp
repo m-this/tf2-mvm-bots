@@ -81,7 +81,7 @@ public Action CTFBotGetAmmo_Update(BehaviorAction action, int actor, float inter
 	if (m_flRepathTime[actor] <= GetGameTime())
 	{
 		m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(0.9, 1.0);
-		m_pPath[actor].ComputeToPos(myBot, WorldSpaceCenter(m_iAmmoPack[actor]));
+		RepathToPos(actor, myBot, WorldSpaceCenter(m_iAmmoPack[actor]));
 	}
 	
 	m_pPath[actor].Update(myBot);

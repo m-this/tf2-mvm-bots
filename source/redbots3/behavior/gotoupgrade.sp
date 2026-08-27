@@ -78,7 +78,7 @@ public Action CTFBotGotoUpgrade_Update(BehaviorAction action, int actor, float i
 	if (m_flRepathTime[actor] <= GetGameTime())
 	{
 		m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(1.0, 2.0);
-		m_pPath[actor].ComputeToPos(myBot, center);
+		RepathToPos(actor, myBot, center);
 	}
 	
 	m_pPath[actor].Update(myBot);

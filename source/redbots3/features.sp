@@ -35,6 +35,7 @@ enum
 	FEATURE_DEMO_STICKY_SELF_VETO,
 	FEATURE_HOLD_THE_NEST,
 	FEATURE_MEDIC_SHIELD,
+	FEATURE_PATH_LENGTH_CAP,
 	FEATURE_COUNT
 }
 
@@ -55,7 +56,8 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"demo_tank_pipes",
 	"demo_sticky_self_veto",
 	"hold_the_nest",
-	"medic_shield"
+	"medic_shield",
+	"path_length_cap"
 };
 
 static ConVar g_arrFeatureConVars[FEATURE_COUNT];
@@ -120,6 +122,12 @@ void LoadFeatures()
 
 	g_arrFeatureConVars[FEATURE_MEDIC_SHIELD] = MakeFeature(FEATURE_MEDIC_SHIELD,
 		"Let the medic put up the projectile shield, and buy the rage that fills it.");
+
+	/* Off until a run says otherwise. An unreachable goal makes NavAreaBuildPath walk the whole
+	   nav mesh, and Mannhattan produced an 1833 ms frame where Decoy never passed 153. See
+	   mvm-cf3. */
+	g_arrFeatureConVars[FEATURE_PATH_LENGTH_CAP] = MakeFeature(FEATURE_PATH_LENGTH_CAP,
+		"Stop a path search that has walked far enough, instead of letting an unreachable goal cost the whole mesh.", false);
 
 	g_arrFeatureConVars[FEATURE_ATTACK_STRAFE] = MakeFeature(FEATURE_ATTACK_STRAFE,
 		"A bot that has arrived at its firing position keeps sidestepping instead of standing still.");

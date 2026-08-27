@@ -186,7 +186,7 @@ public Action CTFBotSpyCheck_Update(BehaviorAction action, int actor, float inte
 		if (m_flRepathTime[actor] <= GetGameTime())
 		{
 			m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(0.3, 0.4);
-			m_pPath[actor].ComputeToTarget(myBot, suspect);
+			RepathToTarget(actor, myBot, suspect);
 		}
 
 		m_pPath[actor].Update(myBot);
