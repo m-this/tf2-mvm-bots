@@ -1262,6 +1262,9 @@ static int m_iStuckWedgeCount[MAXPLAYERS + 1];
 
 //Stucks at one spot before the bot is moved off it, and how far to look for somewhere it can stand
 #define STUCK_WEDGE_GIVEUP	3
+
+//Wedges before a bot nobody can move is taken out of the game, well past the point of rescuing him
+#define STUCK_WEDGE_KICK	8
 #define STUCK_WEDGE_SEARCH	400.0
 
 int StuckCountOf(int client)
@@ -1351,6 +1354,27 @@ static void UpdateStuckWatchdog(int actor)
 	
 	if (m_iStuckWedgeCount[actor] >= STUCK_WEDGE_GIVEUP && MoveWedgedDefender(actor))
 		return;
+
+	/* A bot that cannot be moved is the one that kills the server
+
+	The crash in k-kaneta's cores is not the wedge. It is what the wedge costs: a bot that cannot
+	reach its goal asks for a path again every time it is reset, NavAreaBuildPath walks the mesh for
+	an answer that does not exist, and the watchdog kills the server on the frame that takes.
+	Twelve forced wedges produced no successful recovery at all, so a bot the recovery cannot help
+	is not rare.
+
+	Kicking is the last resort and it is the right one: the seat is refilled by the top-up path a
+	moment later, with a bot that can walk. Leaving him costs the mission. His buildings go with him
+	because a sentry with no owner is somebody else's problem. */
+	if (Feature(FEATURE_KICK_WEDGED_BOTS) && m_iStuckWedgeCount[actor] >= STUCK_WEDGE_KICK)
+	{
+		LogMessage("Stuck: %N could not be moved %d times at %.0f %.0f %.0f, so he is kicked and the seat refilled",
+			actor, m_iStuckWedgeCount[actor], here[0], here[1], here[2]);
+
+		ClearBuildingsBeforeKick(actor);
+		KickClient(actor, "BotManager3: wedged and unrecoverable");
+		return;
+	}
 
 	RequestFrame(Frame_UnstickDefender, actor);
 }

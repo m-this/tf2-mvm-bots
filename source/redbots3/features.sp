@@ -38,6 +38,7 @@ enum
 	FEATURE_PATH_LENGTH_CAP,
 	FEATURE_ENGINEER_CLIMBS,
 	FEATURE_WATCH_IDLE_BOTS,
+	FEATURE_KICK_WEDGED_BOTS,
 	FEATURE_AMMO_FAILOVER,
 	FEATURE_COUNT
 }
@@ -63,7 +64,8 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"path_length_cap",
 	"engineer_climbs",
 	"ammo_failover",
-	"watch_idle_bots"
+	"watch_idle_bots",
+	"kick_wedged_bots"
 };
 
 static ConVar g_arrFeatureConVars[FEATURE_COUNT];
@@ -152,6 +154,11 @@ void LoadFeatures()
 	   Mannhunt and not one stuck line. See mvm-ipf. */
 	g_arrFeatureConVars[FEATURE_WATCH_IDLE_BOTS] = MakeFeature(FEATURE_WATCH_IDLE_BOTS,
 		"The stuck watchdog also rescues a bot that has no behaviour at all, not only one that cannot reach its goal.", false);
+
+	/* Off until a run says otherwise. The crash is not the wedge, it is the path the wedged bot
+	   keeps asking for, and twelve forced wedges produced no successful recovery. See apw-eei. */
+	g_arrFeatureConVars[FEATURE_KICK_WEDGED_BOTS] = MakeFeature(FEATURE_KICK_WEDGED_BOTS,
+		"Kick a bot the stuck recovery cannot move, so the seat is refilled instead of the server paying for his paths.", false);
 
 	g_arrFeatureConVars[FEATURE_ATTACK_STRAFE] = MakeFeature(FEATURE_ATTACK_STRAFE,
 		"A bot that has arrived at its firing position keeps sidestepping instead of standing still.");
