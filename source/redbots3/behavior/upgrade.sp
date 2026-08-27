@@ -274,6 +274,7 @@ public void CTFBotUpgrade_OnEnd(BehaviorAction action, int actor, BehaviorAction
 		g_iBuyUpgradesNumber[actor] = 0;
 		
 		TF2_SetInUpgradeZone(actor, false);
+		RecoverDefenderFromDisconnectedSpawn(actor);
 	}
 }
 
