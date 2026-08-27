@@ -423,12 +423,29 @@ list, so the other one outlived it, and then outlived every wave after that. The
 each break and the stray never was. Reported as two dispensers for one engineer.
 
 Collected before any of them is detonated, because detonating edits the list being walked. */
+/* How many buildings this player owns, and none for a player who has left
+
+TF2Util_GetPlayerObjectCount throws on a client that is not in game, and a thrown native takes the
+whole callback with it. An action's OnEnd is the one place that reliably asks about a bot after he
+has gone: the seat refill kicks bots between waves, which ends their actions, and k-kaneta's log of
+2026-08-27 has the trace twice on Mannworks with the engineer's sentry action named in it.
+
+Zero rather than a refusal, because every caller loops over the answer and a player with no
+buildings is the truth about a player who is not there. */
+stock int PlayerObjectCount(int client)
+{
+	if (client <= 0 || client > MaxClients || !IsClientInGame(client))
+		return 0;
+
+	return TF2Util_GetPlayerObjectCount(client);
+}
+
 void DetonateObjectOfType(int client, TFObjectType iType, TFObjectMode iMode = TFObjectMode_None, bool bIgnoreSapperState = false)
 {
 	int found[MAX_PLAYER_OBJECTS];
 	int count = 0;
 	
-	int iNumObjects = TF2Util_GetPlayerObjectCount(client);
+	int iNumObjects = PlayerObjectCount(client);
 	
 	for (int i = 0; i < iNumObjects && count < MAX_PLAYER_OBJECTS; i++)
 	{
@@ -503,7 +520,7 @@ int HasObjectOfType(int client, TFObjectType iObjectType, TFObjectMode iObjectMo
 
 int GetObjectOfType(int client, TFObjectType iObjectType, TFObjectMode iObjectMode = TFObjectMode_None)
 {
-	int iNumObjects = TF2Util_GetPlayerObjectCount(client);
+	int iNumObjects = PlayerObjectCount(client);
 	
 	for (int i = 0; i < iNumObjects; i++)
 	{

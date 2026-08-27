@@ -190,7 +190,7 @@ nest he has not built. This is the one place that wants the other answer. */
 int CountDisposableSentries(int client)
 {
 	int count = 0;
-	int objects = TF2Util_GetPlayerObjectCount(client);
+	int objects = PlayerObjectCount(client);
 
 	for (int i = 0; i < objects; i++)
 	{

@@ -280,7 +280,7 @@ public Plugin myinfo =
 	/* This fork's version, not upstream's. The tags here restarted at v2.0.0 because the fork is
 	far enough from 1.5.5 that the old number said nothing about what is running. Leaving myinfo on
 	1.5.5 meant `sm plugins list` and every play-test report named a build nobody could identify. */
-	version = "2.21.0",
+	version = "2.21.1",
 	url = "https://github.com/OfficerSpy/TF2-MvM-Defender-TFBots"
 };
 
@@ -2451,7 +2451,7 @@ Everything it owns, not only the sentry: a dispenser and both ends of a teleport
 question */
 static void ClearBuildingsBeforeKick(int client)
 {
-	for (int i = TF2Util_GetPlayerObjectCount(client) - 1; i >= 0; i--)
+	for (int i = PlayerObjectCount(client) - 1; i >= 0; i--)
 	{
 		int building = TF2Util_GetPlayerObject(client, i);
 
