@@ -1341,6 +1341,56 @@ static void UpdateStuckWatchdog(int actor)
 	RequestFrame(Frame_UnstickDefender, actor);
 }
 
+/* Somewhere out of the wedge, and false when nothing near him is far enough
+
+A random point in his own area is what this used to take, and on Mannhunt that was the bug: he is
+standing on valid nav and wedged in the geometry above it, so the nearest area is the one under his
+feet and a point inside it lands back on him. Six give-ups in a row at 1014 885 274 and not one
+move, which is mvm-ipf.
+
+So his own area is tried first and only accepted when the point clears STUCK_RADIUS, then the areas
+touching it. Bounded twice over: the four directions, and MOVE_WEDGED_TRIES points per area. */
+#define MOVE_WEDGED_TRIES	8
+
+static bool WedgeEscapePoint(CNavArea area, const float here[3], float destination[3])
+{
+	if (AreaEscapePoint(area, here, destination))
+		return true;
+
+	for (NavDirType dir = NORTH; dir < NUM_DIRECTIONS; dir++)
+	{
+		int count = area.GetAdjacentCount(dir);
+
+		for (int i = 0; i < count; i++)
+		{
+			CNavArea next = area.GetAdjacentArea(dir, i);
+
+			if (next != NULL_AREA && AreaEscapePoint(next, here, destination))
+				return true;
+		}
+	}
+
+	return false;
+}
+
+//A point in one area that is far enough from where he is wedged, tried a fixed number of times
+static bool AreaEscapePoint(CNavArea area, const float here[3], float destination[3])
+{
+	for (int attempt = 0; attempt < MOVE_WEDGED_TRIES; attempt++)
+	{
+		float point[3]; CNavArea_GetRandomPoint(area, point);
+		point[2] += 10.0;
+
+		if (GetVectorDistance(here, point) > STUCK_RADIUS)
+		{
+			destination = point;
+			return true;
+		}
+	}
+
+	return false;
+}
+
 /* Put a wedged bot somewhere it can walk, when resetting it has stopped working
 
 The same shape as the spawn recovery below and for the same reason, one step further along: that
@@ -1359,11 +1409,9 @@ static bool MoveWedgedDefender(int client)
 	if (area == NULL_AREA)
 		return false;
 
-	float destination[3]; CNavArea_GetRandomPoint(area, destination);
-	destination[2] += 10.0;
+	float destination[3];
 
-	//No point moving him onto the spot he is already wedged in
-	if (GetVectorDistance(here, destination) <= STUCK_RADIUS)
+	if (!WedgeEscapePoint(area, here, destination))
 		return false;
 
 	float stopped[3];
