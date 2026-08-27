@@ -69,7 +69,13 @@ if [ ! -d "$work/ripext" ]; then
 	rm -f "$work/ripext.zip"
 fi
 
-cp -r "$work/ripext/addons/sourcemod/extensions/." "$out/addons/sourcemod/extensions/"
+# -p, and it matters as much as the -u in the container's installer. These are
+# the compiled extensions, and the running server has them mapped. A copy that
+# gives them a new timestamp makes that installer copy them over the top on its
+# next pass, which truncates a mapped file and kills the server in whichever
+# extension was rewritten. The prebuilt tree is fetched once and never changes,
+# so preserving its timestamps means an unchanged extension stays unchanged.
+cp -rp "$work/ripext/addons/sourcemod/extensions/." "$out/addons/sourcemod/extensions/"
 
 # --- The two compiled extensions ---
 #
@@ -90,11 +96,11 @@ if [ ! -d "$work/prebuilt" ]; then
 	rm -f "$work/actions.zip"
 fi
 
-cp "$work/prebuilt/cbasenpc/addons/sourcemod/extensions/cbasenpc.ext.2.tf2.so" \
+cp -p "$work/prebuilt/cbasenpc/addons/sourcemod/extensions/cbasenpc.ext.2.tf2.so" \
 	"$work/prebuilt/actions/actions.ext/extensions/actions.ext.2.tf2.so" \
 	"$out/addons/sourcemod/extensions/"
 
-cp "$work/prebuilt/cbasenpc/addons/sourcemod/gamedata/cbasenpc.txt" \
+cp -p "$work/prebuilt/cbasenpc/addons/sourcemod/gamedata/cbasenpc.txt" \
 	"$out/addons/sourcemod/gamedata/"
 cp "$src/actions/sourcemod/gamedata/actions.games.txt" \
 	"$out/addons/sourcemod/gamedata/"
