@@ -37,6 +37,7 @@ enum
 	FEATURE_MEDIC_SHIELD,
 	FEATURE_PATH_LENGTH_CAP,
 	FEATURE_ENGINEER_CLIMBS,
+	FEATURE_WATCH_IDLE_BOTS,
 	FEATURE_AMMO_FAILOVER,
 	FEATURE_COUNT
 }
@@ -61,7 +62,8 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"medic_shield",
 	"path_length_cap",
 	"engineer_climbs",
-	"ammo_failover"
+	"ammo_failover",
+	"watch_idle_bots"
 };
 
 static ConVar g_arrFeatureConVars[FEATURE_COUNT];
@@ -144,6 +146,12 @@ void LoadFeatures()
 	   an empty path until the pack expired. See mvm-zx0. */
 	g_arrFeatureConVars[FEATURE_AMMO_FAILOVER] = MakeFeature(FEATURE_AMMO_FAILOVER,
 		"A bot whose path to the ammo it picked keeps failing takes the next pack, then gives up, rather than walking at a wall.", false);
+
+	/* Off until a run says otherwise. The stuck watchdog only armed for a bot that was pathing, so
+	   an engineer frozen with an empty action stack was invisible to it: 45 seconds at one spot on
+	   Mannhunt and not one stuck line. See mvm-ipf. */
+	g_arrFeatureConVars[FEATURE_WATCH_IDLE_BOTS] = MakeFeature(FEATURE_WATCH_IDLE_BOTS,
+		"The stuck watchdog also rescues a bot that has no behaviour at all, not only one that cannot reach its goal.", false);
 
 	g_arrFeatureConVars[FEATURE_ATTACK_STRAFE] = MakeFeature(FEATURE_ATTACK_STRAFE,
 		"A bot that has arrived at its firing position keeps sidestepping instead of standing still.");
