@@ -16,6 +16,7 @@ the real wedge looks like from the watchdog's side. Freezing the entity would be
 
 ConVar redbots_debug_wedge_seconds;
 ConVar redbots_debug_wedge_class;
+ConVar redbots_debug_refuse_ammo_paths;
 
 //The bot being held, and until when. One at a time: two wedged bots is a different test.
 static int m_iWedgedBot = -1;
@@ -30,6 +31,32 @@ void DebugFaults_Init()
 
 	redbots_debug_wedge_class = CreateConVar("sm_redbots_debug_wedge_class", "engineer",
 		"Which class to hold when sm_redbots_debug_wedge_seconds is on.", FCVAR_NOTIFY);
+
+	redbots_debug_refuse_ammo_paths = CreateConVar("sm_redbots_debug_refuse_ammo_paths", "0",
+		"Refuse this many path answers to a metal pack per bot, to exercise the ammo failover. 0 is off.",
+		FCVAR_NOTIFY, true, 0.0, true, 20.0);
+}
+
+//How many refusals are still owed to this bot, counted down as they are handed out
+static int m_iAmmoRefusalsLeft[MAXPLAYERS + 1];
+
+//A fresh walk to a pack starts the count again, or one bot spends the whole wave refused
+void DebugFaults_OnAmmoWalkStart(int client)
+{
+	m_iAmmoRefusalsLeft[client] = redbots_debug_refuse_ammo_paths.IntValue;
+}
+
+/* Should this path answer be a refusal
+
+Sits in front of PathFailedFor rather than replacing it, so a route that really failed still reads
+as failed once the owed refusals run out. */
+bool DebugFaults_RefuseAmmoPath(int client)
+{
+	if (m_iAmmoRefusalsLeft[client] <= 0)
+		return false;
+
+	m_iAmmoRefusalsLeft[client]--;
+	return true;
 }
 
 //Pick somebody to hold, at the start of a wave. Nothing happens while the convar is zero.
