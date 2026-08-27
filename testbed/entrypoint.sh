@@ -118,6 +118,20 @@ install_server_cfg() {
 	"
 	done
 
+	# The same again for convars that are not feature switches. Some things a
+	# run wants to vary are a number rather than an on or an off, and the three
+	# BLU scales are the first of them: 1.0 is already the off, so a second
+	# switch beside them would be two ways to say one thing.
+	for pair in $(echo "${BOT_CVARS:-}" | tr ',' ' '); do
+		name=${pair%%=*}
+		value=${pair#*=}
+
+		[ -n "$name" ] || continue
+
+		BOT_FEATURE_LINES="${BOT_FEATURE_LINES}${name} ${value}
+	"
+	done
+
 	cat >"$target" <<-CFG
 	// Managed by the mvm-bots test-bed. Edits here are replaced on restart.
 	hostname "MvM defender bots test-bed"

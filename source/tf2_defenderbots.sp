@@ -252,6 +252,7 @@ Address g_pMannVsMachineUpgrades;
 
 #include "redbots3/archipelago.sp"
 #include "redbots3/features.sp"
+#include "redbots3/blu_assist.sp"
 #include "redbots3/util.sp"
 #include "redbots3/weapon_tuning.sp"
 #include "redbots3/medic_uber.sp"
@@ -276,7 +277,7 @@ public Plugin myinfo =
 	/* This fork's version, not upstream's. The tags here restarted at v2.0.0 because the fork is
 	far enough from 1.5.5 that the old number said nothing about what is running. Leaving myinfo on
 	1.5.5 meant `sm plugins list` and every play-test report named a build nobody could identify. */
-	version = "2.18.1",
+	version = "2.19.0",
 	url = "https://github.com/OfficerSpy/TF2-MvM-Defender-TFBots"
 };
 
@@ -440,6 +441,7 @@ public void OnPluginStart()
 	}
 	
 	LoadFeatures();
+	BluAssist_Init();
 	LoadLoadoutFunctions();
 	LoadPreferencesData();
 	
@@ -626,6 +628,11 @@ public void OnClientPutInServer(int client)
 {
 	if (!IsFakeClient(client))
 		MakeRoomForHumanPlayer(client);
+
+	/* Hooked on everybody who joins, and the hook asks whether the attacker is a
+	robot. The other way round is one hook per robot, and a wave brings them by
+	the hundred while a defender joins once. */
+	SDKHook(client, SDKHook_OnTakeDamage, BluAssist_TakeDamage);
 	
 	//The name is set at tf_bot_add, so one of ours is known here, before it picks its loadout
 	if (IsDefenderBot(client))

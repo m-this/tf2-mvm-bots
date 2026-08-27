@@ -165,5 +165,11 @@ void PublishActiveFeatures()
 		StrCat(list, sizeof(list), FEATURE_NAME[i]);
 	}
 
+	/* The three BLU scales ride along, because they are the other thing that can
+	make one run differ from another and a results file has to say so. They are
+	convars rather than switches: 1.0 is off, so a scale that is set at all is
+	worth recording, and there is nothing to record when none is. */
+	BluAssist_Describe(list, sizeof(list));
+
 	g_cvFeaturesActive.SetString(list);
 }
