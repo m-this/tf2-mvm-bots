@@ -20,6 +20,10 @@ static void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast
 	if (TF2_GetClientTeam(client) == TFTeam_Red && IsTFBotPlayer(client))
 		CreateTimer(0.2, Timer_PlayerSpawn, client, TIMER_FLAG_NO_MAPCHANGE);
 	
+	//The popfile has just decided what this robot is, so bending it comes after
+	if (TF2_GetClientTeam(client) == TFTeam_Blue && IsFakeClient(client))
+		BluAssist_OnRobotSpawn(client);
+	
 	if (g_bIsDefenderBot[client])
 	{
 		GiveBotCosmeticsSoon(client);
