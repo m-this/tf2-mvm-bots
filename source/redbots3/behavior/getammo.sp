@@ -9,6 +9,27 @@ static char g_strHealthAndAmmoEntities[][] =
 
 int m_iAmmoPack[MAXPLAYERS + 1];
 
+/* The other packs he could have had, kept so a refused path is not the end of the walk
+
+The choice was validated once, in OnStart, and then held for the life of the action. Everything
+after that repathed to the same entity every second and threw the answer away, so a bot whose
+route stopped existing walked along an empty path, at 120 units a nudge, until the pack expired.
+That is the "does not know what a wall is, then gives up" in the report: not a goal picked without
+a path, but a goal that stopped having one and nothing watching.
+
+So the ranked list survives OnStart. Three consecutive refusals is the point where the route is
+not coming back, and the next candidate is tried. Running out ends the action rather than leaving
+him walking at nothing, and holds the gate shut long enough that the monitor does not send him
+straight back in. */
+#define AMMO_CANDIDATES_MAX		4
+#define AMMO_REPATH_FAILS_MAX	3
+#define AMMO_GIVEUP_TIME		3.0
+
+static int m_arrAmmoCandidates[MAXPLAYERS + 1][AMMO_CANDIDATES_MAX];
+static int m_iAmmoCandidateCount[MAXPLAYERS + 1];
+static int m_iAmmoCandidate[MAXPLAYERS + 1];
+static int m_iAmmoRepathFails[MAXPLAYERS + 1];
+
 BehaviorAction CTFBotGetAmmo()
 {
 	BehaviorAction action = ActionsManager.Create("DefenderGetAmmo");
@@ -29,34 +50,46 @@ public Action CTFBotGetAmmo_OnStart(BehaviorAction action, int actor, BehaviorAc
 	ArrayList ammo = new ArrayList(2);
 	ComputeHealthAndAmmoVectors(actor, ammo, tf_bot_ammo_search_range.FloatValue);
 	
-	if (ammo.Length <= 0)
+	m_iAmmoPack[actor] = -1;
+	m_iAmmoCandidateCount[actor] = 0;
+	m_iAmmoCandidate[actor] = 0;
+	m_iAmmoRepathFails[actor] = 0;
+
+	//Shortest travel first, so a failover walks outwards rather than anywhere
+	while (m_iAmmoCandidateCount[actor] < AMMO_CANDIDATES_MAX)
 	{
-		delete ammo;
-		return action.Done("No ammo");
-	}
-	
-	float flSmallestDistance = 99999.0;
-	
-	for (int i = 0; i < ammo.Length; i++)
-	{
-		int entity = ammo.Get(i, 0);
-		
-		if (!IsValidAmmo(entity))
-			continue;
-		
-		float flDistance = view_as<float>(ammo.Get(i, 1));
-		
-		if (flDistance <= flSmallestDistance)
+		int best = -1;
+		float flSmallestDistance = 0.0;
+
+		for (int i = 0; i < ammo.Length; i++)
 		{
-			m_iAmmoPack[actor] = entity;
-			flSmallestDistance = flDistance;
+			int entity = ammo.Get(i, 0);
+
+			if (entity == -1 || !IsValidAmmo(entity))
+				continue;
+
+			float flDistance = view_as<float>(ammo.Get(i, 1));
+
+			if (best == -1 || flDistance < flSmallestDistance)
+			{
+				best = i;
+				flSmallestDistance = flDistance;
+			}
 		}
+
+		if (best == -1)
+			break;
+
+		m_arrAmmoCandidates[actor][m_iAmmoCandidateCount[actor]++] = ammo.Get(best, 0);
+		ammo.Set(best, -1, 0);
 	}
-	
+
 	delete ammo;
-	
-	if (m_iAmmoPack[actor] != -1)
+
+	if (m_iAmmoCandidateCount[actor] > 0)
 	{
+		m_iAmmoPack[actor] = m_arrAmmoCandidates[actor][0];
+
 		if (TF2_GetPlayerClass(actor) == TFClass_Engineer)
 			UpdateLookAroundForEnemies(actor, true);
 		
@@ -82,6 +115,27 @@ public Action CTFBotGetAmmo_Update(BehaviorAction action, int actor, float inter
 	{
 		m_flRepathTime[actor] = GetGameTime() + GetRandomFloat(0.9, 1.0);
 		RepathToPos(actor, myBot, WorldSpaceCenter(m_iAmmoPack[actor]));
+
+		if (Feature(FEATURE_AMMO_FAILOVER))
+		{
+			//The return value is the only thing that says the route failed. The length lies.
+			if (!PathFailedFor(actor))
+			{
+				m_iAmmoRepathFails[actor] = 0;
+			}
+			else if (++m_iAmmoRepathFails[actor] >= AMMO_REPATH_FAILS_MAX)
+			{
+				m_iAmmoRepathFails[actor] = 0;
+
+				if (!NextAmmoCandidate(actor))
+				{
+					HoldOffAmmo(actor);
+					return action.Done("No reachable ammo");
+				}
+
+				RepathToPos(actor, myBot, WorldSpaceCenter(m_iAmmoPack[actor]));
+			}
+		}
 	}
 	
 	m_pPath[actor].Update(myBot);
@@ -97,6 +151,26 @@ public Action CTFBotGetAmmo_Update(BehaviorAction action, int actor, float inter
 public void CTFBotGetAmmo_OnEnd(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
 {
 	m_iAmmoPack[actor] = -1;
+	m_iAmmoCandidateCount[actor] = 0;
+	m_iAmmoCandidate[actor] = 0;
+	m_iAmmoRepathFails[actor] = 0;
+}
+
+//The next pack he was ranked onto, skipping any taken while he walked. Bounded by the list.
+static bool NextAmmoCandidate(int actor)
+{
+	while (++m_iAmmoCandidate[actor] < m_iAmmoCandidateCount[actor])
+	{
+		int pack = m_arrAmmoCandidates[actor][m_iAmmoCandidate[actor]];
+
+		if (!IsValidAmmo(pack))
+			continue;
+
+		m_iAmmoPack[actor] = pack;
+		return true;
+	}
+
+	return false;
 }
 
 public Action CTFBotGetAmmo_ShouldHurry(BehaviorAction action, INextBot nextbot, QueryResultType& result)
@@ -145,7 +219,7 @@ next one along instead of costing a search of its own.
 
 The list is entity index and travel distance, in pairs, and the caller takes the shortest. */
 #define HEALTH_CANDIDATES_MAX	64
-#define HEALTH_PATHS_MAX		4
+#define HEALTH_PATHS_MAX		AMMO_CANDIDATES_MAX
 
 void ComputeHealthAndAmmoVectors(int client, ArrayList found, float max_range)
 {
@@ -267,6 +341,17 @@ appears inside that. */
 
 static float m_ctAmmoAsk[MAXPLAYERS + 1];
 static bool m_bAmmoPossible[MAXPLAYERS + 1];
+
+/* Keep the gate shut after a walk that ran out of reachable packs
+
+The cache answers from a nav search that said yes, and the walk that followed said no. Without
+this the monitor re-enters the action on the next frame with the same candidates and the bot
+spends the wave starting and abandoning it. */
+static void HoldOffAmmo(int actor)
+{
+	m_ctAmmoAsk[actor] = GetGameTime() + AMMO_GIVEUP_TIME;
+	m_bAmmoPossible[actor] = false;
+}
 
 bool CTFBotGetAmmo_IsPossible(int actor)
 {

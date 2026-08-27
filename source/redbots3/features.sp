@@ -37,6 +37,7 @@ enum
 	FEATURE_MEDIC_SHIELD,
 	FEATURE_PATH_LENGTH_CAP,
 	FEATURE_ENGINEER_CLIMBS,
+	FEATURE_AMMO_FAILOVER,
 	FEATURE_COUNT
 }
 
@@ -59,7 +60,8 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"hold_the_nest",
 	"medic_shield",
 	"path_length_cap",
-	"engineer_climbs"
+	"engineer_climbs",
+	"ammo_failover"
 };
 
 static ConVar g_arrFeatureConVars[FEATURE_COUNT];
@@ -136,6 +138,12 @@ void LoadFeatures()
 	   This is the first jump in the mod aimed at a piece of ground. See mvm-fgs. */
 	g_arrFeatureConVars[FEATURE_ENGINEER_CLIMBS] = MakeFeature(FEATURE_ENGINEER_CLIMBS,
 		"The engineer crouch jumps onto a teleporter spot above him, and falls back to the nest ring rather than to his feet.", false);
+
+	/* Off until a run says otherwise. The pack was validated once and then repathed to every
+	   second with the answer thrown away, so a route that stopped existing left the bot walking
+	   an empty path until the pack expired. See mvm-zx0. */
+	g_arrFeatureConVars[FEATURE_AMMO_FAILOVER] = MakeFeature(FEATURE_AMMO_FAILOVER,
+		"A bot whose path to the ammo it picked keeps failing takes the next pack, then gives up, rather than walking at a wall.", false);
 
 	g_arrFeatureConVars[FEATURE_ATTACK_STRAFE] = MakeFeature(FEATURE_ATTACK_STRAFE,
 		"A bot that has arrived at its firing position keeps sidestepping instead of standing still.");
