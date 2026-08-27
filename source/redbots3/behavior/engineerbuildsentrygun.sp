@@ -123,6 +123,8 @@ public Action CTFBotMvMEngineerBuildSentrygun_OnStart(BehaviorAction action, int
 	{
 		m_aSentryStuckArea[actor] = m_aNestArea[actor];
 		m_iSentryStuckMark[actor] = StuckCountOf(actor);
+
+		LogBuildFailure(actor, "sentry", "new nest, stuck mark reset");
 	}
 
 	return action.Continue();
