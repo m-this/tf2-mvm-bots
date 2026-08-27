@@ -81,7 +81,10 @@ public Action CTFBotGotoUpgrade_Update(BehaviorAction action, int actor, float i
 		RepathToPos(actor, myBot, center);
 	}
 	
-	m_pPath[actor].Update(myBot);
+	if (PathFailedFor(actor))
+		NudgeTowardsGoal(actor, myBot, center);
+	else
+		m_pPath[actor].Update(myBot);
 	
 	return action.Continue();
 }

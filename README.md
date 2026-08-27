@@ -25,6 +25,8 @@ mission, `go run ./testbed/report` reads a run and compares two.
 See `testbed/README.md` for running it, `docs/testbed-metrics.md` for what the
 numbers mean, and `docs/how-bots-break.md` before debugging anything: the faults
 in this mod have one shape, and it is worth knowing it before guessing.
+`docs/spawn-nav-recovery.md` documents the community-map fallback for defenders
+that cannot leave RED spawn.
 `docs/engineer-and-medic.md` covers the two classes that generate most of the
 reports, including two fixes that looked obviously right and lost their A/B.
 `docs/soldier-and-demoman.md` covers the two lowest-scoring seats, where the

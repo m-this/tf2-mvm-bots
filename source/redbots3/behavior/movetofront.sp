@@ -178,6 +178,7 @@ public Action CTFBotMoveToFront_OnStart(BehaviorAction action, int actor, Behavi
 	m_iMoveToFrontTry[actor] = 0;
 	m_bAtTheFront[actor] = false;
 	m_ctMoveTimeout[actor] = GetGameTime() + MOVE_TO_FRONT_REACH;
+	RecoverDefenderFromDisconnectedSpawn(actor);
 	
 	if (!PickTheFront(actor))
 	{
@@ -253,7 +254,10 @@ public Action CTFBotMoveToFront_Update(BehaviorAction action, int actor, float i
 		RepathToPos(actor, myBot, m_vecGoalArea[actor]);
 	}
 	
-	m_pPath[actor].Update(myBot);
+	if (PathFailedFor(actor))
+		NudgeTowardsGoal(actor, myBot, m_vecGoalArea[actor]);
+	else
+		m_pPath[actor].Update(myBot);
 	
 	return action.Continue();
 }

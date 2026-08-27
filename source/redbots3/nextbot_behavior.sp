@@ -146,6 +146,117 @@ static bool TakePathBudget()
 static bool m_bPathFailed[MAXPLAYERS + 1];
 static int m_iPathFailures[MAXPLAYERS + 1];
 
+//A valid path can still drive a bot into a corner without getting it out of spawn.
+#define SPAWN_EXIT_WATCH_INTERVAL  1.0
+#define SPAWN_EXIT_STALL_TIME      6.0
+#define SPAWN_EXIT_PROGRESS        96.0
+
+static float m_vecSpawnExitProgress[MAXPLAYERS + 1][3];
+static float m_flSpawnExitProgressAt[MAXPLAYERS + 1];
+static float m_flSpawnExitStartedAt[MAXPLAYERS + 1];
+static float m_flSpawnExitWatchAt[MAXPLAYERS + 1];
+
+void ResetSpawnExitWatch(int client)
+{
+	m_vecSpawnExitProgress[client] = NULL_VECTOR;
+	m_flSpawnExitProgressAt[client] = 0.0;
+	m_flSpawnExitStartedAt[client] = 0.0;
+	m_flSpawnExitWatchAt[client] = 0.0;
+}
+
+static float DistanceFromPointToBounds(const float point[3], const float mins[3], const float maxs[3])
+{
+	float squared;
+
+	for (int axis = 0; axis < 3; axis++)
+	{
+		float outside;
+
+		if (point[axis] < mins[axis])
+			outside = mins[axis] - point[axis];
+		else if (point[axis] > maxs[axis])
+			outside = point[axis] - maxs[axis];
+
+		squared += outside * outside;
+	}
+
+	return SquareRoot(squared);
+}
+
+static float DistanceToClosestDefenderSpawn(int client)
+{
+	float point[3]; point = WorldSpaceCenter(client);
+	float closest = -1.0;
+	int room = -1;
+
+	while ((room = FindEntityByClassname(room, "func_respawnroom")) != -1)
+	{
+		int team = BaseEntity_GetTeamNumber(room);
+
+		if (team != 0 && team != GetClientTeam(client))
+			continue;
+
+		if (HasEntProp(room, Prop_Data, "m_bDisabled") && GetEntProp(room, Prop_Data, "m_bDisabled"))
+			continue;
+
+		float origin[3]; origin = GetAbsOrigin(room);
+		float mins[3]; GetEntPropVector(room, Prop_Data, "m_vecMins", mins);
+		float maxs[3]; GetEntPropVector(room, Prop_Data, "m_vecMaxs", maxs);
+		AddVectors(mins, origin, mins);
+		AddVectors(maxs, origin, maxs);
+
+		float distance = DistanceFromPointToBounds(point, mins, maxs);
+
+		if (closest < 0.0 || distance < closest)
+			closest = distance;
+	}
+
+	return closest;
+}
+
+static bool IsInOrNearDefenderSpawn(int client)
+{
+	if (TF2Util_IsPointInRespawnRoom(WorldSpaceCenter(client), client))
+		return true;
+
+	float distance = DistanceToClosestDefenderSpawn(client);
+	return distance >= 0.0 && distance <= redbots_manager_spawn_nav_recovery_radius.FloatValue;
+}
+
+static bool ShouldWatchDefenderSpawnExit(int client)
+{
+	RoundState state = GameRules_GetRoundState();
+	return state == RoundState_RoundRunning ? g_bHasUpgraded[client] :
+		state == RoundState_BetweenRounds && (g_bShoppedThisBreak[client] || !redbots_manager_bot_use_upgrades.BoolValue);
+}
+
+static CNavArea FindNearestRecoveryAreaByClassname(int client, const char[] classname)
+{
+	float clientPosition[3]; clientPosition = WorldSpaceCenter(client);
+	float closest = 999999.0;
+	CNavArea best = NULL_AREA;
+	int entity = -1;
+
+	while ((entity = FindEntityByClassname(entity, classname)) != -1)
+	{
+		float position[3]; position = WorldSpaceCenter(entity);
+		CNavArea area = TheNavMesh.GetNearestNavArea(position, true, 1500.0, true, true, TEAM_ANY);
+
+		if (area == NULL_AREA)
+			continue;
+
+		float distance = GetVectorDistance(clientPosition, position);
+
+		if (distance < closest)
+		{
+			closest = distance;
+			best = area;
+		}
+	}
+
+	return best;
+}
+
 int PathFailuresOf(int client)
 {
 	return m_iPathFailures[client];
@@ -157,7 +268,7 @@ bool PathFailedFor(int client)
 	return m_bPathFailed[client];
 }
 
-static void NudgeTowardsGoal(int client, INextBot myBot, const float goal[3])
+void NudgeTowardsGoal(int client, INextBot myBot, const float goal[3])
 {
 	ILocomotion myLoco = myBot.GetLocomotionInterface();
 	
@@ -228,6 +339,198 @@ static void NotePathResult(int actor, bool built)
 		m_iPathFailures[actor]++;
 	
 	m_bPathFailed[actor] = failed;
+}
+
+static CNavArea FindSpawnRecoveryArea(int client, char[] source, int sourceLength)
+{
+	int anchor = GetCapturableAreaTrigger(GetPlayerEnemyTeam(client));
+
+	if (anchor != -1)
+	{
+		CNavArea area = TheNavMesh.GetNearestNavArea(WorldSpaceCenter(anchor), true, 1500.0, true, true, TEAM_ANY);
+
+		if (area != NULL_AREA)
+		{
+			strcopy(source, sourceLength, "capture trigger");
+			return area;
+		}
+	}
+
+	CNavArea best = FindNearestRecoveryAreaByClassname(client, "func_capturezone");
+
+	if (best != NULL_AREA)
+	{
+		strcopy(source, sourceLength, "func_capturezone");
+		return best;
+	}
+
+	best = FindNearestRecoveryAreaByClassname(client, "team_control_point");
+
+	if (best != NULL_AREA)
+	{
+		strcopy(source, sourceLength, "control point");
+		return best;
+	}
+
+	float shortestBombTravel = 999999.0;
+
+	for (int i = 0; i < TheNavAreas.Count; i++)
+	{
+		CTFNavArea area = view_as<CTFNavArea>(TheNavAreas.Get(i));
+
+		if (area == NULL_AREA || area.HasAttributeTF(RED_SPAWN_ROOM) || area.HasAttributeTF(BLUE_SPAWN_ROOM))
+			continue;
+
+		float travel = GetTravelDistanceToBombTarget(area);
+
+		if (travel >= 0.0 && travel < shortestBombTravel)
+		{
+			shortestBombTravel = travel;
+			best = area;
+		}
+	}
+
+	if (best != NULL_AREA)
+		strcopy(source, sourceLength, "bomb-target NAV");
+
+	return best;
+}
+
+//Move to walkable NAV near the final objective, then let normal class behavior resume.
+static bool MoveDefenderFromSpawnToBattlefield(int client, const char[] reason)
+{
+	if (client < 1 || client > MaxClients || !IsClientInGame(client) || !IsPlayerAlive(client) || !g_bIsDefenderBot[client])
+		return false;
+
+	if (!IsInOrNearDefenderSpawn(client))
+		return false;
+
+	char anchorSource[32];
+	CNavArea area = FindSpawnRecoveryArea(client, anchorSource, sizeof(anchorSource));
+
+	if (area == NULL_AREA)
+		return false;
+
+	float destination[3]; CNavArea_GetRandomPoint(area, destination);
+	destination[2] += 10.0;
+	float stopped[3];
+
+	TeleportEntity(client, destination, NULL_VECTOR, stopped);
+	CBaseCombatCharacter(client).UpdateLastKnownArea();
+	m_flRepathTime[client] = 0.0;
+	ResetSpawnExitWatch(client);
+
+	LogMessage("SpawnNavRecovery: %N %s; moved them using %s", client, reason, anchorSource);
+	return true;
+}
+
+bool RecoverDefenderFromDisconnectedSpawn(int client)
+{
+	if (client < 1 || client > MaxClients || !IsClientInGame(client) || !IsPlayerAlive(client) || !g_bIsDefenderBot[client])
+		return false;
+
+	if (!IsInOrNearDefenderSpawn(client))
+		return false;
+
+	char anchorSource[32];
+	CNavArea area = FindSpawnRecoveryArea(client, anchorSource, sizeof(anchorSource));
+
+	if (area == NULL_AREA)
+		return false;
+
+	float anchor[3]; area.GetCenter(anchor);
+
+	if (IsPathToVectorPossible(client, anchor))
+		return false;
+
+	return MoveDefenderFromSpawnToBattlefield(client, "has no route out of spawn");
+}
+
+void WatchDefenderSpawnExit(int client)
+{
+	if (!redbots_manager_spawn_nav_recovery.BoolValue || !ShouldWatchDefenderSpawnExit(client) ||
+		TF2_IsInUpgradeZone(client) || !IsInOrNearDefenderSpawn(client))
+	{
+		ResetSpawnExitWatch(client);
+		return;
+	}
+
+	float now = GetGameTime();
+
+	if (m_flSpawnExitWatchAt[client] > now)
+		return;
+
+	m_flSpawnExitWatchAt[client] = now + SPAWN_EXIT_WATCH_INTERVAL;
+
+	if (m_flSpawnExitStartedAt[client] == 0.0)
+		m_flSpawnExitStartedAt[client] = now;
+	else if (now - m_flSpawnExitStartedAt[client] >= redbots_manager_spawn_nav_recovery_time.FloatValue)
+	{
+		MoveDefenderFromSpawnToBattlefield(client, "exceeded the configured time for leaving spawn");
+		return;
+	}
+
+	float here[3]; here = GetAbsOrigin(client);
+	float flatHere[3]; flatHere = here;
+	float flatPrevious[3]; flatPrevious = m_vecSpawnExitProgress[client];
+	flatHere[2] = 0.0;
+	flatPrevious[2] = 0.0;
+
+	if (m_flSpawnExitProgressAt[client] == 0.0 || GetVectorDistance(flatHere, flatPrevious) >= SPAWN_EXIT_PROGRESS)
+	{
+		m_vecSpawnExitProgress[client] = here;
+		m_flSpawnExitProgressAt[client] = now;
+		return;
+	}
+
+	if (now - m_flSpawnExitProgressAt[client] < SPAWN_EXIT_STALL_TIME)
+		return;
+
+	MoveDefenderFromSpawnToBattlefield(client, "made no spawn-exit progress for six seconds");
+}
+
+public Action Command_DumpSpawnNav(int client, int args)
+{
+	ReplyToCommand(client, "Spawn NAV recovery: enabled %d, radius %.0f, max time %.1f", redbots_manager_spawn_nav_recovery.BoolValue,
+		redbots_manager_spawn_nav_recovery_radius.FloatValue, redbots_manager_spawn_nav_recovery_time.FloatValue);
+
+	for (int bot = 1; bot <= MaxClients; bot++)
+	{
+		if (!IsClientInGame(bot) || !IsPlayerAlive(bot) || !g_bIsDefenderBot[bot])
+			continue;
+
+		bool strict = TF2Util_IsPointInRespawnRoom(WorldSpaceCenter(bot), bot);
+		float distance = DistanceToClosestDefenderSpawn(bot);
+		bool near = strict || distance >= 0.0 && distance <= redbots_manager_spawn_nav_recovery_radius.FloatValue;
+		float now = GetGameTime();
+		float watched = m_flSpawnExitStartedAt[bot] > 0.0 ? now - m_flSpawnExitStartedAt[bot] : 0.0;
+		float stalled = m_flSpawnExitProgressAt[bot] > 0.0 ? now - m_flSpawnExitProgressAt[bot] : 0.0;
+		float moved = m_flSpawnExitProgressAt[bot] > 0.0 ? GetVectorDistance(GetAbsOrigin(bot), m_vecSpawnExitProgress[bot]) : 0.0;
+		char anchorSource[32];
+		bool anchorNav = FindSpawnRecoveryArea(bot, anchorSource, sizeof(anchorSource)) != NULL_AREA;
+
+		ReplyToCommand(client, "%N: strict %d, spawn distance %.0f, near %d, eligible %d, upgrade zone %d, watched %.1fs, stalled %.1fs, moved %.0f, anchor %s, anchor NAV %d",
+			bot, strict, distance, near, ShouldWatchDefenderSpawnExit(bot), TF2_IsInUpgradeZone(bot), watched, stalled, moved, anchorSource, anchorNav);
+	}
+
+	return Plugin_Handled;
+}
+
+public Action Command_RecoverSpawnBots(int client, int args)
+{
+	int recovered;
+
+	for (int bot = 1; bot <= MaxClients; bot++)
+	{
+		if (!IsClientInGame(bot) || !IsPlayerAlive(bot) || !g_bIsDefenderBot[bot] || !IsInOrNearDefenderSpawn(bot))
+			continue;
+
+		if (MoveDefenderFromSpawnToBattlefield(bot, "was manually recovered by an admin"))
+			recovered++;
+	}
+
+	ReplyToCommand(client, "Recovered %d defender bot(s) from the configured spawn radius.", recovered);
+	return Plugin_Handled;
 }
 
 #include "behavior/attack.sp"
@@ -1519,6 +1822,8 @@ public Action CTFBotSpyLeaveSpawnRoom_OnStart(BehaviorAction action, int actor, 
 Action GetDesiredBotAction(int client, BehaviorAction action)
 {
 	RoundState state = GameRules_GetRoundState();
+	if (state == RoundState_RoundRunning && g_bHasUpgraded[client])
+		RecoverDefenderFromDisconnectedSpawn(client);
 	
 	if (state == RoundState_BetweenRounds)
 	{
