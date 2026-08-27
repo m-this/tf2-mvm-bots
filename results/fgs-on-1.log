@@ -1,0 +1,47 @@
+[test-bed] found a Team Fortress 2 install in tf2-archipelago_tf2game
+mvmbots-testbed_tf2game already has something in it, leaving it alone
+mvmbots-testbed_tf2game already has the game
+[test-bed] starting the server on mvm_bigrock
+ Container mvmbots-testbed-srcds-1 Recreate 
+ Container mvmbots-testbed-srcds-1 Recreated 
+ Container mvmbots-testbed-srcds-1 Starting 
+ Container mvmbots-testbed-srcds-1 Started 
+[test-bed] waiting for the server to answer rcon (the first run downloads the game)
+[test-bed] loading mission mvm_bigrock_advanced1
+[test-bed] waiting for the server to settle before restarting the round
+[test-bed] watching for 2 wave results, giving up after 1200s
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] the game server has crashed 1 time(s): that is a bug in what is being measured, not a slow wave
+[test-bed] the engine watchdog killed it: a frame took too long, so look for what was slow
+  srcds-1  | [defenderbots] stuck: Wesley (engineer) at -367 4260 204 for 12s, stuck #1, MainAction < TacticalMonitor < DefenderEngineerIdle < ScenarioMonitor
+  srcds-1  | [defenderbots] stuck: Wesley (engineer) at -367 4254 204 for 12s, stuck #2, MainAction < TacticalMonitor < DefenderEngineerIdle < ScenarioMonitor
+  srcds-1  | WatchDog! Server took too long to process (probably infinite loop).
+[test-bed] docker cp a9d72804fcddeda87d34fd5e01c56f477d0483bae2f528f41a28a99c348d2ea0:/home/steam/tf-dedicated/core.111 /tmp/ && /home/mathis/projects/tf2-mvm-bots/testbed/symbolise-core.sh /tmp/core.111
+[test-bed] docker compose -f /home/mathis/projects/tf2-mvm-bots/testbed/compose.yml logs srcds | grep -i 'core dumped'
+[test-bed] wrote results/fgs-on-1.jsonl
+results/fgs-on-1.jsonl
+  no wave results in this file
