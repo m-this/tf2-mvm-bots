@@ -1282,7 +1282,21 @@ static void UpdateStuckWatchdog(int actor)
 	INextBot myBot = CBaseNPC_GetNextBotOfEntity(actor);
 	ILocomotion myLoco = myBot.GetLocomotionInterface();
 	
-	bool wantsToBeElsewhere = g_arrPluginBot[actor].bPathing || myLoco.IsStuck();
+	/* A bot with nothing on its stack is stuck too, and the watchdog used to miss it
+
+	Measured on Mannhunt with v2.21.3: the engineer sat at 1014 885 274 for 45 seconds with no
+	behaviour in 69 per cent of samples, and not one stuck line was written. He was not pathing, so
+	wantsToBeElsewhere was false and the watchdog never armed. A bot that has stopped asking to go
+	anywhere is exactly the one nobody is going to rescue, which is the opposite of what a watchdog
+	is for.
+
+	The reset below is what an empty stack needs anyway: ResetIntentionInterface is what gives a bot
+	its behaviour back. */
+	char actions[512]; ActionStackOf(actor, actions, sizeof(actions));
+
+	bool noBehaviour = Feature(FEATURE_WATCH_IDLE_BOTS) && actions[0] == '\0';
+
+	bool wantsToBeElsewhere = g_arrPluginBot[actor].bPathing || myLoco.IsStuck() || noBehaviour;
 	
 	float here[3]; here = GetAbsOrigin(actor);
 	
@@ -1324,16 +1338,16 @@ static void UpdateStuckWatchdog(int actor)
 	myLoco.ClearStuckStatus("Watchdog");
 	g_arrPluginBot[actor].bPathing = false;
 	
-	char stack[512]; ActionStackOf(actor, stack, sizeof(stack));
-	
 	PrintToServer("[defenderbots] stuck: %N (%s) at %.0f %.0f %.0f for %.0fs, stuck #%d, %s",
 		actor, g_sRawPlayerClassNames[TF2_GetPlayerClass(actor)],
-		here[0], here[1], here[2], STUCK_TIME, m_iStuckCount[actor], stack);
+		here[0], here[1], here[2], STUCK_TIME, m_iStuckCount[actor],
+		actions[0] == '\0' ? "no behaviour" : actions);
 
 	//The same line in the file, so a run can be counted rather than watched
 	LogMessage("Stuck: %N (%s) at %.0f %.0f %.0f, stuck #%d, %s",
 		actor, g_sRawPlayerClassNames[TF2_GetPlayerClass(actor)],
-		here[0], here[1], here[2], m_iStuckCount[actor], stack);
+		here[0], here[1], here[2], m_iStuckCount[actor],
+		actions[0] == '\0' ? "no behaviour" : actions);
 	
 	if (m_iStuckWedgeCount[actor] >= STUCK_WEDGE_GIVEUP && MoveWedgedDefender(actor))
 		return;
