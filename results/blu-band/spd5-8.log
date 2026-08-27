@@ -1,0 +1,26 @@
+[test-bed] found a Team Fortress 2 install in tf2-archipelago_tf2game
+mvmbots-testbed_tf2game already has something in it, leaving it alone
+mvmbots-testbed_tf2game already has the game
+[test-bed] starting the server on mvm_rottenburg
+ Container mvmbots-testbed-srcds-1 Running 
+[test-bed] waiting for the server to answer rcon (the first run downloads the game)
+[test-bed] loading mission mvm_rottenburg_advanced1
+[test-bed] waiting for the server to settle before restarting the round
+[test-bed] watching for 1 wave results, giving up after 900s
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] the game server has crashed 1 time(s): that is a bug in what is being measured, not a slow wave
+[test-bed] a segfault, with no watchdog before it: look for what is corrupt
+[test-bed] docker cp bc4fa990299076b29defd72dc21103dd340c57bd23db21a47a96b1b3344d0d1b:/home/steam/tf-dedicated/core.1315 /tmp/ && /home/mathis/projects/tf2-mvm-bots/testbed/symbolise-core.sh /tmp/core.1315
+[test-bed] docker compose -f /home/mathis/projects/tf2-mvm-bots/testbed/compose.yml logs srcds | grep -i 'core dumped'
+[test-bed] wrote results/blu-band/spd5-8.jsonl
+results/blu-band/spd5-8.jsonl
+  no wave results in this file

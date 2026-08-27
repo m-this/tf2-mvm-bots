@@ -1,0 +1,106 @@
+[test-bed] found a Team Fortress 2 install in tf2-archipelago_tf2game
+mvmbots-testbed_tf2game already has something in it, leaving it alone
+mvmbots-testbed_tf2game already has the game
+[test-bed] starting the server on mvm_rottenburg
+ Container mvmbots-testbed-srcds-1 Running 
+[test-bed] waiting for the server to answer rcon (the first run downloads the game)
+[test-bed] loading mission mvm_rottenburg_advanced1
+[test-bed] waiting for the server to settle before restarting the round
+[test-bed] watching for 1 wave results, giving up after 900s
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 0 of 1 waves finished
+[test-bed] 1 of 1 waves finished
+[test-bed] wrote results/blu-band/spd5-6.jsonl
+
+results/blu-band/spd5-6.jsonl
+  waves played      1
+  cleared           0 (0%)
+  robots killed     57, of them 2 giants
+  defenders died    20
+  sentries lost     3
+  buildings took    638, engineer put back 191 (30%)
+  damage dealt      17581
+  of it, sentries   1136 (6%)
+  damage to tanks   0
+  healing done      3319, 0 ubers
+  healing by class  scout 2778  engineer 483  medic 58
+  scoreboard says   2835   (the event sum says 3319, which is a -484 gap)
+  damage by class   heavy 5685  soldier 3994  demoman 3796  scout 2100  engineer 1916  medic 90
+  kills by class    heavy 21  demoman 14  soldier 9  scout 8  engineer 5
+  giants by class   demoman 1  heavy 1
+  killed us         soldier 16  demoman 3  scout 1
+  died to           explosion 17  other 3
+  demoman damage    pipes 3626, stickies 170, bottle 0
+  soldier damage    rockets 3994, everything else 0
+  jars thrown       5
+  projectiles       soldier 60 fired, 34 hit (56%);  demoman 69 fired, 36 hit (52%)
+  hurt themselves   soldier 1474  demoman 412  engineer 16
+  killed themselves soldier 1
+
+  what the bots were doing (251 samples)
+    Marvin           soldier   DefenderAttack 48%, DefenderMoveToFront 39%, DefenderCampBomb 7%
+                               primary 97%/secondary 2%, hurt 7% of the time
+    Oliver           demoman   DefenderAttack 47%, DefenderMoveToFront 27%, DefenderGotoUpgrade 9%
+                               primary 72%/secondary 27%, hurt 15% of the time
+    Toby             scout     DefenderCollectMoney 37%, DefenderMoveToFront 23%, DefenderAttack 18%
+                               primary 32%/secondary 67%, hurt 13% of the time
+    Uri              heavy     DefenderAttack 59%, DefenderMoveToFront 28%, DefenderGotoUpgrade 9%
+                               primary 100%, hurt 7% of the time
+    Wally            medic     Heal 51%, DefenderMoveToFront 35%, DefenderGotoUpgrade 5%
+                               beam on somebody 33% of the time, trigger held 48% (68% of that connected)
+                               primary 10%/secondary 89%, hurt 5% of the time
+    Walt             engineer  DefenderEngineerIdle 26%, DefenderBuildSentrygun 26%, DefenderBuildTeleporter 21%
+                               primary 59%/secondary 4%/melee 14%, hurt 4% of the time
+
+  what the buildings were worth (104 samples)
+    Walt dispenser               level 3, saw a robot 29% of samples (0.8 at a time), 1.2 teammates in range
+    Walt sentry                  level 3, saw a robot 16% of samples (0.4 at a time), 2.0 teammates in range
+    Walt teleporter entrance     level 3, saw a robot 6% of samples (0.1 at a time), 0.2 teammates in range
+    Walt teleporter exit         level 3, saw a robot 0% of samples (0.0 at a time), 0.2 teammates in range
+
+  how close the buildings got to the spots mvm_rottenburg names
+    Walt dispenser                wave 1: 20
+    Walt sentry                   wave 1: 586!
+    (median units from the nearest authored spot; ! is off it, !! is nowhere near it)
+
+  how close the nearest robot was
+    demoman   median 845, closest tenth under 220, point blank 0% of samples
+    engineer  median 1248, closest tenth under 357, point blank 3% of samples
+    heavy     median 1059, closest tenth under 378, point blank 0% of samples
+    medic     median 1170, closest tenth under 425, point blank 0% of samples
+    scout     median 639, closest tenth under 139, point blank 11% of samples
+    soldier   median 792, closest tenth under 313, point blank 0% of samples
+
+  where they stood while a wave was running
+    Marvin           soldier   stood still 4% of the time, longest 5s at 1234 -1692 -568, 22323 units walked per wave
+                               trigger held in 37% of samples, 88% of those into the world (aimed at world 80%, entity_medigun_shield 8%, prop_dynamic 4%)
+    Oliver           demoman   stood still 11% of the time, longest 10s at 1290 -1822 -567, 17691 units walked per wave
+                               trigger held in 29% of samples, 75% of those into the world (aimed at world 89%, entity_medigun_shield 3%, giant soldier 3%)
+    Toby             scout     stood still 0% of the time, longest 0s, 28424 units walked per wave
+                               trigger held in 26% of samples, 57% of those into the world (aimed at world 77%, giant soldier 7%, giant demoman 3%)
+    Uri              heavy     stood still 0% of the time, longest 0s, 15752 units walked per wave
+                               trigger held in 56% of samples, 21% of those into the world (aimed at world 50%, entity_medigun_shield 15%, scout 11%)
+    Wally            medic     stood still 0% of the time, longest 0s, 18684 units walked per wave
+                               trigger held in 81% of samples, 16% of those into the world (aimed at teammate 43%, world 34%, entity_medigun_shield 17%)
+    Walt             engineer  stood still 0% of the time, longest 0s, 26668 units walked per wave
+                               asked to walk in 88% of samples, 9% of those with no path at all, 0% of those without moving
+                               trigger held in 36% of samples, 33% of those into the world (aimed at world 69%, own_sentrygun 7%, giant soldier 7%)
+                               wrench out 4 samples, 0% of them stopped out of reach of his own buildings
+
+  between waves
+    Marvin           soldier   no behaviour in 0% of samples, longest 0s, 9472 units walked
+    Oliver           demoman   no behaviour in 0% of samples, longest 0s, 10780 units walked
+    Toby             scout     no behaviour in 0% of samples, longest 0s, 10315 units walked
+    Uri              heavy     no behaviour in 0% of samples, longest 0s, 12529 units walked
+    Wally            medic     no behaviour in 0% of samples, longest 0s, 12170 units walked
+    Walt             engineer  no behaviour in 0% of samples, longest 0s, 18657 units walked
+
+  how much one wave varies from the next

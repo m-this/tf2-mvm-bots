@@ -1,0 +1,117 @@
+[test-bed] found a Team Fortress 2 install in tf2-archipelago_tf2game
+mvmbots-testbed_tf2game already has something in it, leaving it alone
+mvmbots-testbed_tf2game already has the game
+[test-bed] starting the server on mvm_bigrock
+ Container mvmbots-testbed-srcds-1 Running 
+[test-bed] waiting for the server to answer rcon (the first run downloads the game)
+[test-bed] loading mission mvm_bigrock_advanced1
+[test-bed] waiting for the server to settle before restarting the round
+[test-bed] watching for 2 wave results, giving up after 1200s
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 2 of 2 waves finished
+[test-bed] wrote results/fgs-on-4.jsonl
+
+results/fgs-on-4.jsonl
+  waves played      2
+  cleared           0 (0%)
+  robots killed     82, of them 1 giants
+  defenders died    55
+  sentries lost     3
+  buildings took    801, engineer put back 0 (0%)
+  damage dealt      32967
+  of it, sentries   2080 (6%)
+  damage to tanks   0
+  healing done      2449, 1 ubers
+  healing by class  scout 1874  engineer 310  medic 265
+  scoreboard says   3851   (the event sum says 2449, which is a 1402 gap)
+  damage by class   heavy 9224  scout 7608  soldier 5643  demoman 5418  engineer 4384  medic 690
+  kills by class    heavy 28  soldier 18  demoman 14  scout 12  engineer 10
+  giants by class   scout 1
+  killed us         soldier 44  sniper 5  scout 3  spy 2  sentry 1
+  died to           explosion 43  bullet 5  other 4  backstab 2  melee 1
+  demoman damage    pipes 4274, stickies 1144, bottle 0
+  soldier damage    rockets 5643, everything else 0
+  jars thrown       11
+  projectiles       soldier 81 fired, 40 hit (49%);  demoman 77 fired, 32 hit (41%)
+  hurt themselves   medic 2103  soldier 741  demoman 619  engineer 32
+  killed themselves nothing
+
+  what the bots were doing (519 samples)
+    Bob              demoman   DefenderAttack 40%, DefenderMoveToFront 36%, DefenderCampBomb 17%
+                               primary 85%/secondary 14%, hurt 12% of the time
+    Ulric            medic     Heal 44%, DefenderMoveToFront 37%, DefenderMedicRevive 14%
+                               beam on somebody 32% of the time, trigger held 50% (66% of that connected)
+                               primary 6%/secondary 93%, hurt 4% of the time
+    Walt             scout     DefenderCollectMoney 37%, DefenderMoveToFront 35%, DefenderAttack 19%
+                               primary 37%/secondary 62%, hurt 6% of the time
+    Wesley           engineer  DefenderBuildSentrygun 54%, DefenderEngineerIdle 27%, DefenderBuildTeleporter 14%
+                               primary 64%/secondary 6%/melee 1%, hurt 3% of the time
+    Yanni            heavy     DefenderAttack 53%, DefenderMoveToFront 37%, DefenderGotoUpgrade 5%
+                               primary 95%/secondary 4%, hurt 12% of the time
+    Yogi             soldier   DefenderAttack 49%, DefenderMoveToFront 38%, DefenderCampBomb 7%
+                               primary 98%/secondary 1%, hurt 12% of the time
+
+  what the buildings were worth (65 samples)
+    Wesley dispenser             level 3, saw a robot 9% of samples (0.2 at a time), 2.4 teammates in range
+    Wesley sentry                level 3, saw a robot 24% of samples (1.0 at a time), 1.4 teammates in range
+
+  how close the buildings got to the spots mvm_bigrock names
+    Wesley dispenser              wave 1: 49
+    Wesley sentry                 wave 1: 14
+    (median units from the nearest authored spot; ! is off it, !! is nowhere near it)
+
+  how close the nearest robot was
+    demoman   median 1002, closest tenth under 244, point blank 9% of samples
+    engineer  median 1302, closest tenth under 366, point blank 0% of samples
+    heavy     median 1202, closest tenth under 200, point blank 7% of samples
+    medic     median 1304, closest tenth under 197, point blank 5% of samples
+    scout     median 867, closest tenth under 154, point blank 9% of samples
+    soldier   median 1462, closest tenth under 233, point blank 6% of samples
+
+  where they stood while a wave was running
+    Bob              demoman   stood still 15% of the time, longest 25s at -1502 -2199 576, 60123 units walked per wave
+                               trigger held in 22% of samples, 66% of those into the world (aimed at world 85%, scout 5%, giant soldier 3%)
+    Ulric            medic     stood still 11% of the time, longest 10s at -1193 4302 124, 55143 units walked per wave
+                               trigger held in 83% of samples, 29% of those into the world (aimed at world 33%, teammate 29%, entity_medigun_shield 22%)
+    Walt             scout     stood still 7% of the time, longest 5s at -995 3787 187, 75445 units walked per wave
+                               trigger held in 46% of samples, 36% of those into the world (aimed at world 54%, scout 12%, giant soldier 12%)
+    Wesley           engineer  stood still 8% of the time, longest 20s at -467 4274 198, 69125 units walked per wave
+                               asked to walk in 91% of samples, 9% of those with no path at all, 4% of those without moving
+                               trigger held in 30% of samples, 42% of those into the world (aimed at world 74%, giant soldier 6%, teammate 6%)
+                               wrench out 1 samples, 0% of them stopped out of reach of his own buildings
+    Yanni            heavy     stood still 1% of the time, longest 5s at 652 816 320, 61626 units walked per wave
+                               trigger held in 41% of samples, 18% of those into the world (aimed at world 59%, entity_medigun_shield 12%, giant soldier 12%)
+    Yogi             soldier   stood still 10% of the time, longest 10s at -809 -2506 467, 60210 units walked per wave
+                               trigger held in 14% of samples, 85% of those into the world (aimed at world 80%, func_brush 5%, scout 3%)
+
+  between waves
+    Bob              demoman   no behaviour in 0% of samples, longest 0s, 34558 units walked
+    Ulric            medic     no behaviour in 0% of samples, longest 0s, 36573 units walked
+    Walt             scout     no behaviour in 0% of samples, longest 0s, 33825 units walked
+    Wesley           engineer  no behaviour in 0% of samples, longest 0s, 48314 units walked
+    Yanni            heavy     no behaviour in 0% of samples, longest 0s, 33722 units walked
+    Yogi             soldier   no behaviour in 0% of samples, longest 0s, 33655 units walked
+
+  how much one wave varies from the next

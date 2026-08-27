@@ -1,0 +1,137 @@
+[test-bed] found a Team Fortress 2 install in tf2-archipelago_tf2game
+mvmbots-testbed_tf2game already has something in it, leaving it alone
+mvmbots-testbed_tf2game already has the game
+[test-bed] starting the server on mvm_mannworks
+ Container mvmbots-testbed-srcds-1 Running 
+[test-bed] waiting for the server to answer rcon (the first run downloads the game)
+[test-bed] loading mission mvm_mannworks_intermediate2
+[test-bed] waiting for the server to settle before restarting the round
+[test-bed] watching for 2 wave results, giving up after 1500s
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] timed out with 1 of 2 results
+[test-bed] wrote results/wedgefix-2.jsonl
+
+results/wedgefix-2.jsonl
+  waves played      1
+  cleared           0 (0%)
+  robots killed     0, of them 0 giants
+  defenders died    0
+  sentries lost     0
+  (no contribution numbers in this file)
+
+  what the bots were doing (1824 samples)
+    Bob              demoman   ScenarioMonitor 54%, DefenderAttack 41%, DefenderMoveToFront 3%
+                               primary 100%, hurt 0% of the time
+    Ulric            medic     Heal 96%, DefenderMoveToFront 3%
+                               beam on somebody 96% of the time, trigger held 96% (100% of that connected)
+                               secondary 100%, hurt 0% of the time
+    Walt             scout     ScenarioMonitor 96%, DefenderMoveToFront 3%
+                               secondary 100%, hurt 0% of the time
+    Wesley           engineer  DefenderGetAmmo 94%, ScenarioMonitor 2%, DefenderBuildSentrygun 2%
+                               primary 0%/melee 94%, hurt 0% of the time
+    Yanni            heavy     ScenarioMonitor 54%, DefenderAttack 41%, DefenderMoveToFront 3%
+                               primary 100%, hurt 0% of the time
+    Yogi             soldier   DefenderAttack 54%, ScenarioMonitor 41%, DefenderMoveToFront 3%
+                               primary 100%, hurt 0% of the time
+
+  what the buildings were worth (287 samples)
+    Wesley sentry                level 1, saw a robot 0% of samples (0.0 at a time), 1.0 teammates in range
+
+  how close the buildings got to the spots mvm_mannworks names
+    Wesley sentry                 wave 1: 120
+    (median units from the nearest authored spot; ! is off it, !! is nowhere near it)
+
+  where they stood while a wave was running
+    Bob              demoman   stood still 100% of the time, longest 1455s at 692 1634 130, 0 units walked per wave
+    Ulric            medic     stood still 97% of the time, longest 1285s at 883 2193 219, 1442 units walked per wave
+                               trigger held in 100% of samples, 0% of those into the world (aimed at teammate 100%)
+    Walt             scout     stood still 100% of the time, longest 1455s at 784 1808 129, 0 units walked per wave
+    Wesley           engineer  stood still 99% of the time, longest 1430s at 1026 700 267, 186 units walked per wave
+                               asked to walk in 100% of samples, 0% of those with no path at all, 99% of those without moving
+                               trigger held in 0% of samples, 0% of those into the world (aimed at func_brush 45%, world 45%, func_respawnroomvisualizer 8%)
+                               wrench out 287 samples, 0% of them stopped out of reach of his own buildings
+    Yanni            heavy     stood still 98% of the time, longest 1290s at 799 2284 244, 1469 units walked per wave
+    Yogi             soldier   stood still 100% of the time, longest 1455s at 690 1395 129, 62 units walked per wave
+
+  between waves
+    Bob              demoman   no behaviour in 8% of samples, longest 5s at -643 -2627 384, 4864 units walked
+    Ulric            medic     no behaviour in 8% of samples, longest 5s at -643 -2637 384, 4992 units walked
+    Walt             scout     no behaviour in 8% of samples, longest 5s at -643 -2603 384, 5002 units walked
+    Wesley           engineer  no behaviour in 75% of samples, longest 45s at 1014 885 274, 0 units walked
+    Yanni            heavy     no behaviour in 0% of samples, longest 0s, 4629 units walked
+    Yogi             soldier   no behaviour in 0% of samples, longest 0s, 4740 units walked
+
+  how much one wave varies from the next
