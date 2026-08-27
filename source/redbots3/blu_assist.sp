@@ -34,8 +34,17 @@ ConVar redbots_manager_blu_speed_scale;
 //The team size the scales are written against, which is the team every MvM wave is tuned for
 #define BLU_ASSIST_FULL_TEAM 6.0
 
+//Counts the robots a bend has been applied to this map, for the sampled log line below
+static int m_iBluAssistSeen;
+
+//The same, for hits a robot landed on a defender
+static int m_iBluAssistHits;
+
 void BluAssist_Init()
 {
+	m_iBluAssistSeen = 0;
+	m_iBluAssistHits = 0;
+
 	redbots_manager_blu_damage_scale = CreateConVar("sm_redbots_manager_blu_damage_scale", "1.0",
 		"What a robot's damage is multiplied by when one human is on RED. Rises to 1.0 at six. 1.0 is off.",
 		FCVAR_NOTIFY, true, 0.1, true, 1.0);
@@ -181,6 +190,35 @@ static void BluAssistApplyToRobot(int userid)
 
 	if (speed < 1.0)
 		BluAssistBendAttrib(client, "move speed bonus", 1.0, 0.0, speed);
+
+	BluAssistSay(client, health, speed);
+}
+
+/* Write down what a bend actually did to one robot in every BLU_ASSIST_SAMPLE
+
+The levers are read off wave outcomes otherwise, and a wave outcome cannot tell a lever that did
+nothing from a lever that did something too small to win with. This says what the robot was worth
+before and after, which is the question.
+
+Sampled rather than every robot: a wave brings them by the hundred and a line per robot is a line
+nobody reads. */
+#define BLU_ASSIST_SAMPLE	25
+
+static void BluAssistSay(int client, float health, float speed)
+{
+	if (health >= 1.0 && speed >= 1.0)
+		return;
+
+	if (++m_iBluAssistSeen % BLU_ASSIST_SAMPLE != 0)
+		return;
+
+	Address moveAttrib = TF2Attrib_GetByName(client, "move speed bonus");
+
+	LogMessage("BluAssist: robot %d of the wave, health %d of %d wanted x%.2f, move speed bonus %.2f wanted x%.2f, on the ground %.0f",
+		m_iBluAssistSeen,
+		GetClientHealth(client), GetEntProp(client, Prop_Data, "m_iMaxHealth"), health,
+		moveAttrib == Address_Null ? 1.0 : TF2Attrib_GetValue(moveAttrib), speed,
+		GetEntPropFloat(client, Prop_Data, "m_flMaxspeed"));
 }
 
 /* Bend an attribute the popfile may already have set, from its neutral value when it has not
@@ -212,7 +250,15 @@ public Action BluAssist_TakeDamage(int victim, int &attacker, int &inflictor, fl
 	if (scale >= 1.0)
 		return Plugin_Continue;
 
+	float before = damage;
+
 	damage *= scale;
+
+	/* Same sampling as the spawn bends, and for the same reason: a wave outcome cannot tell a
+	   damage lever that is not applying from one that is applying and not enough. */
+	if (++m_iBluAssistHits % BLU_ASSIST_SAMPLE == 0)
+		LogMessage("BluAssist: hit %d of the wave, %.0f became %.0f, wanted x%.2f",
+			m_iBluAssistHits, before, damage, scale);
 
 	return Plugin_Changed;
 }
