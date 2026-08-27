@@ -188,6 +188,23 @@ public Action CTFBotMvMEngineerBuildDispenser_Update(BehaviorAction action, int 
 	
 	if (outOfTime)
 		stand = GetAbsOrigin(actor);
+
+	/* He never arrived, so the spot is unreachable rather than slow
+
+	outOfTime above settles for where he stands, and only while he is near the nest, for the reason
+	in the comment on it. That leaves an engineer who never gets near at all walking at the same
+	spot for the rest of the mission.
+
+	He gives the dispenser up rather than standing there. The action ends, the idle behaviour picks
+	again, and a dispenser he does not have is worth less than an engineer who is doing something
+	else. */
+	if (m_ctDispenserReachDeadline[actor] > 0.0 && GetGameTime() > m_ctDispenserReachDeadline[actor]
+		&& GetVectorDistance(GetAbsOrigin(actor), spot) >= DISPENSER_SETTLE_RANGE)
+	{
+		LogBuildFailure(actor, "dispenser", "could not reach the spot, gave it up");
+
+		return action.Done("Cannot reach the dispenser spot");
+	}
 	
 	float range_to_stand = GetVectorDistance(GetAbsOrigin(actor), stand);
 	
