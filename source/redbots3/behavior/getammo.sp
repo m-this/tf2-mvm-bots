@@ -47,6 +47,9 @@ public Action CTFBotGetAmmo_OnStart(BehaviorAction action, int actor, BehaviorAc
 {
 	m_pPath[actor].SetMinLookAheadDistance(GetDesiredPathLookAheadRange(actor));
 	
+	//Nothing unless a debug convar is set, which is never on a real server
+	DebugFaults_OnAmmoWalkStart(actor);
+	
 	ArrayList ammo = new ArrayList(2);
 	ComputeHealthAndAmmoVectors(actor, ammo, tf_bot_ammo_search_range.FloatValue);
 	
@@ -119,7 +122,7 @@ public Action CTFBotGetAmmo_Update(BehaviorAction action, int actor, float inter
 		if (Feature(FEATURE_AMMO_FAILOVER))
 		{
 			//The return value is the only thing that says the route failed. The length lies.
-			if (!PathFailedFor(actor))
+			if (!DebugFaults_RefuseAmmoPath(actor) && !PathFailedFor(actor))
 			{
 				m_iAmmoRepathFails[actor] = 0;
 			}
