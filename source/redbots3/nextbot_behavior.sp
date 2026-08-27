@@ -1256,6 +1256,14 @@ static float m_vStuckOrigin[MAXPLAYERS + 1][3];
 static float m_ctStuckDeadline[MAXPLAYERS + 1];
 static int m_iStuckCount[MAXPLAYERS + 1];
 
+//Where a bot kept getting stuck, and how many times running, so a wedge is told from a slow walk
+static float m_vStuckWedge[MAXPLAYERS + 1][3];
+static int m_iStuckWedgeCount[MAXPLAYERS + 1];
+
+//Stucks at one spot before the bot is moved off it, and how far to look for somewhere it can stand
+#define STUCK_WEDGE_GIVEUP	3
+#define STUCK_WEDGE_SEARCH	400.0
+
 int StuckCountOf(int client)
 {
 	return m_iStuckCount[client];
@@ -1289,6 +1297,26 @@ static void UpdateStuckWatchdog(int actor)
 	if (GetGameTime() < m_ctStuckDeadline[actor])
 		return;
 	
+	/* Stuck again without having moved, which is a bot wedged rather than a bot walking slowly
+
+	Measured on Mannworks with Mean Machines: the same engineer at 1014 885 274, eleven times, and
+	the server killed by the watchdog on the same spot. Resetting his behaviour does not move him,
+	so he comes back to the same wedge and asks for another path, which is the frame that grows.
+
+	Counting here rather than inside the action he happens to be running. Anything armed in an
+	action is armed again when the reset restarts it: two attempts at this fix were defeated that
+	way, and the nest the engineer is aiming at churns underneath it. The watchdog is the one place
+	the reset cannot reach. */
+	if (GetVectorDistance(here, m_vStuckWedge[actor]) <= STUCK_RADIUS)
+	{
+		m_iStuckWedgeCount[actor]++;
+	}
+	else
+	{
+		m_vStuckWedge[actor] = here;
+		m_iStuckWedgeCount[actor] = 1;
+	}
+
 	m_vStuckOrigin[actor] = here;
 	m_ctStuckDeadline[actor] = GetGameTime() + STUCK_TIME;
 	m_iStuckCount[actor]++;
@@ -1298,11 +1326,57 @@ static void UpdateStuckWatchdog(int actor)
 	
 	char stack[512]; ActionStackOf(actor, stack, sizeof(stack));
 	
-	PrintToServer("[defenderbots] stuck: %N (%s) at %.0f %.0f %.0f for %.0fs, %s",
+	PrintToServer("[defenderbots] stuck: %N (%s) at %.0f %.0f %.0f for %.0fs, stuck #%d, %s",
 		actor, g_sRawPlayerClassNames[TF2_GetPlayerClass(actor)],
-		here[0], here[1], here[2], STUCK_TIME, stack);
+		here[0], here[1], here[2], STUCK_TIME, m_iStuckCount[actor], stack);
+
+	//The same line in the file, so a run can be counted rather than watched
+	LogMessage("Stuck: %N (%s) at %.0f %.0f %.0f, stuck #%d, %s",
+		actor, g_sRawPlayerClassNames[TF2_GetPlayerClass(actor)],
+		here[0], here[1], here[2], m_iStuckCount[actor], stack);
 	
+	if (m_iStuckWedgeCount[actor] >= STUCK_WEDGE_GIVEUP && MoveWedgedDefender(actor))
+		return;
+
 	RequestFrame(Frame_UnstickDefender, actor);
+}
+
+/* Put a wedged bot somewhere it can walk, when resetting it has stopped working
+
+The same shape as the spawn recovery below and for the same reason, one step further along: that
+one moves a bot that never left spawn, and this one moves a bot that left and then stopped. Both
+beat leaving it where it is, because a bot that cannot move asks for a path every frame and the
+watchdog kills the server on the answer.
+
+Nearby rather than at the objective. He was going somewhere and the wedge is what stopped him, so
+the least surprising thing is the same place minus the geometry he is inside. */
+static bool MoveWedgedDefender(int client)
+{
+	float here[3]; here = GetAbsOrigin(client);
+
+	CNavArea area = TheNavMesh.GetNearestNavArea(here, true, STUCK_WEDGE_SEARCH, false, true, TEAM_ANY);
+
+	if (area == NULL_AREA)
+		return false;
+
+	float destination[3]; CNavArea_GetRandomPoint(area, destination);
+	destination[2] += 10.0;
+
+	//No point moving him onto the spot he is already wedged in
+	if (GetVectorDistance(here, destination) <= STUCK_RADIUS)
+		return false;
+
+	float stopped[3];
+	TeleportEntity(client, destination, NULL_VECTOR, stopped);
+	CBaseCombatCharacter(client).UpdateLastKnownArea();
+
+	m_flRepathTime[client] = 0.0;
+	m_iStuckWedgeCount[client] = 0;
+
+	LogMessage("Stuck: %N was wedged at %.0f %.0f %.0f, moved to %.0f %.0f %.0f",
+		client, here[0], here[1], here[2], destination[0], destination[1], destination[2]);
+
+	return true;
 }
 
 public Action CTFBotTacticalMonitor_Update(BehaviorAction action, int actor, float interval, ActionResult result)
