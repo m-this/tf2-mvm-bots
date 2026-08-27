@@ -46,6 +46,25 @@ idle action, which scores a nest again and tries afresh. */
 #define SENTRY_BUILD_TIME	45.0
 
 static float m_ctSentryReachDeadline[MAXPLAYERS + 1];
+
+/* What the stuck watchdog had counted when this build attempt started
+
+The watchdog resets the whole behaviour every STUCK_TIME, which restarts this action, which re-arms
+the reach deadline. So an engineer who cannot reach his spot is rescued by nothing: the deadline
+that would have made him pick another spot is pushed forward every time he is rescued.
+
+Measured on Mannworks with Mean Machines: the same engineer stuck at 1014 885 274, nineteen times,
+inside DefenderBuildSentrygun, and never a sentry. STUCK_TIME and SENTRY_REACH_TIME are both twelve
+seconds, so the two timers chase each other.
+
+Counting stucks across the restarts is what survives them. */
+static int m_iSentryStuckMark[MAXPLAYERS + 1];
+
+//The nest the mark above belongs to, so a restart does not look like a new attempt
+static CNavArea m_aSentryStuckArea[MAXPLAYERS + 1] = {NULL_AREA, ...};
+
+//Stucks inside one attempt before the spot is the suspect rather than the walk
+#define SENTRY_STUCK_GIVEUP	2
 static float m_ctSentryGiveUpTime[MAXPLAYERS + 1];
 static float m_ctSentryTryDeadline[MAXPLAYERS + 1];
 //When the last build press is allowed to have landed, so the next frame is not another press
@@ -91,7 +110,21 @@ public Action CTFBotMvMEngineerBuildSentrygun_OnStart(BehaviorAction action, int
 	m_ctSentryReachDeadline[actor] = GetGameTime() + BuildReachTime(GetAbsOrigin(actor), m_vSentryStand[actor]);
 	
 	LogBuildFailure(actor, "sentry", "started");
-	
+
+	/* The mark has to survive the watchdog's reset, which is the whole point of it
+
+	ResetIntentionInterface restarts this action, so anything armed in OnStart is armed again every
+	twelve seconds and can never expire. That is the fault in the reach deadline, and re-marking
+	here would inherit it: the count would restart alongside the thing it counts.
+
+	So the mark belongs to the nest rather than to the attempt. It resets when he is sent somewhere
+	new, and not when he is merely restarted at the same place. */
+	if (m_aSentryStuckArea[actor] != m_aNestArea[actor])
+	{
+		m_aSentryStuckArea[actor] = m_aNestArea[actor];
+		m_iSentryStuckMark[actor] = StuckCountOf(actor);
+	}
+
 	return action.Continue();
 }
 
@@ -128,8 +161,34 @@ public Action CTFBotMvMEngineerBuildSentrygun_Update(BehaviorAction action, int 
 	the nest from three metres short of it is the same thing; aiming at it from twenty metres short
 	puts the sentry twenty metres from where anybody wanted it, facing a direction chosen by where
 	he happened to get stuck. Decoy produced one 625 units from its own nest that way. */
-	bool outOfTime = GetGameTime() > m_ctSentryReachDeadline[actor]
-		&& GetVectorDistance(GetAbsOrigin(actor), m_vSentrySpot[actor]) < SENTRY_SETTLE_RANGE;
+	float range_to_spot = GetVectorDistance(GetAbsOrigin(actor), m_vSentrySpot[actor]);
+	bool outOfTime = GetGameTime() > m_ctSentryReachDeadline[actor] && range_to_spot < SENTRY_SETTLE_RANGE;
+
+	/* The walk ran out and he is nowhere near the spot, so the spot is what to give up on
+
+	outOfTime above deliberately refuses to build from far away, for the reason in the comment on
+	it. What that leaves is the case nothing handled: an engineer who never arrives keeps walking at
+	a spot he cannot reach, for the whole mission, and builds nothing at all. Reported on Mannworks
+	with Mean Machines, and Bigrock has a spot on a rock he cannot jump onto.
+
+	The retry below re-scores the nest, and it only runs once he is close enough to try building. So
+	the same thing is done here, from the other side of the range check: a new area rather than a
+	sentry twenty metres from where anybody wanted one. */
+	if ((GetGameTime() > m_ctSentryReachDeadline[actor] && range_to_spot >= SENTRY_SETTLE_RANGE)
+		|| StuckCountOf(actor) - m_iSentryStuckMark[actor] >= SENTRY_STUCK_GIVEUP)
+	{
+		m_iSentryStuckMark[actor] = StuckCountOf(actor);
+		m_aSentryStuckArea[actor] = m_aNestArea[actor];
+
+		m_aNestArea[actor] = PickBuildArea(actor);
+		m_iSentryTry[actor] = 0;
+		SentryStandPoint(actor);
+		m_ctSentryReachDeadline[actor] = GetGameTime() + SENTRY_REACH_TIME;
+
+		LogBuildFailure(actor, "sentry", "could not reach the spot, took another");
+
+		return action.Continue();
+	}
 	
 	if (outOfTime)
 	{
