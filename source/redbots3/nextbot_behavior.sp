@@ -1338,15 +1338,15 @@ static void UpdateStuckWatchdog(int actor)
 	myLoco.ClearStuckStatus("Watchdog");
 	g_arrPluginBot[actor].bPathing = false;
 	
-	PrintToServer("[defenderbots] stuck: %N (%s) at %.0f %.0f %.0f for %.0fs, stuck #%d, %s",
+	PrintToServer("[defenderbots] stuck: %N (%s) at %.0f %.0f %.0f for %.0fs, stuck #%d, wedge #%d, %s",
 		actor, g_sRawPlayerClassNames[TF2_GetPlayerClass(actor)],
 		here[0], here[1], here[2], STUCK_TIME, m_iStuckCount[actor],
-		actions[0] == '\0' ? "no behaviour" : actions);
+		m_iStuckWedgeCount[actor], actions[0] == '\0' ? "no behaviour" : actions);
 
 	//The same line in the file, so a run can be counted rather than watched
-	LogMessage("Stuck: %N (%s) at %.0f %.0f %.0f, stuck #%d, %s",
+	LogMessage("Stuck: %N (%s) at %.0f %.0f %.0f, stuck #%d, wedge #%d, %s",
 		actor, g_sRawPlayerClassNames[TF2_GetPlayerClass(actor)],
-		here[0], here[1], here[2], m_iStuckCount[actor],
+		here[0], here[1], here[2], m_iStuckCount[actor], m_iStuckWedgeCount[actor],
 		actions[0] == '\0' ? "no behaviour" : actions);
 	
 	if (m_iStuckWedgeCount[actor] >= STUCK_WEDGE_GIVEUP && MoveWedgedDefender(actor))
@@ -1421,12 +1421,20 @@ static bool MoveWedgedDefender(int client)
 	CNavArea area = TheNavMesh.GetNearestNavArea(here, true, STUCK_WEDGE_SEARCH, false, true, TEAM_ANY);
 
 	if (area == NULL_AREA)
+	{
+		LogMessage("Stuck: %N is wedged at %.0f %.0f %.0f with no nav area within %.0f, so nothing can be done",
+			client, here[0], here[1], here[2], STUCK_WEDGE_SEARCH);
 		return false;
+	}
 
 	float destination[3];
 
 	if (!WedgeEscapePoint(area, here, destination))
+	{
+		LogMessage("Stuck: %N is wedged at %.0f %.0f %.0f and every point in its area and the ones touching it is too close",
+			client, here[0], here[1], here[2]);
 		return false;
+	}
 
 	float stopped[3];
 	TeleportEntity(client, destination, NULL_VECTOR, stopped);
