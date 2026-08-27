@@ -22,11 +22,29 @@ The same rock the dispenser found on Rottenburg. A nav mesh says ground is conne
 promise a bot can squeeze past a boulder to reach the middle of it, and the old code asked again
 next frame forever.
 
-The exit only. He is standing at his nest when this runs out, which is where an exit belongs
-anyway, so building it there costs nothing. The entrance has the length of the map to walk and no
-business being dropped wherever the walk stopped, so it is bounded by the build time above and
-gives up rather than settling. */
+The exit only. The entrance has the length of the map to walk and no business being dropped
+wherever the walk stopped, so it is bounded by the build time above and gives up rather than
+settling. */
 #define TELEPORTER_EXIT_REACH_TIME	12.0
+
+/* Getting up onto the ground the map named, instead of building at the bottom of it
+
+Bigrock's exit spot is on a rock about seventy units above the floor beside it. Nothing in this mod
+has ever pressed a jump at a piece of ground, so the walk stopped at the foot of the rock, all eight
+placements were refused from down there, and the exit went down where he stood, which is the lane
+every robot walks. Reported from play twice: "wtf is this exit spot", then "IT'S STILL IN MAIN BOT
+PATH".
+
+A rise of more than a step and no more than a crouch jump, from close enough to land on it: he
+looks at the spot, walks into it and crouch jumps, which is what a person does. Bounded by a count
+as well as by the reach clock above, because a spot that is not actually a ledge would otherwise be
+an engineer hopping at a wall until the wave starts. */
+#define TELEPORTER_CLIMB_RISE_MIN	24.0
+#define TELEPORTER_CLIMB_RISE_MAX	72.0
+#define TELEPORTER_CLIMB_RANGE		140.0
+#define TELEPORTER_CLIMB_INTERVAL	0.7
+#define TELEPORTER_CLIMB_HOLD		0.3
+#define TELEPORTER_CLIMB_LIMIT		6
 
 //He stands a build's reach short of where it goes, because a building lands in front of the man
 #define TELEPORTER_BUILD_REACH		90.0
@@ -66,6 +84,8 @@ the sentry beats an engineer who gives up. */
 float m_ctTeleporterGiveUp[MAXPLAYERS + 1];
 float m_ctTeleporterReachDeadline[MAXPLAYERS + 1];
 float m_ctTeleporterTryDeadline[MAXPLAYERS + 1];
+float m_ctTeleporterClimb[MAXPLAYERS + 1];
+int m_iTeleporterClimbs[MAXPLAYERS + 1];
 int m_iTeleporterTry[MAXPLAYERS + 1];
 TFObjectMode m_nTeleporterMode[MAXPLAYERS + 1];
 float m_vTeleporterSpot[MAXPLAYERS + 1][3];
@@ -107,6 +127,8 @@ public Action CTFBotMvMEngineerBuildTeleporter_OnStart(BehaviorAction action, in
 	m_ctTeleporterGiveUp[actor] = GetGameTime() + TELEPORTER_BUILD_MAX_TIME;
 	m_ctTeleporterReachDeadline[actor] = GetGameTime() + TELEPORTER_EXIT_REACH_TIME;
 	m_ctTeleporterTryDeadline[actor] = GetGameTime() + TELEPORTER_TRY_TIME;
+	m_ctTeleporterClimb[actor] = 0.0;
+	m_iTeleporterClimbs[actor] = 0;
 	m_iTeleporterTry[actor] = 0;
 	m_iTeleporterRoutePoints[actor] = 0;
 
@@ -151,20 +173,38 @@ public Action CTFBotMvMEngineerBuildTeleporter_Update(BehaviorAction action, int
 		return TeleporterDone(action, actor, "Ran out of time");
 	}
 
-	float spot[3]; spot = m_vTeleporterSpot[actor];
-	float stand[3]; stand = m_vTeleporterStand[actor];
+	/* The walk to the named exit spot ran out, so he takes the ring round his own nest
 
-	//The walk to the exit ran out, so it goes down where he stands, which is his own nest
+	Where he stands when a walk fails is halfway to wherever he was going, and for the exit that is
+	the lane the robots come down. The nest ring is a spot rather than an accident: beside his own
+	sentry, out of the buster's blast, and it is where the exit goes on every map that names none. */
+	if (Feature(FEATURE_ENGINEER_CLIMBS)
+		&& m_nTeleporterMode[actor] == TFObjectMode_Exit
+		&& GetGameTime() > m_ctTeleporterReachDeadline[actor])
+		TeleporterFallBackToNest(actor);
+
+	float spot[3]; spot = m_vTeleporterSpot[actor];
+
+	//The walk to the exit ran out and the nest ring is gone too, so it goes down where he stands
 	bool outOfTime = m_nTeleporterMode[actor] == TFObjectMode_Exit
 		&& GetGameTime() > m_ctTeleporterReachDeadline[actor];
 
-	if (outOfTime)
-		stand = GetAbsOrigin(actor);
-
-	float range = GetVectorDistance(GetAbsOrigin(actor), stand);
-
 	INextBot myNextbot = CBaseNPC_GetNextBotOfEntity(actor);
 	IBody myBody = myNextbot.GetBodyInterface();
+
+	//The map put the spot on top of something, so he gets on top of it rather than building below it
+	if (Feature(FEATURE_ENGINEER_CLIMBS) && !outOfTime && m_bTeleporterNamedSpot[actor]
+		&& TeleporterClimbToSpot(actor, myBody, spot))
+	{
+		g_arrPluginBot[actor].bPathing = false;
+
+		return action.Continue();
+	}
+
+	//Read after the climb, which moves it to where he landed
+	float stand[3]; stand = outOfTime ? GetAbsOrigin(actor) : m_vTeleporterStand[actor];
+
+	float range = GetVectorDistance(GetAbsOrigin(actor), stand);
 
 	//The toolbox comes out on the way in, so arriving is not another two seconds of standing about
 	if (range < 200.0)
@@ -218,7 +258,9 @@ public Action CTFBotMvMEngineerBuildTeleporter_Update(BehaviorAction action, int
 					return TeleporterDone(action, actor, "Nowhere out of spawn takes one");
 				}
 
-				m_ctTeleporterReachDeadline[actor] = GetGameTime();
+				//Nothing round the named spot takes one, so the nest ring gets its own eight tries
+				if (!Feature(FEATURE_ENGINEER_CLIMBS) || !TeleporterFallBackToNest(actor))
+					m_ctTeleporterReachDeadline[actor] = GetGameTime();
 
 				return action.Continue();
 			}
@@ -252,6 +294,78 @@ static int TeleporterTryLimit(int actor)
 		return TELEPORTER_TRY_POINTS * TELEPORTER_EXIT_RINGS;
 
 	return TELEPORTER_TRY_POINTS;
+}
+
+/* Crouch jumping onto the ground the spot sits on, and false when there is nothing to climb
+
+The stand point comes off the nav mesh, so for a spot on a rock the mesh does not cover it is the
+floor underneath: he arrives, the spot is over his head, and every placement from down there is
+refused. This puts him on top instead.
+
+Once he is up, where he stands is where he stands. Recomputing the ring point from up there asks
+the nav mesh again and the nav mesh answers with the floor he just left, which is the walk back
+down. He climbed from within a build's reach, so the spot is already in front of him.
+
+The count resets when he makes it, so falling off and climbing again costs another six attempts
+rather than none. The reach clock is what bounds the pair of them. */
+static bool TeleporterClimbToSpot(int actor, IBody myBody, float spot[3])
+{
+	float origin[3]; origin = GetAbsOrigin(actor);
+
+	float rise = spot[2] - origin[2];
+
+	if (rise < TELEPORTER_CLIMB_RISE_MIN)
+	{
+		if (m_iTeleporterClimbs[actor] > 0)
+		{
+			m_iTeleporterClimbs[actor] = 0;
+			m_vTeleporterStand[actor] = origin;
+		}
+
+		return false;
+	}
+
+	//Higher than a crouch jump is not a ledge, it is a wall, and no number of jumps will do it
+	if (rise > TELEPORTER_CLIMB_RISE_MAX || m_iTeleporterClimbs[actor] >= TELEPORTER_CLIMB_LIMIT)
+		return false;
+
+	float flat[3]; SubtractVectors(spot, origin, flat);
+
+	flat[2] = 0.0;
+
+	//Far enough out and the jump lands on the wall rather than on top of it
+	if (GetVectorLength(flat) > TELEPORTER_CLIMB_RANGE)
+		return false;
+
+	AimHeadTowards(myBody, spot, MANDATORY, 0.2, _, "Climbing to the teleporter spot");
+
+	if (m_ctTeleporterClimb[actor] > GetGameTime())
+		return true;
+
+	m_ctTeleporterClimb[actor] = GetGameTime() + TELEPORTER_CLIMB_INTERVAL;
+	m_iTeleporterClimbs[actor]++;
+
+	//Forward is along where he is looking, which is the spot, so the three together are a person
+	g_arrExtraButtons[actor].PressButtons(IN_FORWARD | IN_JUMP | IN_DUCK, TELEPORTER_CLIMB_HOLD);
+
+	return true;
+}
+
+/* The named exit spot beaten him, so he takes the ring round his own nest instead
+
+Once per action: the named flag is what selects it and this clears it, so there is one fall back and
+then the ordinary give-up. False when there was no named spot to fall back from. */
+static bool TeleporterFallBackToNest(int actor)
+{
+	if (!m_bTeleporterNamedSpot[actor] || m_nTeleporterMode[actor] != TFObjectMode_Exit)
+		return false;
+
+	m_bTeleporterNamedSpot[actor] = false;
+	m_iTeleporterTry[actor] = 0;
+	m_iTeleporterClimbs[actor] = 0;
+	m_ctTeleporterReachDeadline[actor] = GetGameTime() + TELEPORTER_EXIT_REACH_TIME;
+
+	return TeleporterStandPoint(actor);
 }
 
 static bool TeleporterStandPoint(int actor)
