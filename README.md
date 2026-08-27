@@ -40,3 +40,4 @@ answer turned out to be self-inflicted blast rather than aim.
 - Custom Sniper spots for various maps by Us_le.
 - Spy checking and the stickybomb trap follow the approach in [RCBot2](https://github.com/chrizonix/RCBot2) by Cheeseh: paranoia that grows from where a Spy was last seen, a suspect picked out as the teammate who was not there a moment ago, and a bomb-by-bomb trap laid across a spread rather than onto one point. The code is ours; the ideas are worth the credit.
 - Engineer nest spots are read from the map's own `bot_hint_sentrygun` and `bot_hint_engineer_nest` entities where a map carries them.
+- Spawn navigation recovery by [kelly-cs](https://github.com/kelly-cs), which is what lets the bots play community maps whose nav mesh leaves them stuck in spawn.
