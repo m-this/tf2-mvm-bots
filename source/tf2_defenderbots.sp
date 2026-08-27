@@ -269,6 +269,7 @@ Address g_pMannVsMachineUpgrades;
 #include "redbots3/player_pref.sp"
 #include "redbots3/menu.sp"
 #include "redbots3/tf_upgrades.sp"
+#include "redbots3/debug_faults.sp"
 #include "redbots3/nextbot_behavior.sp"
 #include "redbots3/botaim.sp"
 
@@ -280,7 +281,7 @@ public Plugin myinfo =
 	/* This fork's version, not upstream's. The tags here restarted at v2.0.0 because the fork is
 	far enough from 1.5.5 that the old number said nothing about what is running. Leaving myinfo on
 	1.5.5 meant `sm plugins list` and every play-test report named a build nobody could identify. */
-	version = "2.23.0",
+	version = "2.24.0",
 	url = "https://github.com/OfficerSpy/TF2-MvM-Defender-TFBots"
 };
 
@@ -450,6 +451,7 @@ public void OnPluginStart()
 	
 	LoadFeatures();
 	BluAssist_Init();
+	DebugFaults_Init();
 	LoadLoadoutFunctions();
 	LoadPreferencesData();
 	
@@ -589,6 +591,11 @@ being the defaults and starts being what the server was asked for. */
 public void OnConfigsExecuted()
 {
 	PublishActiveFeatures();
+}
+
+public void OnGameFrame()
+{
+	DebugFaults_OnGameFrame();
 }
 
 public void OnMapStart()

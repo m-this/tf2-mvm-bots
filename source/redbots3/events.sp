@@ -200,6 +200,9 @@ static Action Timer_ResetOneBehaviour(Handle timer)
 
 static void Event_MvmWaveBegin(Event event, const char[] name, bool dontBroadcast)
 {
+	//Nothing unless a debug convar is set, which is never on a real server
+	DebugFaults_OnWaveStart();
+
 	/* Publish here rather than only on a timer after the map loads
 
 	server.cfg runs at its own pace and a late-loaded plugin misses it entirely, so a list

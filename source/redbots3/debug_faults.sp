@@ -1,0 +1,95 @@
+/* Make a fault happen on purpose, so a fix for it can be measured
+
+Three engineer fixes have shipped against faults the test-bed will not produce: the setup freeze,
+the refused path to a metal pack and the wedge. Each was measured against a condition that did not
+happen, so each arm ran the same code and the run said nothing. See mvm-0lo.
+
+These convars force the condition instead of waiting for it. They are for a run, not for a server:
+each is off at zero and does nothing until somebody sets it.
+
+Wedging is done by putting the bot back where it was every frame rather than by freezing it. A bot
+held in place still asks for paths, still runs its actions and still fails to arrive, which is what
+the real wedge looks like from the watchdog's side. Freezing the entity would be a different bug. */
+
+//Far enough that only a teleport explains it. A bot shuffling inside the hold is still held.
+#define DEBUG_WEDGE_ESCAPED	120.0
+
+ConVar redbots_debug_wedge_seconds;
+ConVar redbots_debug_wedge_class;
+
+//The bot being held, and until when. One at a time: two wedged bots is a different test.
+static int m_iWedgedBot = -1;
+static float m_flWedgedUntil;
+static float m_vWedgedAt[3];
+
+void DebugFaults_Init()
+{
+	redbots_debug_wedge_seconds = CreateConVar("sm_redbots_debug_wedge_seconds", "0",
+		"Hold one defender in place for this many seconds after a wave starts, to exercise the stuck watchdog. 0 is off.",
+		FCVAR_NOTIFY, true, 0.0, true, 300.0);
+
+	redbots_debug_wedge_class = CreateConVar("sm_redbots_debug_wedge_class", "engineer",
+		"Which class to hold when sm_redbots_debug_wedge_seconds is on.", FCVAR_NOTIFY);
+}
+
+//Pick somebody to hold, at the start of a wave. Nothing happens while the convar is zero.
+void DebugFaults_OnWaveStart()
+{
+	m_iWedgedBot = -1;
+
+	float seconds = redbots_debug_wedge_seconds.FloatValue;
+
+	if (seconds <= 0.0)
+		return;
+
+	char wanted[32]; redbots_debug_wedge_class.GetString(wanted, sizeof(wanted));
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || !IsDefenderBot(i) || !IsPlayerAlive(i))
+			continue;
+
+		if (!StrEqual(g_sRawPlayerClassNames[TF2_GetPlayerClass(i)], wanted, false))
+			continue;
+
+		m_iWedgedBot = i;
+		m_flWedgedUntil = GetGameTime() + seconds;
+		m_vWedgedAt = GetAbsOrigin(i);
+
+		LogMessage("DebugFaults: holding %N (%s) at %.0f %.0f %.0f for %.0fs",
+			i, wanted, m_vWedgedAt[0], m_vWedgedAt[1], m_vWedgedAt[2], seconds);
+		return;
+	}
+
+	LogMessage("DebugFaults: no %s on RED to hold", wanted);
+}
+
+/* Put the held bot back, once a frame
+
+Stops on its own at the deadline, and stops early if the bot died, left, or was moved a long way:
+a teleport out of the hold is the watchdog's recovery working, and continuing to drag him back
+would be measuring this file rather than the fix. */
+void DebugFaults_OnGameFrame()
+{
+	if (m_iWedgedBot <= 0)
+		return;
+
+	if (GetGameTime() > m_flWedgedUntil || !IsClientInGame(m_iWedgedBot) || !IsPlayerAlive(m_iWedgedBot))
+	{
+		m_iWedgedBot = -1;
+		return;
+	}
+
+	float here[3]; here = GetAbsOrigin(m_iWedgedBot);
+
+	if (GetVectorDistance(here, m_vWedgedAt) > DEBUG_WEDGE_ESCAPED)
+	{
+		LogMessage("DebugFaults: %N left the hold, %.0f units away, so something moved him",
+			m_iWedgedBot, GetVectorDistance(here, m_vWedgedAt));
+
+		m_iWedgedBot = -1;
+		return;
+	}
+
+	TeleportEntity(m_iWedgedBot, m_vWedgedAt, NULL_VECTOR, view_as<float>({0.0, 0.0, 0.0}));
+}
