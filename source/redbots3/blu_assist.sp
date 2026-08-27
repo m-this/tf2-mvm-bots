@@ -129,22 +129,49 @@ void BluAssist_Describe(char[] buffer, int maxlength)
 
 /* Scale a robot's health and speed as it spawns
 
-Health is set rather than added to, because the popfile has just decided what this robot is worth
-and that number is the one to bend. Both the current and the maximum move, or a robot spawns hurt
-instead of smaller.
+Applied a frame after player_spawn. The popfile finishes building the robot inside the spawn frame:
+it gives the template's items, fires post_inventory_application, then writes the health and the
+attributes the mission wants. Anything written from the event itself is overwritten by that, which
+is why health and speed did nothing while damage, scaled on the hit rather than on the robot, did.
+
+Health goes through "max health additive bonus" as well as m_iMaxHealth, because TF2 recomputes the
+maximum from the attributes and would otherwise put the popfile's number back. The delta is added
+to what the popfile already set, so a giant stays a giant, scaled.
+
+Speed multiplies the template's own move speed bonus rather than replacing it, or a fast robot and
+a normal one would come out walking at the same speed.
 
 A giant scales the same way a common does. The alternative is a lever per robot size, which is
 three more numbers to measure before anybody knows whether the first three matter */
 void BluAssist_OnRobotSpawn(int client)
 {
+	if (BluAssist_HealthScale() >= 1.0 && BluAssist_SpeedScale() >= 1.0)
+		return;
+
+	RequestFrame(BluAssistApplyToRobot, GetClientUserId(client));
+}
+
+static void BluAssistApplyToRobot(int userid)
+{
+	int client = GetClientOfUserId(userid);
+
+	if (client <= 0 || !IsClientInGame(client) || !IsPlayerAlive(client))
+		return;
+
+	if (TF2_GetClientTeam(client) != TFTeam_Blue || !IsFakeClient(client))
+		return;
+
 	float health = BluAssist_HealthScale();
 
 	if (health < 1.0)
 	{
-		int wanted = RoundToCeil(float(GetEntProp(client, Prop_Data, "m_iMaxHealth")) * health);
+		int maxHealth = GetEntProp(client, Prop_Data, "m_iMaxHealth");
+		int wanted = RoundToCeil(float(maxHealth) * health);
 
 		if (wanted < 1)
 			wanted = 1;
+
+		BluAssistBendAttrib(client, "max health additive bonus", 0.0, float(wanted - maxHealth));
 
 		SetEntProp(client, Prop_Data, "m_iMaxHealth", wanted);
 		SetEntityHealth(client, wanted);
@@ -153,7 +180,19 @@ void BluAssist_OnRobotSpawn(int client)
 	float speed = BluAssist_SpeedScale();
 
 	if (speed < 1.0)
-		TF2Attrib_SetByName(client, "move speed bonus", speed);
+		BluAssistBendAttrib(client, "move speed bonus", 1.0, 0.0, speed);
+}
+
+/* Bend an attribute the popfile may already have set, from its neutral value when it has not
+
+Both bends compose with the mission rather than replacing it: the delta for a health bonus that is
+additive, the scale for a speed bonus that is a multiplier. */
+static void BluAssistBendAttrib(int client, const char[] name, float neutral, float delta, float scale = 1.0)
+{
+	Address attrib = TF2Attrib_GetByName(client, name);
+	float current = attrib == Address_Null ? neutral : TF2Attrib_GetValue(attrib);
+
+	TF2Attrib_SetByName(client, name, current * scale + delta);
 }
 
 /* What a robot's hit takes off a defender

@@ -36,6 +36,7 @@ enum
 	FEATURE_HOLD_THE_NEST,
 	FEATURE_MEDIC_SHIELD,
 	FEATURE_PATH_LENGTH_CAP,
+	FEATURE_ENGINEER_CLIMBS,
 	FEATURE_COUNT
 }
 
@@ -57,7 +58,8 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"demo_sticky_self_veto",
 	"hold_the_nest",
 	"medic_shield",
-	"path_length_cap"
+	"path_length_cap",
+	"engineer_climbs"
 };
 
 static ConVar g_arrFeatureConVars[FEATURE_COUNT];
@@ -128,6 +130,12 @@ void LoadFeatures()
 	   mvm-cf3. */
 	g_arrFeatureConVars[FEATURE_PATH_LENGTH_CAP] = MakeFeature(FEATURE_PATH_LENGTH_CAP,
 		"Stop a path search that has walked far enough, instead of letting an unreachable goal cost the whole mesh.", false);
+
+	/* Off until a Bigrock run says otherwise. The exit spot there is 70 units up a rock the
+	   engineer cannot walk onto, so he gives up and builds where he stands, in the bot lane.
+	   This is the first jump in the mod aimed at a piece of ground. See mvm-fgs. */
+	g_arrFeatureConVars[FEATURE_ENGINEER_CLIMBS] = MakeFeature(FEATURE_ENGINEER_CLIMBS,
+		"The engineer crouch jumps onto a teleporter spot above him, and falls back to the nest ring rather than to his feet.", false);
 
 	g_arrFeatureConVars[FEATURE_ATTACK_STRAFE] = MakeFeature(FEATURE_ATTACK_STRAFE,
 		"A bot that has arrived at its firing position keeps sidestepping instead of standing still.");
