@@ -214,6 +214,22 @@ this file exists to find and briefly invented instead.
 
 ## Gotchas paid for already
 
+- **Never rebuild while a run measures.** `testbed/build.sh` restages the
+  tree, and the container copies the stage into the game tree every thirty
+  seconds. For the compiled extensions that truncates a file the server has
+  mapped and kills it. For a `.smx` it swaps the build under the run, so the two
+  halves of an A/B are no longer the same mod. Wait for the run, or use a second
+  checkout.
+- **`cp` gives an identical file a new timestamp.** The installer uses `cp -ru`,
+  so an unchanged tree is never rewritten. `build.sh` staged the prebuilt
+  extensions with a plain `cp`, so every build made them look new. It reads as a
+  segfault deep inside whichever extension the installer rewrote. The core says
+  `SEGV_MAPERR` at an instruction whose operand carries a relocation: the text
+  page reverted to its on-disk bytes. `cp -p` keeps the upstream timestamps,
+  which never change.
+- **Check the lever reached the server.** A run where a convar silently did not
+  apply looks exactly like a lever that does nothing. One rcon query before the
+  waves start settles it.
 - **`ActionsManager.Iterator` throws on a client that is not a NextBot**, and a
   thrown native takes the whole callback with it. `mvmbots_host` parks an
   ordinary fake client on RED to hold a seat, so the first client of every pass
