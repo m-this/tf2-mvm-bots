@@ -101,9 +101,9 @@ func (l Lab) Wait(ctx context.Context, w *Watcher, every, limit time.Duration, s
 
 		lines, waves, begun := samples()
 		if waves > 0 {
-			// Something finished, so the run is producing what it was asked for
-			// and the patience counters start again.
-			w.noRobots, w.silent = 0, 0
+			// The caller reports a count only once it has what it asked for, so
+			// this is the run being finished rather than merely progressing.
+			return Health{Samples: lines, Roster: Roster{}}, nil
 		}
 		h := w.Check(l, lines, begun)
 		if h.Reason != "" {
