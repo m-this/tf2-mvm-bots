@@ -28,8 +28,10 @@ import (
 	"strings"
 )
 
-var classes = []string{"scout", "soldier", "pyro", "demoman", "heavy",
-	"engineer", "medic", "sniper", "spy"}
+var classes = []string{
+	"scout", "soldier", "pyro", "demoman", "heavy",
+	"engineer", "medic", "sniper", "spy",
+}
 
 type record struct {
 	Event    string  `json:"event"`

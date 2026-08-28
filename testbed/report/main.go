@@ -71,12 +71,16 @@ type wave struct {
 	CauseBy      map[string]int `json:"-"`
 }
 
-var classes = []string{"scout", "soldier", "pyro", "demoman", "heavy",
-	"engineer", "medic", "sniper", "spy"}
+var classes = []string{
+	"scout", "soldier", "pyro", "demoman", "heavy",
+	"engineer", "medic", "sniper", "spy",
+}
 
 // How a defender died, as opposed to who killed him
-var causes = []string{"bullet", "explosion", "fire", "melee", "backstab",
-	"headshot", "fall", "other"}
+var causes = []string{
+	"bullet", "explosion", "fire", "melee", "backstab",
+	"headshot", "fall", "other",
+}
 
 // The per-class fields are flat keys rather than nested objects, because the
 // plugin writes them with one format string and no allocation.

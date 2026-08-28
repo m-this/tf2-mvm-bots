@@ -71,8 +71,10 @@ func (w *Watcher) Check(l Lab, samples int, begun bool) Health {
 			// gone, and only the second is worth calling a crash.
 			return Health{Samples: samples}
 		}
-		return Health{Samples: samples, Fatal: true,
-			Reason: fmt.Sprintf("the server stopped answering rcon %d times running: %v", w.quiet, err)}
+		return Health{
+			Samples: samples, Fatal: true,
+			Reason: fmt.Sprintf("the server stopped answering rcon %d times running: %v", w.quiet, err),
+		}
 	}
 	w.quiet = 0
 	return w.check(roster, samples, begun)

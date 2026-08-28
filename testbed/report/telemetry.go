@@ -100,8 +100,10 @@ func rollupBots(samples []botSample) map[string]*botRollup {
 		r := out[s.Who]
 
 		if r == nil {
-			r = &botRollup{class: s.Class, slots: map[int]int{},
-				actions: map[string]int{}, stillFor: map[string]int{}}
+			r = &botRollup{
+				class: s.Class, slots: map[int]int{},
+				actions: map[string]int{}, stillFor: map[string]int{},
+			}
 			out[s.Who] = r
 		}
 
