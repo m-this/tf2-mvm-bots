@@ -26,6 +26,25 @@ type Result struct {
 	Damage     int `json:"damage"`
 }
 
+// Begun reports whether the plugin has written a wave_begin, which is the only
+// honest sign that a wave is running rather than a break being taken.
+func Begun(path string) bool {
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+
+	scan := bufio.NewScanner(file)
+	scan.Buffer(make([]byte, 0, 1<<20), 1<<22)
+	for scan.Scan() {
+		if strings.Contains(scan.Text(), `"event":"wave_begin"`) {
+			return true
+		}
+	}
+	return false
+}
+
 // Read is every wave result in one file. A file with none is not an error here:
 // the caller knows whether that means a crash, a timeout or a stall, and says so.
 func Read(path string) ([]Result, error) {
