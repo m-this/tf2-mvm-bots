@@ -133,8 +133,7 @@ func run() error {
 		}()
 	}
 
-	// One map or a list of them. A sweep is the same run repeated, so it is a
-	// loop here rather than a script that reimplements the preconditions.
+	// A sweep is the same run repeated, so it is a loop here, not a script reimplementing the preconditions.
 	played := strings.Fields(*maps)
 	if len(played) == 0 {
 		played = []string{*mapName}

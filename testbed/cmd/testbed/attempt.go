@@ -15,7 +15,6 @@ import (
 	"github.com/m-this/tf2-mvm-bots/testbed/internal/wave"
 )
 
-// playArm runs every attempt of one arm and collects what they produced.
 func playArm(ctx context.Context, l lab.Lab, a arm, o options) (wave.Arm, error) {
 	got := wave.Arm{Name: a.name}
 
@@ -61,7 +60,6 @@ func cleared(results []wave.Result) int {
 	return n
 }
 
-// playOnce is one attempt: set the arm, load the mission, wait for the waves.
 func playOnce(ctx context.Context, l lab.Lab, a arm, o options, path string) ([]wave.Result, bool, error) {
 	if err := clearStats(ctx, o.root); err != nil {
 		return nil, false, err
@@ -139,7 +137,6 @@ func waitForWaves(ctx context.Context, l lab.Lab, o options) ([]wave.Result, boo
 		found = results
 		begun := wave.Begun(staged)
 		if len(results) >= o.waves {
-			// Enough waves: say so by reporting the count the caller wanted.
 			return lines, len(results), begun
 		}
 		return lines, 0, begun
@@ -155,8 +152,7 @@ func waitForWaves(ctx context.Context, l lab.Lab, o options) ([]wave.Result, boo
 	return found, health.Fatal, health.Reason
 }
 
-// readStagedWithLines is the results so far and how much has been written at
-// all. The line count is what tells a quiet wave from a dead plugin.
+// The line count is what tells a quiet wave from a dead plugin.
 func readStagedWithLines(ctx context.Context, root, staged string) (int, []wave.Result) {
 	if err := copyStats(ctx, root, staged); err != nil {
 		return 0, nil

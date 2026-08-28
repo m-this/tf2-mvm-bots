@@ -78,7 +78,6 @@ type Arm struct {
 	Empty    int // attempts that produced no wave at all
 }
 
-// Cleared is how many waves this arm won.
 func (a Arm) Cleared() int {
 	n := 0
 	for _, r := range a.Results {

@@ -32,7 +32,6 @@ import (
 	"github.com/m-this/tf2-mvm-bots/testbed/internal/rcon"
 )
 
-// Lab is a server and the rules for talking to it.
 type Lab struct {
 	Client rcon.Client
 	Say    func(format string, args ...any)
@@ -48,7 +47,6 @@ func (l Lab) say(format string, args ...any) {
 	}
 }
 
-// Do runs one command, and says what it sent when it fails.
 func (l Lab) Do(command string) (string, error) {
 	out, err := l.Client.Do(command)
 	if err != nil {
@@ -81,7 +79,6 @@ var (
 	versionRow = regexp.MustCompile(`"Defender TFBots"\s+\(([^)]+)\)`)
 )
 
-// Roster is who is on the server, split the way a run cares about.
 type Roster struct {
 	Humans    int
 	Bots      int
@@ -126,7 +123,6 @@ func (l Lab) Roster() (Roster, error) {
 	return r, nil
 }
 
-// CurrentMap is the map the server is on.
 func (l Lab) CurrentMap() (string, error) {
 	out, err := l.Do("status")
 	if err != nil {
@@ -138,7 +134,6 @@ func (l Lab) CurrentMap() (string, error) {
 	return "", fmt.Errorf("status said nothing about a map: %q", trim(out))
 }
 
-// PopFile is the mission the server says it is playing.
 func (l Lab) PopFile() (string, error) {
 	out, err := l.Do("tf_mvm_popfile")
 	if err != nil {

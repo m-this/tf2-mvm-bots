@@ -58,7 +58,6 @@ type Watcher struct {
 	lastSeen int
 }
 
-// Check reads the server once and says whether to carry on.
 func (w *Watcher) Check(l Lab, samples int, begun bool) Health {
 	roster, err := l.Roster()
 	if err != nil {
@@ -107,7 +106,6 @@ func (w *Watcher) check(roster Roster, samples int, begun bool) Health {
 	return h
 }
 
-// Wait polls until the run is done, hopeless, or out of time.
 func (l Lab) Wait(ctx context.Context, w *Watcher, every, limit time.Duration, samples func() (int, int, bool)) (Health, error) {
 	deadline := time.Now().Add(limit)
 	for {

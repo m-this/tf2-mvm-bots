@@ -35,7 +35,6 @@ type Client struct {
 	Timeout  time.Duration
 }
 
-// Do runs one command and returns what the server said.
 func (c Client) Do(command string) (string, error) {
 	timeout := c.Timeout
 	if timeout <= 0 {
