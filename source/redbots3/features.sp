@@ -162,9 +162,17 @@ void LoadFeatures()
 
 	/* Off until a run says otherwise. A sniper whose lurk cannot reach its spot asks the game for a
 	   path every update, and three stock snipers on Decoy killed the server: the core names
-	   CTFBotSniperLurk::Update over NavAreaBuildPath under the watchdog. See mvm-bj8. */
+	   CTFBotSniperLurk::Update over NavAreaBuildPath under the watchdog. See mvm-bj8.
+
+	   On rather than off, against the usual rule, because the fault is confirmed twice from a
+	   player's own server and the test-bed has never once reproduced it. Peppy's second bundle ran
+	   v2.33.0 with the rescue built in and his sniper still sat at one position for 577 samples: the
+	   switch was never set, and a fix nobody turns on is not a fix.
+
+	   It costs nothing when snipers work. It fires only on a rifle sniper who is not pathing and has
+	   not moved for STUCK_TIME while further than SNIPER_AT_SPOT from every spot the map offers. */
 	g_arrFeatureConVars[FEATURE_WATCH_LURKING_SNIPERS] = MakeFeature(FEATURE_WATCH_LURKING_SNIPERS,
-		"The stuck watchdog also rescues a sniper lurking nowhere near a spot, which is the one it used to miss.", false);
+		"The stuck watchdog also rescues a sniper parked nowhere near a spot, which is the one it used to miss.");
 
 	g_arrFeatureConVars[FEATURE_ATTACK_STRAFE] = MakeFeature(FEATURE_ATTACK_STRAFE,
 		"A bot that has arrived at its firing position keeps sidestepping instead of standing still.");
