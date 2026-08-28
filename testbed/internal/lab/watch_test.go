@@ -72,3 +72,20 @@ func TestABreakIsNotAStall(t *testing.T) {
 		}
 	}
 }
+
+// A single failed rcon read is a long frame, not a crash. Calling it one turned
+// a healthy run into a reported crash, which is the wrong answer in the
+// direction that flatters the fix being measured.
+func TestOneQuietReadIsNotACrash(t *testing.T) {
+	w := &Watcher{PatienceQuiet: 3}
+	dead := Lab{}
+
+	for i := 1; i <= 2; i++ {
+		if h := w.Check(dead, 10, true); h.Fatal {
+			t.Fatalf("read %d was called a crash", i)
+		}
+	}
+	if h := w.Check(dead, 10, true); !h.Fatal {
+		t.Error("three quiet reads running were not called a crash")
+	}
+}

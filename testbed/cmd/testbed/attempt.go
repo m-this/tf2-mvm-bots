@@ -128,6 +128,9 @@ func waitForWaves(ctx context.Context, l lab.Lab, o options) ([]wave.Result, boo
 		// polls is well past a between-rounds lull and well short of a wave.
 		PatienceRobots: 5,
 		PatienceSilent: 6,
+		// Three reads apart, so a crash is called after a minute of silence
+		// rather than on one long frame.
+		PatienceQuiet: 3,
 	}
 
 	var found []wave.Result

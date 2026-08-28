@@ -46,8 +46,15 @@ type Watcher struct {
 	// gone rather than a quiet moment.
 	PatienceSilent int
 
+	// PatienceQuiet is how many rcon reads in a row may fail before the server
+	// is called dead. One is not enough: a long frame makes a read time out on
+	// a server that is still there, and a run once reported a crash the
+	// container had never noticed.
+	PatienceQuiet int
+
 	noRobots int
 	silent   int
+	quiet    int
 	lastSeen int
 }
 
@@ -55,9 +62,20 @@ type Watcher struct {
 func (w *Watcher) Check(l Lab, samples int, begun bool) Health {
 	roster, err := l.Roster()
 	if err != nil {
+		w.quiet++
+		patience := w.PatienceQuiet
+		if patience < 1 {
+			patience = 3
+		}
+		if w.quiet < patience {
+			// Quiet once is a long frame. Quiet repeatedly is a server that has
+			// gone, and only the second is worth calling a crash.
+			return Health{Samples: samples}
+		}
 		return Health{Samples: samples, Fatal: true,
-			Reason: fmt.Sprintf("the server stopped answering rcon: %v", err)}
+			Reason: fmt.Sprintf("the server stopped answering rcon %d times running: %v", w.quiet, err)}
 	}
+	w.quiet = 0
 	return w.check(roster, samples, begun)
 }
 
