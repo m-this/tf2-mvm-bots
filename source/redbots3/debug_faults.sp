@@ -18,6 +18,7 @@ ConVar redbots_debug_wedge_seconds;
 ConVar redbots_debug_wedge_class;
 ConVar redbots_debug_refuse_ammo_paths;
 ConVar redbots_debug_old_wedge_recovery;
+ConVar redbots_debug_unreachable_goal;
 
 //The bot being held, and until when. One at a time: two wedged bots is a different test.
 static int m_iWedgedBot = -1;
@@ -36,6 +37,10 @@ void DebugFaults_Init()
 	redbots_debug_refuse_ammo_paths = CreateConVar("sm_redbots_debug_refuse_ammo_paths", "0",
 		"Refuse this many path answers to a metal pack per bot, to exercise the ammo failover. 0 is off.",
 		FCVAR_NOTIFY, true, 0.0, true, 20.0);
+
+	redbots_debug_unreachable_goal = CreateConVar("sm_redbots_debug_unreachable_goal", "0",
+		"Send the held bot at a point off the nav mesh, so every path search walks the whole thing and finds nothing. 0 is off.",
+		FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
 	redbots_debug_old_wedge_recovery = CreateConVar("sm_redbots_debug_old_wedge_recovery", "0",
 		"Use the pre-2.21.3 wedge recovery, which only ever tried the area the bot stands in. For measuring what that fix is worth.",
@@ -135,4 +140,22 @@ differ: measuring what a fix is worth needs the fault available, not only its ab
 bool DebugFaults_OldWedgeRecovery()
 {
 	return redbots_debug_old_wedge_recovery != null && redbots_debug_old_wedge_recovery.BoolValue;
+}
+
+/* Where to send the held bot so that no path exists
+
+Far above the map, which is off every nav area there is. The search has to walk the mesh to
+establish that, which is the frame the watchdog kills the server on, and the whole point of this
+convar is to make that frame happen rather than wait for a map to arrange it. */
+bool DebugFaults_UnreachableGoal(int client, float goal[3])
+{
+	if (redbots_debug_unreachable_goal == null || !redbots_debug_unreachable_goal.BoolValue)
+		return false;
+
+	if (client != m_iWedgedBot)
+		return false;
+
+	goal = m_vWedgedAt;
+	goal[2] += 16384.0;
+	return true;
 }
