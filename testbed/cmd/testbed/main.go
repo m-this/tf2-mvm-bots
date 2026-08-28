@@ -177,7 +177,7 @@ func report(tag, mapName, mission string, got []wave.Arm) string {
 	case 1:
 		a := got[0]
 		fmt.Fprintf(&b, "\n%s: %d attempts, %d waves, %d cleared, %d crashes, %d empty\n",
-			a.Name, a.Empty+len(a.Results), len(a.Results), a.Cleared(), a.Crashes, a.Empty)
+			a.Name, a.Attempts, len(a.Results), a.Cleared(), a.Crashes, a.Empty)
 	default:
 		// The last arm is the control: the off switch is written last by habit,
 		// and the treated arm is the one being asked about.

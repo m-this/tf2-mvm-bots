@@ -21,6 +21,7 @@ func playArm(ctx context.Context, l lab.Lab, a arm, o options) (wave.Arm, error)
 
 	for i := 1; i <= o.attempts; i++ {
 		o.say("=== %s attempt %d of %d", a.name, i, o.attempts)
+		got.Attempts++
 
 		path := filepath.Join(o.out, fmt.Sprintf("%s-%s-%d.jsonl", o.tag, a.name, i))
 		results, crashed, err := playOnce(ctx, l, a, o, path)

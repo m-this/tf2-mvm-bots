@@ -71,10 +71,11 @@ func Read(path string) ([]Result, error) {
 
 // Arm is one side of a comparison: every wave of every attempt with one setting.
 type Arm struct {
-	Name    string
-	Results []Result
-	Crashes int
-	Empty   int // attempts that produced no wave at all
+	Name     string
+	Results  []Result
+	Attempts int // runs started, which is not the number of waves they produced
+	Crashes  int
+	Empty    int // attempts that produced no wave at all
 }
 
 // Cleared is how many waves this arm won.
@@ -139,7 +140,8 @@ quartiles, and it says so rather than inventing a verdict.
 func Compare(treated, control Arm) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "\n%-16s %18s %18s\n", "", treated.Name, control.Name)
-	fmt.Fprintf(&b, "%-16s %18d %18d\n", "attempts", len(treated.Results), len(control.Results))
+	fmt.Fprintf(&b, "%-16s %18d %18d\n", "attempts", treated.Attempts, control.Attempts)
+	fmt.Fprintf(&b, "%-16s %18d %18d\n", "waves", len(treated.Results), len(control.Results))
 	fmt.Fprintf(&b, "%-16s %18d %18d\n", "waves cleared", treated.Cleared(), control.Cleared())
 	fmt.Fprintf(&b, "%-16s %18d %18d\n", "crashes", treated.Crashes, control.Crashes)
 	fmt.Fprintf(&b, "%-16s %18d %18d\n", "empty runs", treated.Empty, control.Empty)
