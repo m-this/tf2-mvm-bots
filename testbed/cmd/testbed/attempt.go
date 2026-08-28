@@ -86,6 +86,12 @@ func playOnce(ctx context.Context, l lab.Lab, a arm, o options, path string) ([]
 	if err := l.Settle(ctx, o.defenders, 3*time.Minute); err != nil {
 		return nil, false, err
 	}
+	if o.jump > 0 {
+		o.say("jumping to wave %d", o.jump)
+		if err := l.JumpToWave(ctx, o.jump); err != nil {
+			return nil, false, err
+		}
+	}
 
 	results, crashed := waitForWaves(ctx, l, o)
 	if err := copyStats(ctx, o.root, path); err != nil {

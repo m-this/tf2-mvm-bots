@@ -74,6 +74,9 @@ func run() error {
 		out      = flag.String("out", "results", "where to write the run")
 		tag      = flag.String("tag", "run", "what to call this run")
 		build    = flag.Bool("build", true, "compile and restart the server before the first attempt")
+		jumpTo   = flag.Int("wave", 0, "start at this wave of the mission, 0 for the first")
+		down     = flag.Bool("down", false, "stop the server when the run is done")
+		maps     = flag.String("maps", "", "run every map in this list instead of -map, space separated")
 		list     arms
 	)
 	flag.Var(&list, "arm", "name:cvars, repeatable. Comma separated cvars, key=value")
@@ -123,26 +126,41 @@ func run() error {
 		return err
 	}
 
-	results := make([]wave.Arm, 0, len(list))
-	for _, a := range list {
-		got, err := playArm(ctx, l, a, options{
-			root: root, mapName: *mapName, mission: *mission, waves: *waves,
-			attempts: *attempts, timeout: *timeout, team: *team, defenders: *defend,
-			out: filepath.Join(root, *out), tag: *tag, say: say,
-		})
-		if err != nil {
-			return err
-		}
-		results = append(results, got)
+	if *down {
+		defer func() {
+			say("stopping the server")
+			_ = lab.Compose(context.Background(), filepath.Join(root, "testbed", "compose.yml"), "stop")
+		}()
 	}
 
-	fmt.Print(report(*tag, *mapName, *mission, results))
+	// One map or a list of them. A sweep is the same run repeated, so it is a
+	// loop here rather than a script that reimplements the preconditions.
+	played := strings.Fields(*maps)
+	if len(played) == 0 {
+		played = []string{*mapName}
+	}
+
+	for _, name := range played {
+		results := make([]wave.Arm, 0, len(list))
+		for _, a := range list {
+			got, err := playArm(ctx, l, a, options{
+				root: root, mapName: name, mission: *mission, waves: *waves,
+				attempts: *attempts, timeout: *timeout, team: *team, defenders: *defend,
+				out: filepath.Join(root, *out), tag: *tag, jump: *jumpTo, say: say,
+			})
+			if err != nil {
+				return err
+			}
+			results = append(results, got)
+		}
+		fmt.Print(report(*tag, name, *mission, results))
+	}
 	return nil
 }
 
 type options struct {
 	root, mapName, mission, team, out, tag string
-	waves, attempts, defenders             int
+	waves, attempts, defenders, jump       int
 	timeout                                time.Duration
 	say                                    func(string, ...any)
 }

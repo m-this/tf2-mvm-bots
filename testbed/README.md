@@ -18,10 +18,10 @@ person and everything is written down.
 ## Running it
 
 ```sh
-testbed/run.sh                                   # six waves of Decoy
-testbed/run.sh --mission mvm_decoy_advanced      # a named popfile
-testbed/run.sh --waves 12 --timeout 3600         # a longer look
-testbed/run.sh --out testbed/results/after.jsonl # somewhere to compare against
+go run ./testbed/cmd/testbed -arm plain:                  # two waves of Decoy
+go run ./testbed/cmd/testbed -mission mvm_decoy_advanced -arm plain:
+go run ./testbed/cmd/testbed -waves 12 -timeout 60m -arm plain:
+go run ./testbed/cmd/testbed -maps "mvm_decoy mvm_coaltown" -arm plain:
 ```
 
 Then compare two runs:
@@ -33,7 +33,7 @@ go run ./testbed/report testbed/results/after.jsonl testbed/results/before.jsonl
 Needs Docker and Python 3.
 
 The first run needs Team Fortress 2, which is about fourteen gigabytes. On a
-machine that already has a server on it, `run.sh` finds
+machine that already has a server on it, the runner finds
 `tf2-archipelago_tf2game` and copies it rather than downloading the game again;
 `TESTBED_SEED_FROM=some_volume` names a different one. It is a copy and not a
 shared mount on purpose: the test-bed installs its own plugins over `addons/`,
@@ -124,8 +124,8 @@ is a property of geometry, so it takes all of them to tell a map-shaped bug from
 a mod-shaped one.
 
 ```sh
-testbed/sweep.sh                       # every installed map, six waves each
-testbed/sweep.sh --waves 4 --tag night
+go run ./testbed/cmd/testbed -maps "..." -waves 6 -arm plain:
+go run ./testbed/cmd/testbed -maps "..." -waves 4 -tag night -arm plain:
 go run ./testbed/sweepreport testbed/results/sweep-night
 ```
 
@@ -138,7 +138,8 @@ A feature is a named switch (`source/redbots3/features.sp`), which means the
 same build can play both sides of an argument:
 
 ```sh
-testbed/ab.sh --feature demo_sticky_first --maps "mvm_coaltown mvm_decoy"
+go run ./testbed/cmd/testbed -maps "mvm_coaltown mvm_decoy" \
+  -arm on:sm_redbots_feature_demo_sticky_first=1 -arm off:sm_redbots_feature_demo_sticky_first=0
 go run ./testbed/sweepreport results/ab-demo_sticky_first/on \
                              results/ab-demo_sticky_first/off
 ```
@@ -161,7 +162,7 @@ natively ends the session.
 
 ```sh
 testbed/seed-native.sh                 # once: copies the game out of the container
-testbed/run-native.sh --waves 6        # same flags as run.sh
+testbed/run-native.sh --waves 6        # the native path, still shell
 testbed/symbolise-core.sh core.1234    # a backtrace with names in it
 ```
 
@@ -198,7 +199,7 @@ plain name or a path you can write, not a pipe to a crash handler.
 
 ## When the server crashes
 
-`run.sh` greps the container's log for `core dumped` on every poll and stops
+The runner notices a server that stops answering rcon and stops
 with a message rather than waiting out the timeout, because from outside a
 crashing server and a slow one look the same: no new results either way.
 
@@ -241,9 +242,7 @@ does not say whether the bots look right, and somebody still has to watch them.
 
 | file                    | what it is                                            |
 | ----------------------- | ----------------------------------------------------- |
-| `run.sh`                | brings the server up, runs the mission, reads results  |
-| `sweep.sh`              | plays every installed map, one results file each       |
-| `ab.sh`                 | plays the same maps twice with one feature switched    |
+| `cmd/testbed`           | brings the server up, runs the arms, reads results     |
 | `report/`               | turns a results file into a table, and compares two    |
 | `sweepreport/`          | reads a whole sweep, or one A/B arm against the other  |
 | `checkspots.py`         | which dispenser spot each authored nest would take     |

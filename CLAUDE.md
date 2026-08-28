@@ -14,7 +14,7 @@ Do not guess. The test-bed decides. Repeat these steps:
 1. Reproduce the bug on the test-bed.
 2. Read the run report. If it does not show the bug, add the statistic that does.
 3. Make one change.
-4. Start `testbed/ab.sh --feature <name>`. It plays the same maps with the change on and off.
+4. Start `go run ./testbed/cmd/testbed -arm on:<cvar>=1 -arm off:<cvar>=0`. The last arm is the control.
 5. Compare the two run reports. Keep the change if the numbers improve.
 6. If the numbers do not improve, remove the change and try a different one.
 7. Go back to step 3 until the numbers are good enough.
@@ -25,16 +25,16 @@ One run for each half does not decide anything. The maps and the waves move the
 numbers on their own. First measure how much two runs of one build differ.
 Then add runs until the two halves differ by more than that.
 
-- More maps: `testbed/ab.sh --feature <name> --maps "mvm_coaltown mvm_decoy"`.
-- More runs of one mission: `testbed/batch.sh 3`.
-- Every installed map: `testbed/sweep.sh`.
+- More maps: add `-maps "mvm_coaltown mvm_decoy"`.
+- More runs of one mission: add `-attempts 3`.
+- Every installed map: pass them all to `-maps`.
 
 A small win on one map is noise. Widen the sample before you keep the change.
 
 ```bash
 testbed/build.sh   # build the plugin
-testbed/run.sh     # play one mission and write one run report
-testbed/sweep.sh   # play every installed map
+go run ./testbed/cmd/testbed  # play arms of one mission and report them
+                              # -maps plays several, one after another
 ```
 
 ## Triage from Discord

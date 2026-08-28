@@ -284,3 +284,34 @@ func trim(s string) string {
 	}
 	return s
 }
+
+/*
+JumpToWave starts the mission partway in, which is how a wave three report is
+made without playing waves one and two for half an hour.
+
+The jump is a cheat command, so cheats go on for it and back to what they were
+after. Restoring the previous value rather than zero: a server somebody had set
+cheats on deliberately should not have them turned off by a measurement.
+*/
+func (l Lab) JumpToWave(ctx context.Context, wave int) error {
+	before, err := l.Do("sv_cheats")
+	if err != nil {
+		return err
+	}
+	restore := "0"
+	if strings.Contains(before, `"sv_cheats" = "1"`) {
+		restore = "1"
+	}
+
+	if err := sleep(ctx, 5*time.Second); err != nil {
+		return err
+	}
+	if _, err := l.Do("sv_cheats 1"); err != nil {
+		return err
+	}
+	if _, err := l.Do(fmt.Sprintf("tf_mvm_jump_to_wave %d", wave)); err != nil {
+		return err
+	}
+	_, err = l.Do("sv_cheats " + restore)
+	return err
+}
