@@ -119,6 +119,7 @@ static void Event_MvmWaveComplete(Event event, const char[] name, bool dontBroad
 		if (IsClientInGame(i) && g_bIsDefenderBot[i])
 		{
 			//Wave complete, rethink what we should do
+			ClearSniperStall(i);
 			ResetIntentionInterface(i);
 			
 #if defined MOD_REQUEST_CREDITS
