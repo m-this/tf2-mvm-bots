@@ -2036,10 +2036,6 @@ bool TF2_IsGunslingerEquipped(int client)
 	return GetLoadoutSlotItemDefinitionIndex(client, TFWeaponSlot_Melee) == TF_ITEMDEF_GUNSLINGER;
 }
 
-bool TF2_IsEurekaEffectEquipped(int client)
-{
-	return GetLoadoutSlotItemDefinitionIndex(client, TFWeaponSlot_Melee) == TF_ITEMDEF_EUREKA_EFFECT;
-}
 
 bool TF2_IsRescueRangerEquipped(int client)
 {
