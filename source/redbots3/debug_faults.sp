@@ -45,6 +45,8 @@ void DebugFaults_Init()
 	redbots_debug_old_wedge_recovery = CreateConVar("sm_redbots_debug_old_wedge_recovery", "0",
 		"Use the pre-2.21.3 wedge recovery, which only ever tried the area the bot stands in. For measuring what that fix is worth.",
 		FCVAR_NOTIFY, true, 0.0, true, 1.0);
+
+	RegServerCmd("sm_redbots_debug_sniper_spots", Command_SniperSpots);
 }
 
 //How many refusals are still owed to this bot, counted down as they are handed out
@@ -158,4 +160,43 @@ bool DebugFaults_UnreachableGoal(int client, float goal[3])
 	goal = m_vWedgedAt;
 	goal[2] += 16384.0;
 	return true;
+}
+
+/* Report whether each sniper spot can be walked to, from each sniper standing now
+
+The stock sniper is handed to the game's CTFBotSniperLurk, which computes its own path and hangs
+the frame the watchdog kills the server on. Whether the spots are reachable at all decides the
+fix: an unreachable spot means filtering them before committing, a reachable one means the lurk
+never starts. See mvm-bj8. */
+void DebugFaults_ReportSniperSpots()
+{
+	ArrayList spots = g_arrMapConfig.adtSniperSpot;
+
+	PrintToServer("[sniperspots] %d configured", spots.Length);
+
+	for (int client = 1; client <= MaxClients; client++)
+	{
+		if (!IsClientInGame(client) || !IsPlayerAlive(client))
+			continue;
+
+		if (!g_bIsDefenderBot[client] || TF2_GetPlayerClass(client) != TFClass_Sniper)
+			continue;
+
+		float here[3]; here = GetAbsOrigin(client);
+
+		for (int i = 0; i < spots.Length; i++)
+		{
+			float spot[3]; spots.GetArray(i, spot);
+
+			PrintToServer("[sniperspots] bot %d spot %d away %.0f reachable %d rifle %d",
+				client, i, GetVectorDistance(here, spot),
+				IsPathToVectorPossible(client, spot), HasSniperRifle(client));
+		}
+	}
+}
+
+public Action Command_SniperSpots(int args)
+{
+	DebugFaults_ReportSniperSpots();
+	return Plugin_Handled;
 }
