@@ -188,6 +188,7 @@ MainAction is the one every bot has. Ending it every update is what makes the fr
 once produces a bot that is idle for a frame and then carries on. */
 static int m_iEmptiedBot = -1;
 static float m_flEmptiedUntil;
+static float m_flEmptiedSaid;
 
 void DebugFaults_OnWaveStartEmpty()
 {
@@ -225,7 +226,23 @@ bool DebugFaults_ShouldEmpty(int client)
 		return false;
 
 	if (GetGameTime() <= m_flEmptiedUntil && IsPlayerAlive(client))
+	{
+		/* Say what the stack looks like while it is being emptied
+
+		Ending MainAction lets the intention build it again, so the stack a watchdog sampling once a
+		second sees may never be the empty one. Without this line, a rescue that does not fire and a
+		fault that is not there read the same. */
+		if (m_flEmptiedSaid <= GetGameTime())
+		{
+			m_flEmptiedSaid = GetGameTime() + 1.0;
+
+			char actions[512]; ActionStackOf(client, actions, sizeof(actions));
+
+			LogMessage("DebugFaults: %N holds \"%s\"", client, actions);
+		}
+
 		return true;
+	}
 
 	LogMessage("DebugFaults: done emptying %N", client);
 	m_iEmptiedBot = -1;
