@@ -314,15 +314,35 @@ void PrepareCustomLoadout(int client)
 		}
 	}
 	
-	char itemClassname[PLATFORM_MAX_PATH];
-	
-	if (TF2Econ_GetItemClassName(m_iWeaponPrimary[client], itemClassname, sizeof(itemClassname)))
+	/* The sniper mission is what makes the game hand him a CTFBotSniperLurk, and a stock loadout
+	   used to miss it entirely
+
+	This is mvm-bj8, and the whole of it. A stock primary leaves m_iWeaponPrimary at
+	TF_ITEMDEF_DEFAULT, TF2Econ_GetItemClassName then fails on an item definition that is not one,
+	and the block below is skipped: no mission, no lurk, and a sniper who stands where he shopped
+	for the rest of the mission. A Machina or a Heatmaker has a real definition index, so it reads
+	back as a rifle and works, which is exactly the split Peppy reported.
+
+	events.sp calls SetMission unconditionally for a sniper when custom loadouts are off, so only a
+	server with them on could see this.
+
+	A sniper carrying the default primary is carrying the stock rifle: there is nothing to look up,
+	and no lookup that can fail. */
+	if (TF2_GetPlayerClass(client) == TFClass_Sniper)
 	{
-		if (StrEqual(itemClassname, "tf_weapon_sniperrifle") || StrEqual(itemClassname, "tf_weapon_sniperrifle_decap") || StrEqual(itemClassname, "tf_weapon_sniperrifle_classic"))
+		char itemClassname[PLATFORM_MAX_PATH];
+
+		bool holdingRifle = m_iWeaponPrimary[client] <= TF_ITEMDEF_DEFAULT;
+
+		if (!holdingRifle && TF2Econ_GetItemClassName(m_iWeaponPrimary[client], itemClassname, sizeof(itemClassname)))
 		{
-			//We determined we're using a sniper rifle, so use sniper ai
-			SetMission(client, CTFBot_MISSION_SNIPER);
+			holdingRifle = StrEqual(itemClassname, "tf_weapon_sniperrifle")
+				|| StrEqual(itemClassname, "tf_weapon_sniperrifle_decap")
+				|| StrEqual(itemClassname, "tf_weapon_sniperrifle_classic");
 		}
+
+		if (holdingRifle)
+			SetMission(client, CTFBot_MISSION_SNIPER);
 	}
 	
 	g_bHasCustomLoadout[client] = true;
