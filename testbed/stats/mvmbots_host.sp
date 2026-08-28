@@ -57,6 +57,8 @@ public void OnPluginStart()
 {
 	g_cvEnabled = CreateConVar("mvmbots_host_enabled", "1",
 		"Connect one fake client to hold a seat on RED and ready up.", _, true, 0.0, true, 1.0);
+
+	RegServerCmd("mvmbots_roster", Command_Roster, "Say who is on each team, for a run to check before it believes itself.");
 	g_cvName = CreateConVar("mvmbots_host_name", "testbed-host",
 		"What to call it, so it can be told apart from the mod's own bots.");
 
@@ -200,4 +202,39 @@ static void ConnectHost()
 static bool IsPlayerReady(int client)
 {
 	return GameRules_GetProp("m_bPlayerReady", 4, client) != 0;
+}
+
+
+/* Say who is on each team, in one line a runner can read
+
+status cannot do this. It lists names and never says which side anybody is on,
+and the robots are named by class on most maps: a runner counting "not a robot
+name" as a defender read fourteen Pyros on BLU as a full RED and passed. The
+game knows the answer and this asks it.
+*/
+static Action Command_Roster(int args)
+{
+	int red, blu, humans, host;
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i))
+			continue;
+
+		if (!IsFakeClient(i))
+			humans++;
+		else if (i == g_iHost)
+			host++;
+
+		switch (TF2_GetClientTeam(i))
+		{
+			case TFTeam_Red: red++;
+			case TFTeam_Blue: blu++;
+		}
+	}
+
+	//The host holds a RED seat and is not a defender, so it is named separately
+	PrintToServer("mvmbots_roster red=%d blu=%d humans=%d host=%d", red, blu, humans, host);
+
+	return Plugin_Handled;
 }

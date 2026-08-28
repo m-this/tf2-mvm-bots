@@ -77,8 +77,6 @@ func (l Lab) WaitForRcon(ctx context.Context, limit time.Duration) error {
 
 var (
 	mapLine    = regexp.MustCompile(`(?m)^map\s+:\s+(\S+)`)
-	playerLine = regexp.MustCompile(`(?m)^players\s*:\s*(\d+)\s+humans,\s+(\d+)\s+bots`)
-	botName    = regexp.MustCompile(`(?m)^#\s+\d+\s+"([^"]*)"\s+BOT`)
 	popLine    = regexp.MustCompile(`Current popfile is:\s*(\S+)`)
 	versionRow = regexp.MustCompile(`"Defender TFBots"\s+\(([^)]+)\)`)
 )
@@ -92,27 +90,39 @@ type Roster struct {
 	Host      bool
 }
 
-// Roster reads status and says who is there.
+var rosterLine = regexp.MustCompile(`mvmbots_roster red=(\d+) blu=(\d+) humans=(\d+) host=(\d+)`)
+
+/*
+Roster asks the game who is on each team.
+
+Through the host plugin rather than through status, because status lists names
+and never says which side anybody is on. The robots are named by class on most
+maps, so a runner counting "not a robot name" as a defender read fourteen Pyros
+on BLU as a full RED and passed a run that had no defenders at all.
+*/
 func (l Lab) Roster() (Roster, error) {
-	out, err := l.Do("status")
+	out, err := l.Do("mvmbots_roster")
 	if err != nil {
 		return Roster{}, err
 	}
+	m := rosterLine.FindStringSubmatch(out)
+	if m == nil {
+		return Roster{}, fmt.Errorf("%w: the host plugin did not answer mvmbots_roster, so nobody can say who is on which team", ErrPrecondition)
+	}
+
 	var r Roster
-	if m := playerLine.FindStringSubmatch(out); m != nil {
-		r.Humans, _ = strconv.Atoi(m[1])
-		r.Bots, _ = strconv.Atoi(m[2])
+	red, _ := strconv.Atoi(m[1])
+	r.Robots, _ = strconv.Atoi(m[2])
+	r.Humans, _ = strconv.Atoi(m[3])
+	host, _ := strconv.Atoi(m[4])
+	r.Host = host > 0
+
+	// The host holds a RED seat and plays nothing, so it is not a defender.
+	r.Defenders = red - host - r.Humans
+	if r.Defenders < 0 {
+		r.Defenders = 0
 	}
-	for _, m := range botName.FindAllStringSubmatch(out, -1) {
-		switch name := m[1]; {
-		case name == "testbed-host":
-			r.Host = true
-		case strings.HasSuffix(name, "TFBot"):
-			r.Robots++
-		default:
-			r.Defenders++
-		}
-	}
+	r.Bots = red + r.Robots - r.Humans
 	return r, nil
 }
 
