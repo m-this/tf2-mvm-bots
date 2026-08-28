@@ -1442,7 +1442,16 @@ static bool MoveWedgedDefender(int client)
 
 	float destination[3];
 
-	if (!WedgeEscapePoint(area, here, destination))
+	if (DebugFaults_OldWedgeRecovery())
+	{
+		//The pre-2.21.3 behaviour, kept only so a run can measure what replacing it was worth
+		CNavArea_GetRandomPoint(area, destination);
+		destination[2] += 10.0;
+
+		if (GetVectorDistance(here, destination) <= STUCK_RADIUS)
+			return false;
+	}
+	else if (!WedgeEscapePoint(area, here, destination))
 	{
 		LogMessage("Stuck: %N is wedged at %.0f %.0f %.0f and every point in its area and the ones touching it is too close",
 			client, here[0], here[1], here[2]);
