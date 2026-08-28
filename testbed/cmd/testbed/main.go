@@ -115,7 +115,7 @@ func run() error {
 		}
 		say("restarting the server onto it")
 		compose := filepath.Join(root, "testbed", "compose.yml")
-		if err := lab.Compose(ctx, compose, "up", "-d", "--force-recreate"); err != nil {
+		if err := lab.Compose(ctx, compose, containerEnv(*mapName, *team, *defend), "up", "-d", "--force-recreate"); err != nil {
 			return err
 		}
 	}
@@ -129,7 +129,7 @@ func run() error {
 	if *down {
 		defer func() {
 			say("stopping the server")
-			_ = lab.Compose(context.Background(), filepath.Join(root, "testbed", "compose.yml"), "stop")
+			_ = lab.Compose(context.Background(), filepath.Join(root, "testbed", "compose.yml"), nil, "stop")
 		}()
 	}
 
@@ -215,4 +215,24 @@ func checkVersion(root string, l lab.Lab, say func(string, ...any)) error {
 	}
 	say("the server is running %s, which is what the source says", got)
 	return nil
+}
+
+/*
+containerEnv is the run's shape, in the variables compose.yml reads.
+
+The container writes server.cfg from these at start up, and the map load reads
+that file. Setting the lineup over rcon instead does not survive, because the
+exec that follows a map load puts the file's values back: a run that set the
+team and then loaded the map found RED empty and refused, which is how this was
+found.
+*/
+func containerEnv(mapName, team string, size int) []string {
+	return []string{
+		"TESTBED_MAP=" + mapName,
+		"TESTBED_BOT_TEAM_COMP=" + team,
+		fmt.Sprintf("TESTBED_BOT_TEAM_SIZE=%d", size),
+		"TESTBED_HOST=1",
+		"TESTBED_PORT=" + envOr("TESTBED_PORT", "27025"),
+		"TESTBED_RCONPW=" + envOr("TESTBED_RCONPW", "testbed"),
+	}
 }
