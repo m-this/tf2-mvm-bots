@@ -1330,16 +1330,30 @@ static void Frame_UnstickDefender(any client)
 	ResetIntentionInterface(client);
 }
 
-/* Whether this is a sniper stuck in a lurk he cannot finish
+/* Whether this is a sniper who is nowhere near a spot and not on his way to one
 
-Near a spot means he arrived and standing still is his job. Far from every one of them, with the
-lurk still on his stack, means the walk is not happening and the path search behind it is running
-every update. */
+Near a spot means he arrived and standing still is his job. Far from every one of them means he is
+not doing the thing his seat exists for.
+
+This used to require SniperLurk on his stack, which is exactly backwards for the fault Peppy
+reported. His logs name it: bot 25 sat at 706 -2229 480 for 1097 samples, one position, stack
+"MainAction < TacticalMonitor < ScenarioMonitor" and no SniperLurk at all, while bot 24 held the
+lurk and moved through 234 positions. The stuck one has a stack, so the idle watchdog's empty-stack
+test never fires either, and he is not pathing, so nothing else arms. He was invisible to every
+check the watchdog had.
+
+So the lurk is not required, in either direction: a rifle sniper parked far from every spot is the
+fault whether ScenarioMonitor gave him a lurk that cannot finish or never gave him one. The reset
+is what both need, and it is the same restart a custom primary causes by accident. See mvm-bj8. */
 #define SNIPER_AT_SPOT	400.0
 
-static bool IsLurkingNowhere(int actor, const char[] actions, const float here[3])
+static bool IsLurkingNowhere(int actor, const float here[3])
 {
-	if (TF2_GetPlayerClass(actor) != TFClass_Sniper || StrContains(actions, "SniperLurk") == -1)
+	if (TF2_GetPlayerClass(actor) != TFClass_Sniper || !HasSniperRifle(actor))
+		return false;
+
+	//A spot he is walking to is a spot he has not reached, and the walk is not the fault
+	if (g_arrPluginBot[actor].bPathing)
 		return false;
 
 	ArrayList spots = g_arrMapConfig.adtSniperSpot;
@@ -1385,7 +1399,7 @@ static void UpdateStuckWatchdog(int actor)
 
 	Standing still is normal for a sniper who arrived, so it only counts against one who is nowhere
 	near a spot the map offers. */
-	bool lurkingNowhere = Feature(FEATURE_WATCH_LURKING_SNIPERS) && IsLurkingNowhere(actor, actions, here);
+	bool lurkingNowhere = Feature(FEATURE_WATCH_LURKING_SNIPERS) && IsLurkingNowhere(actor, here);
 
 	
 	bool wantsToBeElsewhere = g_arrPluginBot[actor].bPathing || myLoco.IsStuck() || noBehaviour || lurkingNowhere;
