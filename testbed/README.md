@@ -288,5 +288,18 @@ It refuses a run rather than producing one nobody should believe:
 - **RED must hold defenders.** A wave with twenty two robots and nobody to fight
   them still writes a file, and every number in it is zero.
 
+While a wave plays it is watched rather than only waited for, because a run that
+has gone wrong looks like a slow one for the first minute and like a finished one
+at the end. It stops and names the reason when:
+
+- **no robot has been on BLU for five polls.** The mission is loaded and not
+  playing. Nine Mannhunt attempts ended this way and were read as losses.
+- **nothing has been written for six polls.** The statistics plugin writes every
+  five seconds, so that is the plugin gone, not a quiet wave.
+- **RED holds no defenders.** Whatever the rest of the wave measures, it is not
+  the lineup asked for.
+- **the server stops answering rcon.** That is a crash in what is being
+  measured, and it is counted as one.
+
 A precondition that fails stops the whole run. They fail the same way every
 time, and grinding through the remaining attempts costs an hour to learn nothing.
