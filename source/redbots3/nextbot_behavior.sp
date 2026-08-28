@@ -2213,7 +2213,13 @@ Action GetDesiredBotAction(int client, BehaviorAction action)
 			}
 			case TFClass_Sniper:
 			{
-				if (HasSniperRifle(client))
+				/* A rifle sniper is given nothing here because Timer_PlayerSpawn is meant to have
+				   given him his sniping behaviour already. When that did not happen he has nothing
+				   for the whole wave, which is the running half of mvm-bj8: Peppy's sniper wandered
+				   the map with an empty ScenarioMonitor and never fired a shot, stall #4, #5, #6.
+
+				   So a sniper caught stalling fights like one who never had a rifle. */
+				if (HasSniperRifle(client) && !IsSniperStalled(client))
 				{
 					//NOTE: we set the sniping behavior manually in Timer_PlayerSpawn
 					return Plugin_Continue;
