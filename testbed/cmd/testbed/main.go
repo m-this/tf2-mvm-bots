@@ -32,6 +32,8 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -83,11 +85,21 @@ func run() error {
 		maps     = flag.String("maps", "", "run every map in this list instead of -map, space separated")
 		list     arms
 	)
+	replay := flag.String("replay", "", "a player's server.cfg, from a debug bundle, whose settings this run plays instead of the flags")
 	flag.Var(&list, "arm", "name:cvars, repeatable. Comma separated cvars, key=value")
 	flag.Parse()
 
 	if len(list) == 0 {
 		return errors.New("no arms: give at least one -arm name:cvars")
+	}
+
+	replayed := map[string]string{}
+	if *replay != "" {
+		found, err := readServerCfg(*replay)
+		if err != nil {
+			return err
+		}
+		replayed = found
 	}
 
 	root, err := repoRoot()
@@ -107,6 +119,12 @@ func run() error {
 	say := func(format string, args ...any) {
 		fmt.Printf("[testbed] "+format+"\n", args...)
 	}
+
+	// Said out loud, because a run that quietly played settings other than the
+	// ones on the command line is the whole fault this flag exists for.
+	for _, setting := range sortedPairs(replayed) {
+		say("replaying %s", setting)
+	}
 	l := lab.Lab{
 		Client: rcon.Client{Addr: address(), Password: password(), Timeout: 15 * time.Second},
 		Say:    say,
@@ -119,7 +137,7 @@ func run() error {
 		}
 		say("restarting the server onto it")
 		compose := filepath.Join(root, "testbed", "compose.yml")
-		if err := lab.Compose(ctx, compose, containerEnv(*mapName, *team, *defend), "up", "-d", "--force-recreate"); err != nil {
+		if err := lab.Compose(ctx, compose, containerEnv(*mapName, *team, *defend, replayed), "up", "-d", "--force-recreate"); err != nil {
 			return err
 		}
 	}
@@ -225,13 +243,37 @@ exec that follows a map load puts the file's values back: a run that set the
 team and then loaded the map found RED empty and refused, which is how this was
 found.
 */
-func containerEnv(mapName, team string, size int) []string {
-	return []string{
-		"TESTBED_MAP=" + mapName,
-		"TESTBED_BOT_TEAM_COMP=" + team,
-		fmt.Sprintf("TESTBED_BOT_TEAM_SIZE=%d", size),
-		"TESTBED_HOST=1",
-		"TESTBED_PORT=" + envOr("TESTBED_PORT", "27025"),
-		"TESTBED_RCONPW=" + envOr("TESTBED_RCONPW", "testbed"),
+func sortedPairs(of map[string]string) []string {
+	out := make([]string, 0, len(of))
+	for key, value := range of {
+		out = append(out, key+"="+value)
 	}
+	sort.Strings(out)
+
+	return out
+}
+
+func containerEnv(mapName, team string, size int, replayed map[string]string) []string {
+	env := map[string]string{
+		"TESTBED_MAP":           mapName,
+		"TESTBED_BOT_TEAM_COMP": team,
+		"TESTBED_BOT_TEAM_SIZE": strconv.Itoa(size),
+		"TESTBED_HOST":          "1",
+		"TESTBED_PORT":          envOr("TESTBED_PORT", "27025"),
+		"TESTBED_RCONPW":        envOr("TESTBED_RCONPW", "testbed"),
+	}
+
+	// A replayed server.cfg wins, because the point of naming one is to play
+	// what it plays rather than what the flags default to.
+	for key, value := range replayed {
+		env[key] = value
+	}
+
+	out := make([]string, 0, len(env))
+	for key, value := range env {
+		out = append(out, key+"="+value)
+	}
+	sort.Strings(out)
+
+	return out
 }
