@@ -1352,6 +1352,25 @@ is what both need, and it is the same restart a custom primary causes by acciden
 
 static float m_ctSniperStallDeadline[MAXPLAYERS + 1];
 
+/* Set once the stall is called, and never cleared while he is on this team
+
+Resetting his intention is not enough on its own: Peppy watched the rescue fire on a sniper nobody
+had walked into, and he stayed in spawn. So the mark outlives the reset and the break reads it, which
+is the only place a bot can be handed an action. */
+static bool m_bSniperStalled[MAXPLAYERS + 1];
+
+//Whether this sniper has been caught stalling and should be sent to the front like every other class
+bool IsSniperStalled(int client)
+{
+	return m_bSniperStalled[client];
+}
+
+void ClearSniperStall(int client)
+{
+	m_bSniperStalled[client] = false;
+	m_ctSniperStallDeadline[client] = 0.0;
+}
+
 static bool IsLurkingNowhere(int actor, const char[] actions, const float here[3])
 {
 	if (TF2_GetPlayerClass(actor) != TFClass_Sniper || !HasSniperRifle(actor))
@@ -1425,6 +1444,7 @@ static void UpdateStuckWatchdog(int actor)
 	else if (Feature(FEATURE_WATCH_LURKING_SNIPERS) && GetGameTime() >= m_ctSniperStallDeadline[actor])
 	{
 		m_ctSniperStallDeadline[actor] = GetGameTime() + SNIPER_STALL_TIME;
+		m_bSniperStalled[actor] = true;
 		m_iStuckCount[actor]++;
 
 		LogMessage("Stalled: %N (sniper) at %.0f %.0f %.0f for %.0fs, stall #%d, %s",
@@ -2150,7 +2170,7 @@ Action GetDesiredBotAction(int client, BehaviorAction action)
 				return action.SuspendFor(CTFBotMoveToFront(), "Skip upgrading");
 			}
 		}
-		else if (ShouldTakeUpPosition(client) && ActionsManager.LookupEntityActionByName(client, "DefenderMoveToFront") == INVALID_ACTION)
+		else if ((ShouldTakeUpPosition(client) || IsSniperStalled(client)) && ActionsManager.LookupEntityActionByName(client, "DefenderMoveToFront") == INVALID_ACTION)
 		{
 			/* Shopping is finished, so go and stand where the robots come out
 
