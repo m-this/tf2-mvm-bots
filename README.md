@@ -19,7 +19,7 @@ TFBots that can play Mann vs Machine.
 with every wave: cleared or lost, how long, how many robots and defenders died,
 how many backstabs, what the engineers lost. It also samples every bot and every
 building every five seconds, so "the engineer was stood in a house" and "that
-dispenser fed nobody" are numbers rather than reports. `testbed/run.sh` plays a
+dispenser fed nobody" are numbers rather than reports. `testbed/cmd/testbed` plays a
 mission, `go run ./testbed/report` reads a run and compares two.
 
 See `testbed/README.md` for running it, `docs/testbed-metrics.md` for what the

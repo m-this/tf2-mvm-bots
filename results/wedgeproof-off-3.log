@@ -1,0 +1,113 @@
+[test-bed] found a Team Fortress 2 install in tf2-archipelago_tf2game
+mvmbots-testbed_tf2game already has something in it, leaving it alone
+mvmbots-testbed_tf2game already has the game
+[test-bed] starting the server on mvm_decoy
+ Container mvmbots-testbed-srcds-1 Running 
+[test-bed] waiting for the server to answer rcon (the first run downloads the game)
+[test-bed] loading mission mvm_decoy_advanced
+[test-bed] waiting for the server to settle before restarting the round
+[test-bed] watching for 2 wave results, giving up after 1500s
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 0 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 1 of 2 waves finished
+[test-bed] 2 of 2 waves finished
+[test-bed] wrote results/wedgeproof-off-3.jsonl
+
+results/wedgeproof-off-3.jsonl
+  waves played      2
+  cleared           0 (0%)
+  robots killed     135, of them 6 giants
+  defenders died    27
+  sentries lost     2
+  buildings took    777, engineer put back 0 (0%)
+  damage dealt      36610
+  of it, sentries   5488 (15%)
+  damage to tanks   0
+  healing done      1612, 0 ubers
+  healing by class  scout 1087  medic 399  engineer 126
+  scoreboard says   3199   (the event sum says 1612, which is a 1587 gap)
+  damage by class   heavy 10287  engineer 8511  demoman 7051  scout 6147  soldier 4425  medic 189
+  kills by class    heavy 39  demoman 28  scout 24  soldier 19  engineer 17  medic 1
+  giants by class   demoman 1  engineer 1  heavy 1  scout 1  soldier 1
+  killed us         pyro 23  heavy 3  soldier 1
+  died to           fire 21  other 5  melee 1
+  demoman damage    pipes 5492, stickies 1559, bottle 0
+  soldier damage    rockets 4360, everything else 65
+  jars thrown       7
+  projectiles       soldier 86 fired, 46 hit (53%);  demoman 126 fired, 64 hit (50%)
+  hurt themselves   soldier 2413  demoman 2014  heavy 1300  engineer 32
+  killed themselves heavy 1  soldier 1
+
+  what the bots were doing (430 samples)
+    Albert           soldier   DefenderAttack 45%, DefenderMoveToFront 35%, DefenderCampBomb 9%
+                               primary 94%/secondary 4%/melee 1%, hurt 11% of the time
+    Cecil            demoman   DefenderAttack 52%, DefenderMoveToFront 34%, ScenarioMonitor 4%
+                               primary 79%/secondary 20%, hurt 18% of the time
+    Elliot           medic     Heal 54%, DefenderMoveToFront 37%, DefenderMedicRevive 4%
+                               beam on somebody 38% of the time, trigger held 54% (71% of that connected)
+                               primary 42%/secondary 57%, hurt 8% of the time
+    Ferris           heavy     DefenderAttack 38%, DefenderMoveToFront 34%, DefenderCampBomb 18%
+                               primary 98%/secondary 1%, hurt 2% of the time
+    Neil             scout     DefenderCollectMoney 50%, DefenderMoveToFront 32%, ScenarioMonitor 6%
+                               primary 41%/secondary 54%/melee 3%, hurt 0% of the time
+    Waldo            engineer  DefenderEngineerIdle 60%, DefenderBuildTeleporter 17%, DefenderBuildSentrygun 14%
+                               primary 70%/secondary 5%/melee 10%, hurt 8% of the time
+
+  what the buildings were worth (207 samples)
+    Waldo dispenser              level 3, saw a robot 16% of samples (0.6 at a time), 3.2 teammates in range
+    Waldo sentry                 level 3, saw a robot 24% of samples (0.4 at a time), 2.1 teammates in range
+    Waldo teleporter entrance    level 3, saw a robot 12% of samples (0.2 at a time), 0.2 teammates in range
+    Waldo teleporter exit        level 3, saw a robot 30% of samples (0.5 at a time), 0.2 teammates in range
+
+  how close the buildings got to the spots mvm_decoy names
+    Waldo dispenser               wave 1: 91
+    Waldo sentry                  wave 1: 82
+    (median units from the nearest authored spot; ! is off it, !! is nowhere near it)
+
+  how close the nearest robot was
+    demoman   median 610, closest tenth under 168, point blank 4% of samples
+    engineer  median 553, closest tenth under 161, point blank 9% of samples
+    heavy     median 752, closest tenth under 303, point blank 4% of samples
+    medic     median 785, closest tenth under 277, point blank 4% of samples
+    scout     median 408, closest tenth under 113, point blank 12% of samples
+    soldier   median 524, closest tenth under 130, point blank 11% of samples
+
+  where they stood while a wave was running
+    Albert           soldier   stood still 9% of the time, longest 5s at 83 732 356, 33285 units walked per wave
+                               trigger held in 21% of samples, 100% of those into the world (aimed at world 90%, func_respawnroomvisualizer 4%, teammate 2%)
+    Cecil            demoman   stood still 2% of the time, longest 5s at 71 512 355, 31320 units walked per wave
+                               trigger held in 44% of samples, 68% of those into the world (aimed at world 81%, giant pyro 4%, heavy 4%)
+    Elliot           medic     stood still 9% of the time, longest 5s at -73 1889 360, 27148 units walked per wave
+                               trigger held in 90% of samples, 21% of those into the world (aimed at teammate 38%, entity_medigun_shield 23%, world 23%)
+    Ferris           heavy     stood still 9% of the time, longest 15s at 528 -1010 352, 25949 units walked per wave
+                               trigger held in 63% of samples, 57% of those into the world (aimed at world 69%, pyro 9%, heavy 7%)
+    Neil             scout     stood still 6% of the time, longest 5s at -53 791 357, 34980 units walked per wave
+                               trigger held in 47% of samples, 56% of those into the world (aimed at world 71%, heavy 10%, pyro 10%)
+    Waldo            engineer  stood still 43% of the time, longest 55s at 398 625 544, 26865 units walked per wave
+                               asked to walk in 87% of samples, 13% of those with no path at all, 36% of those without moving
+                               trigger held in 41% of samples, 58% of those into the world (aimed at world 59%, func_respawnroomvisualizer 19%, heavy 9%)
+                               wrench out 1 samples, 0% of them stopped out of reach of his own buildings
+
+  between waves
+    Albert           soldier   no behaviour in 0% of samples, longest 0s, 13660 units walked
+    Cecil            demoman   no behaviour in 0% of samples, longest 0s, 13191 units walked
+    Elliot           medic     no behaviour in 0% of samples, longest 0s, 12363 units walked
+    Ferris           heavy     no behaviour in 0% of samples, longest 0s, 13542 units walked
+    Neil             scout     no behaviour in 0% of samples, longest 0s, 13237 units walked
+    Waldo            engineer  no behaviour in 0% of samples, longest 0s, 26599 units walked
+
+  how much one wave varies from the next
