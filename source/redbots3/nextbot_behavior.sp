@@ -313,6 +313,22 @@ void RepathToTarget(int actor, INextBot myBot, int target)
 
 void RepathToPos(int actor, INextBot myBot, const float goal[3])
 {
+	/* The crash condition, on demand: a goal with no path to it
+
+	A wedged bot is not expensive on its own. What the cores show is a bot asking for a path that
+	cannot exist, which sends NavAreaBuildPath across the whole mesh for an answer it never finds,
+	every time the behaviour resets. Pinning a bot somewhere he can still path from reproduces the
+	wedge and none of the cost, which is why six attempts under load produced no long frame at all.
+
+	So the injector can send the held bot at a point off the mesh instead. */
+	float unreachable[3];
+
+	if (DebugFaults_UnreachableGoal(actor, unreachable))
+	{
+		NotePathResult(actor, m_pPath[actor].ComputeToPos(myBot, unreachable, PathLengthCap()));
+		return;
+	}
+
 	NotePathResult(actor, m_pPath[actor].ComputeToPos(myBot, goal, PathLengthCap()));
 }
 
