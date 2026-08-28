@@ -85,6 +85,17 @@ func playInto(ctx context.Context, l lab.Lab, a arm, o options, round int, got *
 	}
 	got.Results = append(got.Results, results...)
 	o.say("attempt %d: %d waves, %d cleared", round, len(results), cleared(results))
+
+	/* Said on every run, whatever the run was measuring
+
+	Six defenders doing the work of five still clears waves, so an arm comparison
+	never shows a bot that was handed nothing to do. The stock sniper sat in these
+	files for a day: the samples naming his empty stack were written every half
+	second and nothing read them. See mvm-bj8. */
+	if report := wave.IdleReport(path); report != "" {
+		o.say("%s", report)
+	}
+
 	return nil
 }
 
