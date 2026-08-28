@@ -308,7 +308,29 @@ void NudgeTowardsGoal(int client, INextBot myBot, const float goal[3])
  */
 void RepathToTarget(int actor, INextBot myBot, int target)
 {
-	NotePathResult(actor, m_pPath[actor].ComputeToTarget(myBot, target, PathLengthCap()));
+	float began = GetEngineTime();
+	bool built = m_pPath[actor].ComputeToTarget(myBot, target, PathLengthCap());
+
+	SayIfSlow(actor, began, "to a target");
+	NotePathResult(actor, built);
+}
+
+/* Write down a path search that cost real time
+
+The crash in the cores is a frame the watchdog killed, and the story is that a bot asking for an
+impossible path walks the whole mesh to find that out. Nothing has ever measured what one of these
+costs, so the story has never been checked: about thirty five attempts reproduced the wedge and not
+one long frame. This says what a search actually takes, which is the number the story rests on. */
+#define PATH_SLOW_MS	20.0
+
+static void SayIfSlow(int actor, float began, const char[] what)
+{
+	float ms = (GetEngineTime() - began) * 1000.0;
+
+	if (ms < PATH_SLOW_MS)
+		return;
+
+	LogMessage("Path: %N spent %.0fms searching %s", actor, ms, what);
 }
 
 void RepathToPos(int actor, INextBot myBot, const float goal[3])
@@ -325,11 +347,19 @@ void RepathToPos(int actor, INextBot myBot, const float goal[3])
 
 	if (DebugFaults_UnreachableGoal(actor, unreachable))
 	{
-		NotePathResult(actor, m_pPath[actor].ComputeToPos(myBot, unreachable, PathLengthCap()));
+		float began = GetEngineTime();
+		bool built = m_pPath[actor].ComputeToPos(myBot, unreachable, PathLengthCap());
+
+		SayIfSlow(actor, began, "a goal with no path");
+		NotePathResult(actor, built);
 		return;
 	}
 
-	NotePathResult(actor, m_pPath[actor].ComputeToPos(myBot, goal, PathLengthCap()));
+	float began = GetEngineTime();
+	bool built = m_pPath[actor].ComputeToPos(myBot, goal, PathLengthCap());
+
+	SayIfSlow(actor, began, "to a position");
+	NotePathResult(actor, built);
 }
 
 /* How far a path search may walk before it gives up, and 0.0 for no limit
