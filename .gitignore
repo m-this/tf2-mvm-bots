@@ -11,3 +11,4 @@
 
 # The runner's single-instance lock, which is state and not source
 testbed/.lock
+testbed/peppy-server.cfg
