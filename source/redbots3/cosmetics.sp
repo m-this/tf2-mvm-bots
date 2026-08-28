@@ -173,6 +173,15 @@ static bool WearHat(int client)
 	if (itemDefinition < 1)
 		return false;
 	
+	/* Cleared here rather than trusted to have been cleared
+
+	TF2Util_EquipPlayerWearable throws on Peppy's server, "wearable entity 339 not attached to
+	player", eighteen times in one session. The throw unwinds this function and the timer above it,
+	so the line that clears g_iEquipping after the equip never runs and the next draw reads a refusal
+	that belongs to the previous hat. Clearing on the way in is the one place the throw cannot skip.
+	See the bead on the equip itself, which this does not fix. */
+	g_iEquipping[client] = 0;
+
 	int hat = CreateEntityByName("tf_wearable");
 	
 	if (hat == -1)
