@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -97,49 +98,75 @@ func playOnce(ctx context.Context, l lab.Lab, a arm, o options, path string) ([]
 		}
 	}
 
-	results, crashed := waitForWaves(ctx, l, o)
+	results, crashed, reason := waitForWaves(ctx, l, o)
 	if err := copyStats(ctx, o.root, path); err != nil {
 		return results, crashed, err
+	}
+	if len(results) == 0 && reason != "" && !crashed {
+		// A run that produced nothing for a reason the watcher can name is
+		// worth saying out loud, and worth keeping out of the numbers.
+		o.say("nothing usable from this attempt: %s", reason)
 	}
 	return results, crashed, nil
 }
 
-// waitForWaves polls the statistics file, and notices a server that has gone.
-func waitForWaves(ctx context.Context, l lab.Lab, o options) ([]wave.Result, bool) {
-	deadline := time.Now().Add(o.timeout)
+/*
+waitForWaves watches a running wave rather than only waiting for it.
+
+A wave that goes wrong looks like a slow one for the first minute and like a
+finished one at the end, so the difference has to be caught while it happens.
+The watcher's reasons name what went wrong, which is worth more than a timeout
+and an empty file.
+*/
+func waitForWaves(ctx context.Context, l lab.Lab, o options) ([]wave.Result, bool, string) {
 	staged := filepath.Join(os.TempDir(), "testbed-stats.jsonl")
 
-	for {
-		if time.Now().After(deadline) {
-			o.say("gave up after %s", o.timeout)
-			return readStaged(ctx, o.root, staged), false
-		}
-		select {
-		case <-ctx.Done():
-			return readStaged(ctx, o.root, staged), false
-		case <-time.After(20 * time.Second):
-		}
-
-		if _, err := l.Do("status"); err != nil {
-			o.say("the server stopped answering, which is a crash in what is being measured")
-			return readStaged(ctx, o.root, staged), true
-		}
-		results := readStaged(ctx, o.root, staged)
-		if len(results) >= o.waves {
-			return results, false
-		}
+	watcher := &lab.Watcher{
+		WantDefenders: o.defenders,
+		// A wave lasts minutes and the polls are twenty seconds apart, so five
+		// polls is well past a between-rounds lull and well short of a wave.
+		PatienceRobots: 5,
+		PatienceSilent: 6,
 	}
+
+	var found []wave.Result
+	health, err := l.Wait(ctx, watcher, 20*time.Second, o.timeout, func() (int, int) {
+		lines, results := readStagedWithLines(ctx, o.root, staged)
+		found = results
+		if len(results) >= o.waves {
+			// Enough waves: say so by reporting the count the caller wanted.
+			return lines, len(results)
+		}
+		return lines, 0
+	})
+	if err != nil {
+		return found, false, "cancelled"
+	}
+
+	if len(found) >= o.waves {
+		return found, false, ""
+	}
+	o.say("%s", health.Reason)
+	return found, health.Fatal, health.Reason
 }
 
-func readStaged(ctx context.Context, root, staged string) []wave.Result {
+// readStagedWithLines is the results so far and how much has been written at
+// all. The line count is what tells a quiet wave from a dead plugin.
+func readStagedWithLines(ctx context.Context, root, staged string) (int, []wave.Result) {
 	if err := copyStats(ctx, root, staged); err != nil {
-		return nil
+		return 0, nil
 	}
+	body, err := os.ReadFile(staged)
+	if err != nil {
+		return 0, nil
+	}
+	lines := bytes.Count(body, []byte("\n"))
+
 	results, err := wave.Read(staged)
 	if err != nil {
-		return nil
+		return lines, nil
 	}
-	return results
+	return lines, results
 }
 
 const remoteStats = "/home/steam/tf-dedicated/tf/addons/sourcemod/logs/mvmbots_stats.jsonl"
