@@ -15,39 +15,77 @@ import (
 	"github.com/m-this/tf2-mvm-bots/testbed/internal/wave"
 )
 
-func playArm(ctx context.Context, l lab.Lab, a arm, o options) (wave.Arm, error) {
-	got := wave.Arm{Name: a.name}
+/*
+playArms interleaves the arms and alternates which one goes first.
 
-	for i := 1; i <= o.attempts; i++ {
-		o.say("=== %s attempt %d of %d", a.name, i, o.attempts)
-		got.Attempts++
+Arm at a time, which is what this used to do, made "the first arm" and "the
+first round on a freshly recreated server" the same thing. Five watchdog trips
+in one day all landed in the arm that ran first and none in the second, across
+four features, two of which provably never fired. The crash column was reading
+arm order. See mvm-p4x.
 
-		path := filepath.Join(o.out, fmt.Sprintf("%s-%s-%d.jsonl", o.tag, a.name, i))
-		results, crashed, err := playOnce(ctx, l, a, o, path)
-		switch {
-		case errors.Is(err, context.Canceled):
-			return got, err
-		case errors.Is(err, lab.ErrPrecondition):
-			// Loud, and the run stops: a precondition that fails once fails the
-			// same way every time, and grinding through the rest wastes an hour
-			// to produce nothing.
-			return got, err
-		case err != nil:
-			o.say("attempt %d did not finish: %v", i, err)
-		}
+Alternating costs nothing and removes it: each round plays every arm, and the
+order flips every round, so whatever the first round of a server is worth is
+shared out instead of being paid by one arm.
+*/
+func playArms(ctx context.Context, l lab.Lab, list arms, o options) ([]wave.Arm, error) {
+	got := make([]wave.Arm, len(list))
+	for i, a := range list {
+		got[i] = wave.Arm{Name: a.name}
+	}
 
-		if crashed {
-			got.Crashes++
+	for round := 1; round <= o.attempts; round++ {
+		for _, at := range roundOrder(len(list), round) {
+			o.say("=== %s attempt %d of %d", list[at].name, round, o.attempts)
+			if err := playInto(ctx, l, list[at], o, round, &got[at]); err != nil {
+				return got, err
+			}
 		}
-		if len(results) == 0 {
-			got.Empty++
-			o.say("attempt %d produced no wave result", i)
-			continue
-		}
-		got.Results = append(got.Results, results...)
-		o.say("attempt %d: %d waves, %d cleared", i, len(results), cleared(results))
 	}
 	return got, nil
+}
+
+// Odd rounds in order, even rounds reversed, so no arm keeps the first slot.
+func roundOrder(count, round int) []int {
+	order := make([]int, count)
+	for i := range order {
+		if round%2 == 1 {
+			order[i] = i
+		} else {
+			order[i] = count - 1 - i
+		}
+	}
+	return order
+}
+
+func playInto(ctx context.Context, l lab.Lab, a arm, o options, round int, got *wave.Arm) error {
+	got.Attempts++
+
+	path := filepath.Join(o.out, fmt.Sprintf("%s-%s-%d.jsonl", o.tag, a.name, round))
+	results, crashed, err := playOnce(ctx, l, a, o, path)
+	switch {
+	case errors.Is(err, context.Canceled):
+		return err
+	case errors.Is(err, lab.ErrPrecondition):
+		// Loud, and the run stops: a precondition that fails once fails the
+		// same way every time, and grinding through the rest wastes an hour
+		// to produce nothing.
+		return err
+	case err != nil:
+		o.say("attempt %d did not finish: %v", round, err)
+	}
+
+	if crashed {
+		got.Crashes++
+	}
+	if len(results) == 0 {
+		got.Empty++
+		o.say("attempt %d produced no wave result", round)
+		return nil
+	}
+	got.Results = append(got.Results, results...)
+	o.say("attempt %d: %d waves, %d cleared", round, len(results), cleared(results))
+	return nil
 }
 
 func cleared(results []wave.Result) int {
