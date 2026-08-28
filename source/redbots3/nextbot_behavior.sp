@@ -1320,6 +1320,31 @@ static void Frame_UnstickDefender(any client)
 	ResetIntentionInterface(client);
 }
 
+/* Whether this is a sniper stuck in a lurk he cannot finish
+
+Near a spot means he arrived and standing still is his job. Far from every one of them, with the
+lurk still on his stack, means the walk is not happening and the path search behind it is running
+every update. */
+#define SNIPER_AT_SPOT	400.0
+
+static bool IsLurkingNowhere(int actor, const char[] actions, const float here[3])
+{
+	if (TF2_GetPlayerClass(actor) != TFClass_Sniper || StrContains(actions, "SniperLurk") == -1)
+		return false;
+
+	ArrayList spots = g_arrMapConfig.adtSniperSpot;
+
+	for (int i = 0; i < spots.Length; i++)
+	{
+		float spot[3]; spots.GetArray(i, spot);
+
+		if (GetVectorDistance(here, spot) <= SNIPER_AT_SPOT)
+			return false;
+	}
+
+	return true;
+}
+
 static void UpdateStuckWatchdog(int actor)
 {
 	INextBot myBot = CBaseNPC_GetNextBotOfEntity(actor);
@@ -1339,10 +1364,22 @@ static void UpdateStuckWatchdog(int actor)
 
 	bool noBehaviour = Feature(FEATURE_WATCH_IDLE_BOTS) && actions[0] == '\0';
 
-	bool wantsToBeElsewhere = g_arrPluginBot[actor].bPathing || myLoco.IsStuck() || noBehaviour;
-	
 	float here[3]; here = GetAbsOrigin(actor);
+
+	/* A sniper spinning inside the game's own lurk is the one the watchdog missed
+
+	bPathing is the mod's flag, set by the mod's own repaths, so a bot held inside a behaviour the
+	game owns never sets it. CTFBotSniperLurk::Update calls Path::Compute directly, and when the
+	spot is out of reach it does that every update: three stock snipers on Decoy killed the server
+	that way, and the core names every frame of it. See mvm-bj8.
+
+	Standing still is normal for a sniper who arrived, so it only counts against one who is nowhere
+	near a spot the map offers. */
+	bool lurkingNowhere = Feature(FEATURE_WATCH_LURKING_SNIPERS) && IsLurkingNowhere(actor, actions, here);
+
 	
+	bool wantsToBeElsewhere = g_arrPluginBot[actor].bPathing || myLoco.IsStuck() || noBehaviour || lurkingNowhere;
+
 	if (!wantsToBeElsewhere || GetVectorDistance(here, m_vStuckOrigin[actor]) > STUCK_RADIUS)
 	{
 		m_vStuckOrigin[actor] = here;
