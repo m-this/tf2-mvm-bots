@@ -9,6 +9,10 @@ testbed runs an A/B on the defender mod and says what it found.
 It replaces a pile of shell that produced measurements nobody should have
 believed. What it refuses to do is the point:
 
+  - one arm at a time from start to finish. That made "the first arm" and "the
+    first round on a freshly recreated server" the same thing, and five watchdog
+    trips in a day all landed in whichever arm ran first. The arms interleave and
+    the order flips every round.
   - two runners at once. A lock file holds the test-bed, and a second runner
     says who has it rather than quietly fighting for the map.
   - a stale plugin. The version the server has loaded is compared with the one
@@ -140,17 +144,13 @@ func run() error {
 	}
 
 	for _, name := range played {
-		results := make([]wave.Arm, 0, len(list))
-		for _, a := range list {
-			got, err := playArm(ctx, l, a, options{
-				root: root, mapName: name, mission: *mission, waves: *waves,
-				attempts: *attempts, timeout: *timeout, team: *team, defenders: *defend,
-				out: filepath.Join(root, *out), tag: *tag, jump: *jumpTo, say: say,
-			})
-			if err != nil {
-				return err
-			}
-			results = append(results, got)
+		results, err := playArms(ctx, l, list, options{
+			root: root, mapName: name, mission: *mission, waves: *waves,
+			attempts: *attempts, timeout: *timeout, team: *team, defenders: *defend,
+			out: filepath.Join(root, *out), tag: *tag, jump: *jumpTo, say: say,
+		})
+		if err != nil {
+			return err
 		}
 		fmt.Print(report(*tag, name, *mission, results))
 	}
