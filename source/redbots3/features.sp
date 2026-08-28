@@ -39,6 +39,7 @@ enum
 	FEATURE_ENGINEER_CLIMBS,
 	FEATURE_WATCH_IDLE_BOTS,
 	FEATURE_KICK_WEDGED_BOTS,
+	FEATURE_MOVE_WEDGED_NEST,
 	FEATURE_AMMO_FAILOVER,
 	FEATURE_COUNT
 }
@@ -65,7 +66,8 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"engineer_climbs",
 	"ammo_failover",
 	"watch_idle_bots",
-	"kick_wedged_bots"
+	"kick_wedged_bots",
+	"move_wedged_nest"
 };
 
 static ConVar g_arrFeatureConVars[FEATURE_COUNT];
@@ -159,6 +161,12 @@ void LoadFeatures()
 	   keeps asking for, and twelve forced wedges produced no successful recovery. See apw-eei. */
 	g_arrFeatureConVars[FEATURE_KICK_WEDGED_BOTS] = MakeFeature(FEATURE_KICK_WEDGED_BOTS,
 		"Kick a bot the stuck recovery cannot move, so the seat is refilled instead of the server paying for his paths.", false);
+
+	/* Off until a run says otherwise. The recovery does move a wedged bot, and he walks back:
+	   one engineer reached stuck #64 that way, and each return costs a path search across the
+	   mesh. Moving his nest is what stops him returning. See apw-eei. */
+	g_arrFeatureConVars[FEATURE_MOVE_WEDGED_NEST] = MakeFeature(FEATURE_MOVE_WEDGED_NEST,
+		"Move an engineer's nest when the stuck recovery has had to rescue him from the same place twice.", false);
 
 	g_arrFeatureConVars[FEATURE_ATTACK_STRAFE] = MakeFeature(FEATURE_ATTACK_STRAFE,
 		"A bot that has arrived at its firing position keeps sidestepping instead of standing still.");
