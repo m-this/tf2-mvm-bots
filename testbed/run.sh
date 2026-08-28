@@ -181,6 +181,25 @@ if [ -n "$mission" ]; then
 		exit 1
 		;;
 	esac
+
+	# Load the map again now the popfile is named, because accepting the name is not the same as
+	# spawning its robots.
+	#
+	# mvm_mannworks_intermediate2 set on a map already up reported itself as the current popfile and
+	# then produced a wave with nothing in it: no robot, no damage, no credit, for the whole timeout,
+	# nine times across four builds. The same mission after a changelevel spawns twenty two robots.
+	# mvm_mannworks_advanced and mvm_mannworks_intermediate both play either way, which is why this
+	# went unnoticed and why checking the name was not enough. See mvm-ed0.
+	say "loading the map again so the mission's population is built"
+	eval "$rcon 'changelevel $map'" >/dev/null 2>&1 || true
+
+	waited=0
+	until eval "$rcon status" 2>/dev/null | grep -q "map *: *$map"; do
+		waited=$((waited + 5))
+		[ "$waited" -ge 180 ] && { say "the map did not come back after the changelevel"; exit 1; }
+		sleep 5
+	done
+	sleep 20
 fi
 
 # Let the server finish standing up before telling it to restart the round.
