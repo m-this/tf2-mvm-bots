@@ -714,6 +714,15 @@ void PluginBot_SimulateFrame(int client)
 }
 #endif
 
+//Ends the behaviour of the bot the empty-stack injector holds, and does nothing otherwise
+public Action CTFBotMainAction_Update(BehaviorAction action, int actor, float interval, ActionResult result)
+{
+	if (g_bIsDefenderBot[actor] && DebugFaults_ShouldEmpty(actor))
+		return action.Done("DebugFaults: emptying the stack");
+
+	return Plugin_Continue;
+}
+
 public void OnActionCreated(BehaviorAction action, int actor, const char[] name)
 {
 	//TFBots are players, ignore all other nextbots
@@ -723,6 +732,7 @@ public void OnActionCreated(BehaviorAction action, int actor, const char[] name)
 		{
 			action.SelectTargetPoint = CTFBotMainAction_SelectTargetPoint;
 			action.ShouldAttack = CTFBotMainAction_ShouldAttack;
+			action.Update = CTFBotMainAction_Update;
 		}
 		else if (StrEqual(name, "TacticalMonitor"))
 		{

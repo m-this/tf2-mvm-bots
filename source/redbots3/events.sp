@@ -202,6 +202,7 @@ static void Event_MvmWaveBegin(Event event, const char[] name, bool dontBroadcas
 {
 	//Nothing unless a debug convar is set, which is never on a real server
 	DebugFaults_OnWaveStart();
+	DebugFaults_OnWaveStartEmpty();
 
 	/* Publish here rather than only on a timer after the map loads
 

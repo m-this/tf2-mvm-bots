@@ -20,6 +20,7 @@ ConVar redbots_debug_refuse_ammo_paths;
 ConVar redbots_debug_old_wedge_recovery;
 ConVar redbots_debug_unreachable_goal;
 ConVar redbots_debug_trace_snipers;
+ConVar redbots_debug_empty_stack;
 
 //The bot being held, and until when. One at a time: two wedged bots is a different test.
 static int m_iWedgedBot = -1;
@@ -46,6 +47,10 @@ void DebugFaults_Init()
 	redbots_debug_old_wedge_recovery = CreateConVar("sm_redbots_debug_old_wedge_recovery", "0",
 		"Use the pre-2.21.3 wedge recovery, which only ever tried the area the bot stands in. For measuring what that fix is worth.",
 		FCVAR_NOTIFY, true, 0.0, true, 1.0);
+
+	redbots_debug_empty_stack = CreateConVar("sm_redbots_debug_empty_stack", "0",
+		"Leave one defender with no behaviour at all for this many seconds after a wave starts, to exercise the idle watchdog. 0 is off.",
+		FCVAR_NOTIFY, true, 0.0, true, 300.0);
 
 	redbots_debug_trace_snipers = CreateConVar("sm_redbots_debug_trace_snipers", "0",
 		"Write every sniper's action stack and position to the console each tenth of a second, to read back after a watchdog trip. 0 is off.",
@@ -167,6 +172,65 @@ void DebugFaults_OnGameFrame()
 	}
 
 	TeleportEntity(m_iWedgedBot, m_vWedgedAt, NULL_VECTOR, view_as<float>({0.0, 0.0, 0.0}));
+}
+
+/* Leave one bot with no behaviour at all, which the wedge injector cannot do
+
+A held bot still has behaviour, it just cannot get anywhere, so the wedge exercises the pathing half
+of the stuck watchdog and never the idle half. k-kaneta's frozen Decoy engineer is the other shape:
+a bot that has stopped asking to go anywhere. Six Decoy runs put engineer idle at nought per cent
+and the idle watchdog wrote no line in either arm, so FEATURE_WATCH_IDLE_BOTS is neither confirmed
+nor refuted. This is the fault it needs. See mvm-6rt and mvm-0lo.
+
+Ending MainAction from its own Update rather than reaching into the stack from outside. Done returns
+a result the behaviour is asking for, so it only means anything returned from a callback, and
+MainAction is the one every bot has. Ending it every update is what makes the freeze last: ending it
+once produces a bot that is idle for a frame and then carries on. */
+static int m_iEmptiedBot = -1;
+static float m_flEmptiedUntil;
+
+void DebugFaults_OnWaveStartEmpty()
+{
+	m_iEmptiedBot = -1;
+
+	float seconds = redbots_debug_empty_stack.FloatValue;
+
+	if (seconds <= 0.0)
+		return;
+
+	char wanted[32]; redbots_debug_wedge_class.GetString(wanted, sizeof(wanted));
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || !IsDefenderBot(i) || !IsPlayerAlive(i))
+			continue;
+
+		if (!StrEqual(g_sRawPlayerClassNames[TF2_GetPlayerClass(i)], wanted, false))
+			continue;
+
+		m_iEmptiedBot = i;
+		m_flEmptiedUntil = GetGameTime() + seconds;
+
+		LogMessage("DebugFaults: emptying %N (%s) for %.0fs", i, wanted, seconds);
+		return;
+	}
+
+	LogMessage("DebugFaults: no %s on RED to empty", wanted);
+}
+
+//Whether this bot's behaviour should be ended now, checked from MainAction's update
+bool DebugFaults_ShouldEmpty(int client)
+{
+	if (m_iEmptiedBot != client)
+		return false;
+
+	if (GetGameTime() <= m_flEmptiedUntil && IsPlayerAlive(client))
+		return true;
+
+	LogMessage("DebugFaults: done emptying %N", client);
+	m_iEmptiedBot = -1;
+
+	return false;
 }
 
 /* Whether to use the recovery as it was before v2.21.3
