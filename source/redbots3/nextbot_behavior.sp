@@ -1263,8 +1263,6 @@ static int m_iStuckWedgeCount[MAXPLAYERS + 1];
 //Stucks at one spot before the bot is moved off it, and how far to look for somewhere it can stand
 #define STUCK_WEDGE_GIVEUP	3
 
-//Wedges before a bot nobody can move is taken out of the game, well past the point of rescuing him
-#define STUCK_WEDGE_KICK	8
 #define STUCK_WEDGE_SEARCH	400.0
 
 int StuckCountOf(int client)
@@ -1366,15 +1364,6 @@ static void UpdateStuckWatchdog(int actor)
 	Kicking is the last resort and it is the right one: the seat is refilled by the top-up path a
 	moment later, with a bot that can walk. Leaving him costs the mission. His buildings go with him
 	because a sentry with no owner is somebody else's problem. */
-	if (Feature(FEATURE_KICK_WEDGED_BOTS) && m_iStuckWedgeCount[actor] >= STUCK_WEDGE_KICK)
-	{
-		LogMessage("Stuck: %N could not be moved %d times at %.0f %.0f %.0f, so he is kicked and the seat refilled",
-			actor, m_iStuckWedgeCount[actor], here[0], here[1], here[2]);
-
-		ClearBuildingsBeforeKick(actor);
-		KickClient(actor, "BotManager3: wedged and unrecoverable");
-		return;
-	}
 
 	RequestFrame(Frame_UnstickDefender, actor);
 }
@@ -1393,6 +1382,14 @@ is near enough to still cover what the old one covered.
 Only for a bot that has a nest, which is the engineer. Everyone else is rescued and left alone. */
 #define WEDGE_RESCUES_BEFORE_NEST_MOVES	2
 
+/* Rescues from one spot before the bot is taken out of the game
+
+Counted in rescues, not in wedges, and that is the fix rather than the number. The kick used to
+read m_iStuckWedgeCount, which MoveWedgedDefender sets back to nought every time it succeeds: while
+the recovery worked the count could never reach eight, so the kick was unreachable by construction.
+A forced wedge on Decoy fired it nought times in both arms. */
+#define WEDGE_RESCUES_BEFORE_KICK	5
+
 static float m_vLastRescue[MAXPLAYERS + 1][3];
 static int m_iRescueCount[MAXPLAYERS + 1];
 
@@ -1410,6 +1407,20 @@ static void MoveNestAwayFromWedge(int client, const float here[3], CNavArea move
 
 	if (++m_iRescueCount[client] < WEDGE_RESCUES_BEFORE_NEST_MOVES)
 		return;
+
+	if (m_iRescueCount[client] >= WEDGE_RESCUES_BEFORE_KICK && Feature(FEATURE_KICK_WEDGED_BOTS))
+	{
+		/* Moving his nest did not stop him coming back, so he goes.
+
+		The seat is refilled by the top-up a moment later with a bot that can walk, and his
+		buildings go with him because a sentry with no owner is somebody else's problem. */
+		LogMessage("Stuck: %N came back to %.0f %.0f %.0f %d times after being moved, so he is kicked",
+			client, here[0], here[1], here[2], m_iRescueCount[client]);
+
+		ClearBuildingsBeforeKick(client);
+		KickClient(client, "BotManager3: wedged and unrecoverable");
+		return;
+	}
 
 	m_iRescueCount[client] = 0;
 	m_aNestArea[client] = moved;
