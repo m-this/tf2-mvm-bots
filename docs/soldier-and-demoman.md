@@ -121,7 +121,7 @@ It had won an A/B before, bundled with `attack_strafe` and never split. Split
 now, `attack_strafe` was doing the work. The cap is gone.
 
 The lesson generalises past this file: a pair that wins together says nothing
-about either half, and `testbed/ab.sh` says so in its own header. Split it.
+about either half. Split it.
 
 ## What worked: letting the pipes go while he is still turning
 
