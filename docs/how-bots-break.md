@@ -22,7 +22,8 @@ number again.** In that order, every time.
    instrument is wrong, and both of those are worth knowing before writing code.
 3. **Fix, behind a switch.** A named feature in `features.sp`, defaulting on, so
    one build can play both sides.
-4. **A/B it.** `testbed/ab.sh --feature <name>`. Judge on the number from step 1
+4. **A/B it.** `go run ./testbed/cmd/testbed -arm on:<cvar>=1 -arm off:<cvar>=0`.
+   Judge on the number from step 1
    *and* on the outcome, because a change can move the number it was aimed at
    and lose the wave.
 5. **Look again.** Re-read the same telemetry after the change. This is the step

@@ -1,6 +1,6 @@
 # What the testbed measures
 
-`testbed/run.sh` plays a mission with nobody in it and writes one JSON object
+`go run ./testbed/cmd/testbed` plays a mission with nobody in it and writes one JSON object
 per line to `testbed/results/`. `go run ./testbed/report <file>` turns that into
 prose; a second file argument compares two runs.
 
@@ -245,11 +245,11 @@ this file exists to find and briefly invented instead.
 - **A run measured under paging measures the machine.** A session went from six
   clean waves to four failed runs in a row with no code change: 200 MB free, 5 GB
   swapped, swap-in at 20 MB/s. To a watchdog that measures frame time, a page
-  fault is an infinite loop. `run.sh` refuses to start below 1500 MB available
+  fault is an infinite loop. The runner refuses to start below 1500 MB available
   now; `TESTBED_MIN_FREE_MB=0` overrides it.
 - **A popfile the game refuses leaves the map's own mission running.** Three
   sessions of "Bavarian Botbash wave 3" were measured against Rottenburg's
-  default intermediate mission. `run.sh` reads `tf_mvm_popfile` back now. The
+  default intermediate mission. The runner reads `tf_mvm_popfile` back now. The
   real names are in the VPK: `grep -ao 'mvm_<map>[a-z0-9_]*' tf/tf2_misc_dir.vpk`.
 - **`File.WriteLine` formats through a 2048 byte buffer.** The wave result
   outgrew it and came out at exactly 2047 characters, which is not JSON, so
