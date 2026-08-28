@@ -67,7 +67,6 @@ public Action Command_BoughtUpgrades(int client, int args)
 	if (!IsFakeClient(client))
 		return Plugin_Handled;
 	
-	//Get current weapons
 	int primaryWep = GetPlayerWeaponSlot(client, TFWeaponSlot_Primary);
 	int secondaryWep = GetPlayerWeaponSlot(client, TFWeaponSlot_Secondary);
 	int meleeWep = GetPlayerWeaponSlot(client, TFWeaponSlot_Melee);

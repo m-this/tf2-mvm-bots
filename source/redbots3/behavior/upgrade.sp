@@ -107,8 +107,6 @@ public Action CTFBotUpgrade_OnStart(BehaviorAction action, int actor, BehaviorAc
 		m_flUpgradingTime[actor] = GetGameTime() + (isRoundActive ? BUY_UPGRADES_FAST_MAX_TIME : BUY_UPGRADES_MAX_TIME);
 	}
 	
-	// UpdateLookAroundForEnemies(actor, false);
-	
 	return action.Continue();
 }
 
@@ -257,8 +255,6 @@ public void CTFBotUpgrade_OnEnd(BehaviorAction action, int actor, BehaviorAction
 			DetonateObjectOfType(actor, TFObject_Dispenser);
 	}
 	
-	// UpdateLookAroundForEnemies(actor, true);
-	
 	if (IsPlayerAlive(actor))
 	{
 		//Remember this bot's upgrades
@@ -399,19 +395,6 @@ void CollectUpgrades(int client)
 	}
 	
 	delete iArraySlots;
-	
-	/*PrintToServer("Unsorted upgrades for #%d \"%N\": %i total\n", client, client, CTFPlayerUpgrades[client].Length);
-	PrintToServer("%3s %4s %-5s %-8s\n", "#", "SLOT", "INDEX", "PRIORITY");
-	
-	for (int i = 0; i < CTFPlayerUpgrades[client].Length; i++) 
-	{
-		JSONObject UpgradeInfo = view_as<JSONObject>(CTFPlayerUpgrades[client].Get(i));
-		
-		PrintToServer("%3d %4d %-5d %-8d", i, UpgradeInfo.GetInt("slot"), UpgradeInfo.GetInt("index"), UpgradeInfo.GetInt("priority"));
-		
-		delete UpgradeInfo;
-	}*/
-	
 	
 	SortUpgradesByPriority(client);
 	
@@ -1058,7 +1041,6 @@ JSONObject CTFBotPurchaseUpgrades_ChooseUpgrade(int actor)
 		int iAttribIndex = attr.GetIndex();
 		if (!CanUpgradeWithAttrib(actor, info.GetInt("slot"), iAttribIndex, upgrades.Address))
 		{
-			//PrintToServer("upgrade %d/%d: cannot be upgraded with", info.GetInt("slot"), info.GetInt("index"));
 			delete info;
 			continue;
 		}
@@ -1074,8 +1056,6 @@ JSONObject CTFBotPurchaseUpgrades_ChooseUpgrade(int actor)
 		
 		if (iCost > currency)
 		{
-			//PrintToServer("upgrade %d/%d: cost $%d > $%d", info.GetInt("slot"), info.GetInt("index"), iCost, currency);
-			
 			delete info;
 			continue;
 		}
@@ -1097,8 +1077,6 @@ JSONObject CTFBotPurchaseUpgrades_ChooseUpgrade(int actor)
 		{
 			if (!IsUpgradeTierEnabled(actor, info.GetInt("slot"), tier))
 			{
-				//PrintToServer("upgrade %d/%d: tier %d isn't enabled", info.GetInt("slot"), info.GetInt("index"), tier);
-				
 				delete info;
 				continue;
 			}

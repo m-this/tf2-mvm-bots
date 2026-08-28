@@ -6,7 +6,6 @@ BehaviorAction CTFBotMedicRevive()
 	
 	action.OnStart = CTFBotMedicRevive_OnStart;
 	action.Update = CTFBotMedicRevive_Update;
-	// action.OnEnd = CTFBotMedicRevive_OnEnd;
 	action.OnInjured = CTFBotMedicRevive_OnInjured;
 	
 	return action;
@@ -72,11 +71,6 @@ public Action CTFBotMedicRevive_Update(BehaviorAction action, int actor, float i
 	
 	return action.Continue();
 }
-
-/* public void CTFBotMedicRevive_OnEnd(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
-{
-	CBaseNPC_GetNextBotOfEntity(actor).GetBodyInterface().ClearPendingAimReply();
-} */
 
 public Action CTFBotMedicRevive_OnInjured(BehaviorAction action, int actor, Address takedamageinfo, ActionDesiredResult result)
 {

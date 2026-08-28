@@ -169,8 +169,6 @@ void ShowWeaponPreferenceItemListMenu(int client, const char[] class, const char
 				{
 					//Menu item info will store the item defintion index as a string
 					IntToString(WEAPONS_SCOUT_PRIMARY[i], menuInfo, sizeof(menuInfo));
-					
-					//List the item by its name
 					hMenu.AddItem(menuInfo, weaponName);
 				}
 			}

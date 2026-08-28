@@ -54,9 +54,6 @@ public Action CTFBotGuardPoint_OnStart(BehaviorAction action, int actor, Behavio
 
 public Action CTFBotGuardPoint_Update(BehaviorAction action, int actor, float interval, ActionResult result)
 {
-	// if (IsZeroVector(m_vecPointDefendArea[actor]))
-		// return action.ChangeTo(CTFBotDefenderAttack(), "Defend area is NULL");
-	
 	switch (TF2_GetPlayerClass(actor))
 	{
 		case TFClass_Soldier, TFClass_Pyro, TFClass_DemoMan:

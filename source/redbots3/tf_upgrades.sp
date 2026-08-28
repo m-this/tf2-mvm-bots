@@ -52,13 +52,8 @@ public CEconItemAttributeDefinition CEIAD_GetAttributeDefinitionByName(const cha
 }
 
 //CMannVsMachineUpgrades
-// static int offset_szAttribute;
-// static int offset_szIcon;
-// static int offset_flIncrement;
 static int offset_flCap;
-// static int offset_nCost;
 static int offset_nUIGroup;
-// static int offset_nQuality;
 static int offset_nTier;
 static int CMannVsMachineUpgrades_Size;
 
@@ -144,24 +139,14 @@ int UpgradeCount()
 
 void InitMvMUpgrades(GameData hGamedata)
 {
-	// offset_szAttribute = hGamedata.GetOffset("CMannVsMachineUpgrades::szAttrib");
-	// offset_szIcon = hGamedata.GetOffset("CMannVsMachineUpgrades::szIcon");
-	// offset_flIncrement = hGamedata.GetOffset("CMannVsMachineUpgrades::flIncrement");
 	offset_flCap = hGamedata.GetOffset("CMannVsMachineUpgrades::flCap");
-	// offset_nCost = hGamedata.GetOffset("CMannVsMachineUpgrades::nCost");
 	offset_nUIGroup = hGamedata.GetOffset("CMannVsMachineUpgrades::nUIGroup");
-	// offset_nQuality = hGamedata.GetOffset("CMannVsMachineUpgrades::nQuality");
 	offset_nTier = hGamedata.GetOffset("CMannVsMachineUpgrades::nTier");
 	CMannVsMachineUpgrades_Size = offset_nTier + 4;
 	
 #if defined TESTING_ONLY
-	// LogMessage("CMannVsMachineUpgrades->szAttrib = %d", offset_szAttribute);
-	// LogMessage("CMannVsMachineUpgrades->szIcon = %d", offset_szIcon);
-	// LogMessage("CMannVsMachineUpgrades->flIncrement = %d", offset_flIncrement);
 	LogMessage("InitMvMUpgrades: CMannVsMachineUpgrades->flCap = %d", offset_flCap);
-	// LogMessage("CMannVsMachineUpgrades->nCost = %d", offset_nCost);
 	LogMessage("InitMvMUpgrades: CMannVsMachineUpgrades->nUIGroup = %d", offset_nUIGroup);
-	// LogMessage("CMannVsMachineUpgrades->nQuality = %d", offset_nQuality);
 	LogMessage("InitMvMUpgrades: CMannVsMachineUpgrades->nTier = %d", offset_nTier);
 	LogMessage("InitMvMUpgrades: Size of CMannVsMachineUpgrades = %d", CMannVsMachineUpgrades_Size);
 #endif

@@ -391,8 +391,6 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 				
 				AimHeadTowards(myBody, WorldSpaceCenter(building), CRITICAL, 1.0, _, "Grab building");
 				VS_PressAltFireButton(actor);
-				
-				//PrintToServer("Grab");
 			}
 		}
 		else
@@ -426,8 +424,6 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 						
 						if (!m_bPlacementOK && myBody.IsHeadAimingOnTarget() && myBody.GetHeadSteadyDuration() > 0.6)
 						{
-							//That spot was no good.
-							//Time to pick a new spot.
 							m_aNestArea[actor] = PickBuildArea(actor);
 						}
 						else
@@ -441,8 +437,6 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 						}
 					}
 				}
-				
-				//PrintToServer("Travel");
 			}
 		}
 		
@@ -558,8 +552,6 @@ static Action CTFBotMvMEngineerIdle_Update(BehaviorAction action, int actor, flo
 				{
 					m_ctDispenserCooldown[actor] = GetGameTime() + 3.0;
 				}
-				
-				//m_ctDispenserCooldown[actor] = GetGameTime() + 3.0;	
 			}
 			else 
 			{
@@ -1110,8 +1102,6 @@ bool CTFBotMvMEngineerIdle_ShouldAdvanceNestSpot(int actor)
 	}
 	
 	bool bigger = (m_flBombTargetDistance > bombinfo.flMaxBattleFront);
-	
-	//PrintToServer("m_flBombTargetDistance %f > bombinfo.hatch_dist_back %f = %s", m_flBombTargetDistance, bombinfo.GetFloat("hatch_dist_back"), bigger ? "Yes" : "No");
 	
 	return bigger;
 }

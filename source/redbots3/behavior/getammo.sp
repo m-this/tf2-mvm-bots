@@ -100,7 +100,6 @@ public Action CTFBotGetAmmo_OnStart(BehaviorAction action, int actor, BehaviorAc
 		return action.Continue();
 	}
 	
-	// UpdateLookAroundForEnemies(actor, true);
 	return action.Done("Could not find ammo");
 }
 
