@@ -164,6 +164,25 @@ eval "$rcon 'exec server.cfg'" >/dev/null 2>&1 || true
 $compose exec -T srcds sh -c "rm -f $remote_stats" >/dev/null 2>&1 || true
 
 if [ -n "$mission" ]; then
+	# The map is loaded first and the mission named afterwards, and the order is not a style choice.
+	#
+	# A changelevel resets tf_mvm_popfile to the map's own mission, so naming the mission and then
+	# loading the map throws the name away: a run done that way played mvm_mannworks.pop and
+	# reported no waves at all. And naming it on a map that has been up since the container started
+	# is what left mvm_mannworks_intermediate2 reporting itself as loaded with none of its robots
+	# built. Loading the map and then naming the mission is the order that spawns them: proved by
+	# hand over rcon, twenty two robots. See mvm-ed0.
+	say "loading the map before naming the mission"
+	eval "$rcon 'changelevel $map'" >/dev/null 2>&1 || true
+
+	waited=0
+	until eval "$rcon status" 2>/dev/null | grep -q "map *: *$map"; do
+		waited=$((waited + 5))
+		[ "$waited" -ge 180 ] && { say "the map did not come back after the changelevel"; exit 1; }
+		sleep 5
+	done
+	sleep 20
+
 	say "loading mission $mission"
 	eval "$rcon 'tf_mvm_popfile $mission'" >/dev/null || true
 	sleep 15
@@ -181,25 +200,6 @@ if [ -n "$mission" ]; then
 		exit 1
 		;;
 	esac
-
-	# Load the map again now the popfile is named, because accepting the name is not the same as
-	# spawning its robots.
-	#
-	# mvm_mannworks_intermediate2 set on a map already up reported itself as the current popfile and
-	# then produced a wave with nothing in it: no robot, no damage, no credit, for the whole timeout,
-	# nine times across four builds. The same mission after a changelevel spawns twenty two robots.
-	# mvm_mannworks_advanced and mvm_mannworks_intermediate both play either way, which is why this
-	# went unnoticed and why checking the name was not enough. See mvm-ed0.
-	say "loading the map again so the mission's population is built"
-	eval "$rcon 'changelevel $map'" >/dev/null 2>&1 || true
-
-	waited=0
-	until eval "$rcon status" 2>/dev/null | grep -q "map *: *$map"; do
-		waited=$((waited + 5))
-		[ "$waited" -ge 180 ] && { say "the map did not come back after the changelevel"; exit 1; }
-		sleep 5
-	done
-	sleep 20
 fi
 
 # Let the server finish standing up before telling it to restart the round.
