@@ -1368,67 +1368,6 @@ static void UpdateStuckWatchdog(int actor)
 	RequestFrame(Frame_UnstickDefender, actor);
 }
 
-/* Move an engineer's nest off the ground that keeps wedging him
-
-Rescuing a bot who walks straight back is not a rescue. The Mannhunt log has one engineer moved and
-returning until stuck #64, and every round trip is another NavAreaBuildPath across the mesh, which
-is the frame the watchdog kills the server on. So the second time he is rescued from the same
-place, the place stops being where he is going.
-
-His nest rather than his path, because the nest is what sends him back: the path is recomputed from
-it every time. The area he was moved to is the new one, since it is somewhere he can stand and it
-is near enough to still cover what the old one covered.
-
-Only for a bot that has a nest, which is the engineer. Everyone else is rescued and left alone. */
-#define WEDGE_RESCUES_BEFORE_NEST_MOVES	2
-
-/* Rescues from one spot before the bot is taken out of the game
-
-Counted in rescues, not in wedges, and that is the fix rather than the number. The kick used to
-read m_iStuckWedgeCount, which MoveWedgedDefender sets back to nought every time it succeeds: while
-the recovery worked the count could never reach eight, so the kick was unreachable by construction.
-A forced wedge on Decoy fired it nought times in both arms. */
-#define WEDGE_RESCUES_BEFORE_KICK	5
-
-static float m_vLastRescue[MAXPLAYERS + 1][3];
-static int m_iRescueCount[MAXPLAYERS + 1];
-
-static void MoveNestAwayFromWedge(int client, const float here[3], CNavArea moved)
-{
-	if (!Feature(FEATURE_MOVE_WEDGED_NEST) || m_aNestArea[client] == NULL_AREA)
-		return;
-
-	if (GetVectorDistance(here, m_vLastRescue[client]) > STUCK_RADIUS)
-	{
-		m_vLastRescue[client] = here;
-		m_iRescueCount[client] = 1;
-		return;
-	}
-
-	if (++m_iRescueCount[client] < WEDGE_RESCUES_BEFORE_NEST_MOVES)
-		return;
-
-	if (m_iRescueCount[client] >= WEDGE_RESCUES_BEFORE_KICK && Feature(FEATURE_KICK_WEDGED_BOTS))
-	{
-		/* Moving his nest did not stop him coming back, so he goes.
-
-		The seat is refilled by the top-up a moment later with a bot that can walk, and his
-		buildings go with him because a sentry with no owner is somebody else's problem. */
-		LogMessage("Stuck: %N came back to %.0f %.0f %.0f %d times after being moved, so he is kicked",
-			client, here[0], here[1], here[2], m_iRescueCount[client]);
-
-		ClearBuildingsBeforeKick(client);
-		KickClient(client, "BotManager3: wedged and unrecoverable");
-		return;
-	}
-
-	m_iRescueCount[client] = 0;
-	m_aNestArea[client] = moved;
-
-	LogMessage("Stuck: %N keeps coming back to %.0f %.0f %.0f, so his nest moves there instead",
-		client, here[0], here[1], here[2]);
-}
-
 /* Somewhere out of the wedge, and false when nothing near him is far enough
 
 A random point in his own area is what this used to take, and on Mannhunt that was the bug: he is
@@ -1519,8 +1458,6 @@ static bool MoveWedgedDefender(int client)
 
 	LogMessage("Stuck: %N was wedged at %.0f %.0f %.0f, moved to %.0f %.0f %.0f",
 		client, here[0], here[1], here[2], destination[0], destination[1], destination[2]);
-
-	MoveNestAwayFromWedge(client, here, area);
 
 	return true;
 }
