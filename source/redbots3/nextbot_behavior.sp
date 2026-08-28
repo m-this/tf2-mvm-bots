@@ -2273,22 +2273,6 @@ bool IsPathToVectorPossible(int bot_entidx, const float vec[3], float &length = 
 	return success;
 }
 
-bool IsPathToEntityPossible(int bot_entidx, int goal_entidx, float &length = -1.0)
-{
-	CBaseCombatCharacter(bot_entidx).UpdateLastKnownArea();
-	
-	CBaseCombatCharacter(goal_entidx).UpdateLastKnownArea();
-	
-	PathFollower temp_path = PathFollower(_, Path_FilterIgnoreActors, Path_FilterOnlyActors);
-	
-	bool success = temp_path.ComputeToTarget(CBaseNPC_GetNextBotOfEntity(bot_entidx), goal_entidx);
-	
-	length = temp_path.GetLength();
-	
-	temp_path.Destroy();
-	
-	return success;
-}
 
 bool IsAmmoLow(int client)
 {
