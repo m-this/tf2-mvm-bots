@@ -162,6 +162,14 @@ missions like mvm_mannworks_intermediate2 reporting themselves as loaded with
 none of their robots built.
 */
 func (l Lab) LoadMission(ctx context.Context, mapName, mission string) error {
+	/* server.cfg runs on map load, and the first map can load before the entrypoint has written
+	   ours. Executing it by hand costs nothing when it was already read, and is the difference
+	   between measuring six bots and none: without it the mod has no team composition and RED stays
+	   empty, which the settle step then refuses. */
+	if _, err := l.Do("exec server.cfg"); err != nil {
+		l.say("could not exec server.cfg, which usually means RED will stay empty: %v", err)
+	}
+
 	l.say("loading %s", mapName)
 	if _, err := l.Do("changelevel " + mapName); err != nil {
 		// A changelevel drops the connection, which is not a failure.
@@ -197,6 +205,12 @@ func (l Lab) LoadMission(ctx context.Context, mapName, mission string) error {
 	}
 	if !strings.Contains(loaded, mission) {
 		return fmt.Errorf("%w: asked for %s and the server is playing %s", ErrPrecondition, mission, loaded)
+	}
+
+	// The map load reads server.cfg again, and the mission was named after it.
+	// Executing it here is what puts the lineup back for the round about to start.
+	if _, err := l.Do("exec server.cfg"); err != nil {
+		l.say("could not exec server.cfg after the map load: %v", err)
 	}
 	return nil
 }
