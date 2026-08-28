@@ -231,33 +231,57 @@ func (l Lab) waitForMap(ctx context.Context, want string) error {
 }
 
 /*
-Settle waits for the mod to fill RED, then nudges the round.
+Settle gets the round going and then holds the run to its lineup.
 
-Bounded, and the bound failing is a refusal rather than a shrug: a run with
-nobody on RED writes a file full of zeros, which reads as a mission nobody could
-win rather than as a test-bed that never started.
+The order took a deadlock to get right. The mod fills RED around the round
+starting, so waiting for the full lineup before nudging the round waits for
+something the nudge is what causes. The shell waited for any bot at all and then
+nudged, which worked and never checked the lineup it got.
+
+So both: wait for the mod to show signs of life, nudge, then insist on the
+lineup. That last wait is the precondition, and failing it is a refusal, because
+a wave nobody fought writes a file of zeros that reads as a mission nobody could
+win.
 */
 func (l Lab) Settle(ctx context.Context, wantDefenders int, limit time.Duration) error {
-	l.say("waiting for the mod to fill RED")
+	l.say("waiting for the mod to start filling RED")
+	if err := l.waitForDefenders(ctx, 1, limit/2); err != nil {
+		l.say("nobody on RED yet, nudging the round anyway")
+	}
+	if err := sleep(ctx, 5*time.Second); err != nil {
+		return err
+	}
+	if _, err := l.Do("mp_tournament_restart"); err != nil {
+		return err
+	}
+
+	l.say("waiting for RED to hold %d", wantDefenders)
+	return l.waitForDefenders(ctx, wantDefenders, limit)
+}
+
+// waitForDefenders is bounded, and says how far RED actually got: a mod that
+// never started and one that filled four of six are different faults.
+func (l Lab) waitForDefenders(ctx context.Context, want int, limit time.Duration) error {
 	deadline := time.Now().Add(limit)
+	best := 0
 	for {
 		roster, err := l.Roster()
-		if err == nil && roster.Defenders >= wantDefenders {
-			l.say("RED holds %d defenders", roster.Defenders)
-			break
+		if err == nil {
+			if roster.Defenders > best {
+				best = roster.Defenders
+			}
+			if roster.Defenders >= want {
+				l.say("RED holds %d defenders", roster.Defenders)
+				return nil
+			}
 		}
 		if time.Now().After(deadline) {
-			return fmt.Errorf("%w: RED never reached %d defenders", ErrPrecondition, wantDefenders)
+			return fmt.Errorf("%w: RED reached %d defenders and not %d", ErrPrecondition, best, want)
 		}
 		if err := sleep(ctx, 5*time.Second); err != nil {
 			return err
 		}
 	}
-	if err := sleep(ctx, 5*time.Second); err != nil {
-		return err
-	}
-	_, _ = l.Do("mp_tournament_restart")
-	return nil
 }
 
 /*
