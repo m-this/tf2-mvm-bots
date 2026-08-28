@@ -35,8 +35,10 @@ type Watcher struct {
 	// run measures a team that is not the one under test.
 	WantDefenders int
 
-	// PatienceRobots is how many polls with no robot on BLU to allow after the
-	// wave should have started. A wave between rounds legitimately has none.
+	// PatienceRobots is how many polls with no robot on BLU to allow once a wave
+	// has actually begun. Only then: a break has no robots on purpose, and the
+	// bots spend it shopping and readying, which outlasted this patience the
+	// first time it ran.
 	PatienceRobots int
 
 	// PatienceSilent is how many polls with no new sample to allow. The plugin
@@ -50,17 +52,17 @@ type Watcher struct {
 }
 
 // Check reads the server once and says whether to carry on.
-func (w *Watcher) Check(l Lab, samples int) Health {
+func (w *Watcher) Check(l Lab, samples int, begun bool) Health {
 	roster, err := l.Roster()
 	if err != nil {
 		return Health{Samples: samples, Fatal: true,
 			Reason: fmt.Sprintf("the server stopped answering rcon: %v", err)}
 	}
-	return w.check(roster, samples)
+	return w.check(roster, samples, begun)
 }
 
 // check is the rules on their own, so they can be tested without a server.
-func (w *Watcher) check(roster Roster, samples int) Health {
+func (w *Watcher) check(roster Roster, samples int, begun bool) Health {
 	h := Health{Samples: samples, Roster: roster}
 
 	if samples > w.lastSeen {
@@ -70,7 +72,7 @@ func (w *Watcher) check(roster Roster, samples int) Health {
 		w.silent++
 	}
 
-	if roster.Robots == 0 {
+	if roster.Robots == 0 && begun {
 		w.noRobots++
 	} else {
 		w.noRobots = 0
@@ -88,7 +90,7 @@ func (w *Watcher) check(roster Roster, samples int) Health {
 }
 
 // Wait polls until the run is done, hopeless, or out of time.
-func (l Lab) Wait(ctx context.Context, w *Watcher, every, limit time.Duration, samples func() (int, int)) (Health, error) {
+func (l Lab) Wait(ctx context.Context, w *Watcher, every, limit time.Duration, samples func() (int, int, bool)) (Health, error) {
 	deadline := time.Now().Add(limit)
 	for {
 		select {
@@ -97,13 +99,13 @@ func (l Lab) Wait(ctx context.Context, w *Watcher, every, limit time.Duration, s
 		case <-time.After(every):
 		}
 
-		lines, waves := samples()
+		lines, waves, begun := samples()
 		if waves > 0 {
 			// Something finished, so the run is producing what it was asked for
 			// and the patience counters start again.
 			w.noRobots, w.silent = 0, 0
 		}
-		h := w.Check(l, lines)
+		h := w.Check(l, lines, begun)
 		if h.Reason != "" {
 			return h, nil
 		}

@@ -14,7 +14,7 @@ func TestAWaveWithNoRobotsIsCalledOut(t *testing.T) {
 
 	var h Health
 	for i := 0; i < 3; i++ {
-		h = w.check(Roster{Defenders: 6, Robots: 0}, 10+i)
+		h = w.check(Roster{Defenders: 6, Robots: 0}, 10+i, true)
 	}
 	_ = l
 
@@ -33,7 +33,7 @@ func TestSilenceIsCalledOut(t *testing.T) {
 
 	var h Health
 	for i := 0; i < 4; i++ {
-		h = w.check(Roster{Defenders: 6, Robots: 12}, 100)
+		h = w.check(Roster{Defenders: 6, Robots: 12}, 100, true)
 	}
 	if !strings.Contains(h.Reason, "statistics plugin") {
 		t.Errorf("four silent polls read as %q", h.Reason)
@@ -46,7 +46,7 @@ func TestAHealthyWaveIsLeftAlone(t *testing.T) {
 	w := &Watcher{WantDefenders: 6, PatienceRobots: 3, PatienceSilent: 3}
 
 	for i := 0; i < 10; i++ {
-		if h := w.check(Roster{Defenders: 6, Robots: 20}, 100+i*7); h.Reason != "" {
+		if h := w.check(Roster{Defenders: 6, Robots: 20}, 100+i*7, true); h.Reason != "" {
 			t.Fatalf("a healthy wave was stopped: %q", h.Reason)
 		}
 	}
@@ -56,7 +56,19 @@ func TestAHealthyWaveIsLeftAlone(t *testing.T) {
 func TestAnEmptyRedIsCalledOut(t *testing.T) {
 	w := &Watcher{WantDefenders: 6, PatienceRobots: 0, PatienceSilent: 0}
 
-	if h := w.check(Roster{Defenders: 0, Robots: 20}, 10); !strings.Contains(h.Reason, "no defenders") {
+	if h := w.check(Roster{Defenders: 0, Robots: 20}, 10, true); !strings.Contains(h.Reason, "no defenders") {
 		t.Errorf("an empty RED read as %q", h.Reason)
+	}
+}
+
+// A break has no robots on purpose, and the bots spend it shopping. Counting
+// that as a stalled mission stopped a healthy run after a hundred seconds.
+func TestABreakIsNotAStall(t *testing.T) {
+	w := &Watcher{WantDefenders: 6, PatienceRobots: 3, PatienceSilent: 0}
+
+	for i := 0; i < 20; i++ {
+		if h := w.check(Roster{Defenders: 6, Robots: 0}, 10+i, false); h.Reason != "" {
+			t.Fatalf("a break was called a stall after %d polls: %q", i+1, h.Reason)
+		}
 	}
 }

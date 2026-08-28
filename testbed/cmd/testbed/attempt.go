@@ -130,14 +130,15 @@ func waitForWaves(ctx context.Context, l lab.Lab, o options) ([]wave.Result, boo
 	}
 
 	var found []wave.Result
-	health, err := l.Wait(ctx, watcher, 20*time.Second, o.timeout, func() (int, int) {
+	health, err := l.Wait(ctx, watcher, 20*time.Second, o.timeout, func() (int, int, bool) {
 		lines, results := readStagedWithLines(ctx, o.root, staged)
 		found = results
+		begun := wave.Begun(staged)
 		if len(results) >= o.waves {
 			// Enough waves: say so by reporting the count the caller wanted.
-			return lines, len(results)
+			return lines, len(results), begun
 		}
-		return lines, 0
+		return lines, 0, begun
 	})
 	if err != nil {
 		return found, false, "cancelled"
