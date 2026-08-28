@@ -192,6 +192,17 @@ public Action CTFBotMvMEngineerBuildTeleporter_Update(BehaviorAction action, int
 	INextBot myNextbot = CBaseNPC_GetNextBotOfEntity(actor);
 	IBody myBody = myNextbot.GetBodyInterface();
 
+	/* Say when the climb is not even asked for, so silence means one thing
+
+	Three candidates for why the jump never lands, and the third is that this branch never runs.
+	Without a line here that reads the same as the debug being off. */
+	if (redbots_manager_debug_actions.BoolValue && Feature(FEATURE_ENGINEER_CLIMBS)
+		&& (outOfTime || !m_bTeleporterNamedSpot[actor]))
+	{
+		PrintToServer("[teleclimb] %N not asked: out of time %d, named spot %d",
+			actor, outOfTime, m_bTeleporterNamedSpot[actor]);
+	}
+
 	//The map put the spot on top of something, so he gets on top of it rather than building below it
 	if (Feature(FEATURE_ENGINEER_CLIMBS) && !outOfTime && m_bTeleporterNamedSpot[actor]
 		&& TeleporterClimbToSpot(actor, myBody, spot))
@@ -308,14 +319,39 @@ down. He climbed from within a build's reach, so the spot is already in front of
 
 The count resets when he makes it, so falling off and climbing again costs another six attempts
 rather than none. The reach clock is what bounds the pair of them. */
+/* Say why a climb was refused, or that it was tried
+
+Measured on Bigrock the jump never landed: no sample under 100 units from the
+spot, and the minimum equal to the median. Three candidates were left and one
+line separates them, because each writes a different reason here: the 24 to 72
+window not matching the real rise, the jump not carrying, or the branch never
+being reached at all. See mvm-fgs. */
+static void SayClimb(int actor, const char[] why, float rise, float flat)
+{
+	if (!redbots_manager_debug_actions.BoolValue)
+		return;
+
+	PrintToServer("[teleclimb] %N %s, rise %.0f of %.0f to %.0f, out %.0f of %.0f, climb %d of %d",
+		actor, why, rise, TELEPORTER_CLIMB_RISE_MIN, TELEPORTER_CLIMB_RISE_MAX,
+		flat, TELEPORTER_CLIMB_RANGE, m_iTeleporterClimbs[actor], TELEPORTER_CLIMB_LIMIT);
+}
+
 static bool TeleporterClimbToSpot(int actor, IBody myBody, float spot[3])
 {
 	float origin[3]; origin = GetAbsOrigin(actor);
 
 	float rise = spot[2] - origin[2];
 
+	float reach[3]; SubtractVectors(spot, origin, reach);
+
+	reach[2] = 0.0;
+
+	float out = GetVectorLength(reach);
+
 	if (rise < TELEPORTER_CLIMB_RISE_MIN)
 	{
+		SayClimb(actor, "nothing to climb", rise, out);
+
 		if (m_iTeleporterClimbs[actor] > 0)
 		{
 			m_iTeleporterClimbs[actor] = 0;
@@ -327,15 +363,21 @@ static bool TeleporterClimbToSpot(int actor, IBody myBody, float spot[3])
 
 	//Higher than a crouch jump is not a ledge, it is a wall, and no number of jumps will do it
 	if (rise > TELEPORTER_CLIMB_RISE_MAX || m_iTeleporterClimbs[actor] >= TELEPORTER_CLIMB_LIMIT)
+	{
+		SayClimb(actor, rise > TELEPORTER_CLIMB_RISE_MAX ? "too high to climb" : "out of climbs", rise, out);
+
 		return false;
-
-	float flat[3]; SubtractVectors(spot, origin, flat);
-
-	flat[2] = 0.0;
+	}
 
 	//Far enough out and the jump lands on the wall rather than on top of it
-	if (GetVectorLength(flat) > TELEPORTER_CLIMB_RANGE)
+	if (out > TELEPORTER_CLIMB_RANGE)
+	{
+		SayClimb(actor, "too far out to climb", rise, out);
+
 		return false;
+	}
+
+	SayClimb(actor, "climbing", rise, out);
 
 	AimHeadTowards(myBody, spot, MANDATORY, 0.2, _, "Climbing to the teleporter spot");
 
