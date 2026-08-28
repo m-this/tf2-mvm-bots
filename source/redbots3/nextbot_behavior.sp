@@ -1347,13 +1347,22 @@ fault whether ScenarioMonitor gave him a lurk that cannot finish or never gave h
 is what both need, and it is the same restart a custom primary causes by accident. See mvm-bj8. */
 #define SNIPER_AT_SPOT	400.0
 
-static bool IsLurkingNowhere(int actor, const float here[3])
+//How long a rifle sniper may go without either a lurk or a spot before he is restarted
+#define SNIPER_STALL_TIME	20.0
+
+static float m_ctSniperStallDeadline[MAXPLAYERS + 1];
+
+static bool IsLurkingNowhere(int actor, const char[] actions, const float here[3])
 {
 	if (TF2_GetPlayerClass(actor) != TFClass_Sniper || !HasSniperRifle(actor))
 		return false;
 
 	//A spot he is walking to is a spot he has not reached, and the walk is not the fault
 	if (g_arrPluginBot[actor].bPathing)
+		return false;
+
+	//A lurk on the stack is the game doing its job, however far off he still is
+	if (StrContains(actions, "SniperLurk") != -1)
 		return false;
 
 	ArrayList spots = g_arrMapConfig.adtSniperSpot;
@@ -1399,7 +1408,35 @@ static void UpdateStuckWatchdog(int actor)
 
 	Standing still is normal for a sniper who arrived, so it only counts against one who is nowhere
 	near a spot the map offers. */
-	bool lurkingNowhere = Feature(FEATURE_WATCH_LURKING_SNIPERS) && IsLurkingNowhere(actor, here);
+	/* A sniper's stall is timed on its own, because the watchdog's timer can be reset by a shove
+
+	The watchdog arms only when a bot has not moved further than STUCK_RADIUS for STUCK_TIME, and
+	teammates walking through a parked sniper push him further than that. Peppy watched exactly this:
+	one stuck line, never a second, and the sniper still in spawn the whole time. The rescue read as
+	holding when what it really did was get its timer reset by a shove.
+
+	So this is timed from the last moment he was doing his job, not from the last moment he moved.
+	Reset only when he reaches a spot or gets a lurk, and rescued when neither has happened for
+	SNIPER_STALL_TIME. See mvm-bj8. */
+	if (!IsLurkingNowhere(actor, actions, here))
+	{
+		m_ctSniperStallDeadline[actor] = GetGameTime() + SNIPER_STALL_TIME;
+	}
+	else if (Feature(FEATURE_WATCH_LURKING_SNIPERS) && GetGameTime() >= m_ctSniperStallDeadline[actor])
+	{
+		m_ctSniperStallDeadline[actor] = GetGameTime() + SNIPER_STALL_TIME;
+		m_iStuckCount[actor]++;
+
+		LogMessage("Stalled: %N (sniper) at %.0f %.0f %.0f for %.0fs, stall #%d, %s",
+			actor, here[0], here[1], here[2], SNIPER_STALL_TIME, m_iStuckCount[actor],
+			actions[0] == '\0' ? "no behaviour" : actions);
+
+		RequestFrame(Frame_UnstickDefender, actor);
+
+		return;
+	}
+
+	bool lurkingNowhere = false;
 
 	
 	bool wantsToBeElsewhere = g_arrPluginBot[actor].bPathing || myLoco.IsStuck() || noBehaviour || lurkingNowhere;
