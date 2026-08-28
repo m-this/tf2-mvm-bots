@@ -61,6 +61,16 @@ func cleared(results []wave.Result) int {
 
 // playOnce is one attempt: set the arm, load the mission, wait for the waves.
 func playOnce(ctx context.Context, l lab.Lab, a arm, o options, path string) ([]wave.Result, bool, error) {
+	if err := clearStats(ctx, o.root); err != nil {
+		return nil, false, err
+	}
+	if err := l.LoadMission(ctx, o.mapName, o.mission); err != nil {
+		return nil, false, err
+	}
+
+	/* The arm goes on after the map load, not before.
+	   A map load execs server.cfg, and that file puts the container's own values back: an arm set
+	   first is an arm the server has forgotten by the time the wave starts. */
 	if _, err := l.Do("sm_redbots_manager_team_composition \"" + o.team + "\""); err != nil {
 		return nil, false, err
 	}
@@ -77,12 +87,6 @@ func playOnce(ctx context.Context, l lab.Lab, a arm, o options, path string) ([]
 		}
 	}
 
-	if err := clearStats(ctx, o.root); err != nil {
-		return nil, false, err
-	}
-	if err := l.LoadMission(ctx, o.mapName, o.mission); err != nil {
-		return nil, false, err
-	}
 	if err := l.Settle(ctx, o.defenders, 3*time.Minute); err != nil {
 		return nil, false, err
 	}

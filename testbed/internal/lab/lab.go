@@ -260,10 +260,18 @@ func (l Lab) Settle(ctx context.Context, wantDefenders int, limit time.Duration)
 	return nil
 }
 
-// Compose runs a docker compose subcommand against the test-bed.
-func Compose(ctx context.Context, file string, args ...string) error {
+/*
+Compose runs a docker compose subcommand against the test-bed.
+
+env is passed through because compose.yml reads the run's shape from it:
+TESTBED_MAP, TESTBED_BOT_TEAM_COMP and the rest become the server.cfg the
+container writes. A compose started without them writes a server.cfg naming no
+lineup, and the mod then fills RED with nobody.
+*/
+func Compose(ctx context.Context, file string, env []string, args ...string) error {
 	full := append([]string{"compose", "-f", file}, args...)
 	cmd := exec.CommandContext(ctx, "docker", full...)
+	cmd.Env = append(os.Environ(), env...)
 	cmd.Stdout, cmd.Stderr = os.Stderr, os.Stderr
 	return cmd.Run()
 }
