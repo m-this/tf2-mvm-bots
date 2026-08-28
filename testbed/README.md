@@ -258,3 +258,36 @@ does not say whether the bots look right, and somebody still has to watch them.
 | `versions.env`          | every pinned version                                   |
 
 `build/` and `results/` are working directories and are not committed.
+
+## Running an A/B
+
+`go run ./testbed/cmd/testbed` replaces the shell for anything being measured.
+It builds, restarts the server onto what it built, plays each arm, and prints
+the comparison.
+
+```
+go run ./testbed/cmd/testbed \
+  -map mvm_decoy -mission mvm_decoy_advanced \
+  -arm on:sm_redbots_feature_watch_idle_bots=1 \
+  -arm off:sm_redbots_feature_watch_idle_bots=0 \
+  -attempts 3 -waves 2 -tag idle
+```
+
+The last `-arm` is the control, and every other arm is compared against it.
+
+It refuses a run rather than producing one nobody should believe:
+
+- **One at a time.** A lock file holds the test-bed and a second runner is told
+  who has it. Two shell runs waiting on the same "is a run going" check both
+  started, three times in one session, and each looked ordinary afterwards.
+- **The loaded plugin must be the built one.** The version in the source is
+  compared with the version the server reports. A `--no-build` run once measured
+  a two hour old mod and reported the fix doing nothing.
+- **The mission must be the one asked for**, and the map is loaded before the
+  mission is named. A changelevel resets `tf_mvm_popfile`, and naming a mission
+  on a long-running map leaves some of them loaded with none of their robots.
+- **RED must hold defenders.** A wave with twenty two robots and nobody to fight
+  them still writes a file, and every number in it is zero.
+
+A precondition that fails stops the whole run. They fail the same way every
+time, and grinding through the remaining attempts costs an hour to learn nothing.
