@@ -170,22 +170,33 @@ func (l Lab) LoadMission(ctx context.Context, mapName, mission string) error {
 		l.say("could not exec server.cfg, which usually means RED will stay empty: %v", err)
 	}
 
-	l.say("loading %s", mapName)
-	if _, err := l.Do("changelevel " + mapName); err != nil {
-		// A changelevel drops the connection, which is not a failure.
-		l.say("the changelevel closed the connection, which is expected")
-	}
-	if err := sleep(ctx, 10*time.Second); err != nil {
-		return err
-	}
-	if err := l.WaitForRcon(ctx, 3*time.Minute); err != nil {
-		return err
-	}
-	if err := l.waitForMap(ctx, mapName); err != nil {
-		return err
-	}
-	if err := sleep(ctx, 20*time.Second); err != nil {
-		return err
+	/* Only load the map when the server is not already on it.
+
+	A changelevel costs more than the time. The mod disables its bots in
+	OnMapStart and waits to be started again, and a run that changed level onto
+	the map it was already on found RED at nought defenders every time, on a map
+	that plays perfectly from a fresh container. The container recreate above is
+	already a map load, and it is the one the mission is named after. */
+	if current, err := l.CurrentMap(); err != nil || current != mapName {
+		l.say("loading %s", mapName)
+		if _, err := l.Do("changelevel " + mapName); err != nil {
+			// A changelevel drops the connection, which is not a failure.
+			l.say("the changelevel closed the connection, which is expected")
+		}
+		if err := sleep(ctx, 10*time.Second); err != nil {
+			return err
+		}
+		if err := l.WaitForRcon(ctx, 3*time.Minute); err != nil {
+			return err
+		}
+		if err := l.waitForMap(ctx, mapName); err != nil {
+			return err
+		}
+		if err := sleep(ctx, 20*time.Second); err != nil {
+			return err
+		}
+	} else {
+		l.say("already on %s", mapName)
 	}
 
 	if mission == "" {
