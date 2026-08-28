@@ -17,6 +17,7 @@ the real wedge looks like from the watchdog's side. Freezing the entity would be
 ConVar redbots_debug_wedge_seconds;
 ConVar redbots_debug_wedge_class;
 ConVar redbots_debug_refuse_ammo_paths;
+ConVar redbots_debug_old_wedge_recovery;
 
 //The bot being held, and until when. One at a time: two wedged bots is a different test.
 static int m_iWedgedBot = -1;
@@ -35,6 +36,10 @@ void DebugFaults_Init()
 	redbots_debug_refuse_ammo_paths = CreateConVar("sm_redbots_debug_refuse_ammo_paths", "0",
 		"Refuse this many path answers to a metal pack per bot, to exercise the ammo failover. 0 is off.",
 		FCVAR_NOTIFY, true, 0.0, true, 20.0);
+
+	redbots_debug_old_wedge_recovery = CreateConVar("sm_redbots_debug_old_wedge_recovery", "0",
+		"Use the pre-2.21.3 wedge recovery, which only ever tried the area the bot stands in. For measuring what that fix is worth.",
+		FCVAR_NOTIFY, true, 0.0, true, 1.0);
 }
 
 //How many refusals are still owed to this bot, counted down as they are handed out
@@ -119,4 +124,15 @@ void DebugFaults_OnGameFrame()
 	}
 
 	TeleportEntity(m_iWedgedBot, m_vWedgedAt, NULL_VECTOR, view_as<float>({0.0, 0.0, 0.0}));
+}
+
+/* Whether to use the recovery as it was before v2.21.3
+
+The old one asked TheNavMesh for the nearest area and took a random point in it. For a bot wedged in
+geometry while standing on valid nav that area is the one under his feet, so the point landed back
+on him and the move was thrown away. That is the defect, and this convar is how the arms of an A/B
+differ: measuring what a fix is worth needs the fault available, not only its absence. */
+bool DebugFaults_OldWedgeRecovery()
+{
+	return redbots_debug_old_wedge_recovery != null && redbots_debug_old_wedge_recovery.BoolValue;
 }
