@@ -38,6 +38,7 @@ enum
 	FEATURE_PATH_LENGTH_CAP,
 	FEATURE_ENGINEER_CLIMBS,
 	FEATURE_WATCH_IDLE_BOTS,
+	FEATURE_WATCH_LURKING_SNIPERS,
 	FEATURE_AMMO_FAILOVER,
 	FEATURE_COUNT
 }
@@ -63,7 +64,8 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"path_length_cap",
 	"engineer_climbs",
 	"ammo_failover",
-	"watch_idle_bots"
+	"watch_idle_bots",
+	"watch_lurking_snipers"
 };
 
 static ConVar g_arrFeatureConVars[FEATURE_COUNT];
@@ -152,6 +154,12 @@ void LoadFeatures()
 	   Mannhunt and not one stuck line. See mvm-ipf. */
 	g_arrFeatureConVars[FEATURE_WATCH_IDLE_BOTS] = MakeFeature(FEATURE_WATCH_IDLE_BOTS,
 		"The stuck watchdog also rescues a bot that has no behaviour at all, not only one that cannot reach its goal.", false);
+
+	/* Off until a run says otherwise. A sniper whose lurk cannot reach its spot asks the game for a
+	   path every update, and three stock snipers on Decoy killed the server: the core names
+	   CTFBotSniperLurk::Update over NavAreaBuildPath under the watchdog. See mvm-bj8. */
+	g_arrFeatureConVars[FEATURE_WATCH_LURKING_SNIPERS] = MakeFeature(FEATURE_WATCH_LURKING_SNIPERS,
+		"The stuck watchdog also rescues a sniper lurking nowhere near a spot, which is the one it used to miss.", false);
 
 	g_arrFeatureConVars[FEATURE_ATTACK_STRAFE] = MakeFeature(FEATURE_ATTACK_STRAFE,
 		"A bot that has arrived at its firing position keeps sidestepping instead of standing still.");
