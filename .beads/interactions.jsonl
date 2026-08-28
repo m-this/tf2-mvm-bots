@@ -71,3 +71,4 @@
 {"id":"int-80cecdb7f4b69778911e44757b7e66e0","kind":"field_change","created_at":"2026-08-28T08:22:49.599369437Z","actor":"m-this","issue_id":"mvm-81n","extra":{"field":"status","new_value":"in_progress","old_value":"open"}}
 {"id":"int-75d9764bfbca0544e69e88a3ed02a8e3","kind":"field_change","created_at":"2026-08-28T08:22:49.600055084Z","actor":"m-this","issue_id":"mvm-81n","extra":{"field":"priority","new_value":"0","old_value":"1"}}
 {"id":"int-16c2b16b32fcf49cfd3adc742abb79ee","kind":"field_change","created_at":"2026-08-28T09:26:58.824865631Z","actor":"m-this","issue_id":"mvm-ed0","extra":{"field":"status","new_value":"in_progress","old_value":"closed"}}
+{"id":"int-d7b8f26cf2c874bd2b2db07f71841a31","kind":"field_change","created_at":"2026-08-28T11:03:57.125921064Z","actor":"m-this","issue_id":"mvm-bj8","extra":{"field":"status","new_value":"in_progress","old_value":"open"}}
