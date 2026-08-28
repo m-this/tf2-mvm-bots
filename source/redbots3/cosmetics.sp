@@ -314,6 +314,19 @@ Per class first, because a hat that fits nine heads is nine models and the wrong
 wearing a Heavy's hat at a Heavy's height. */
 static bool HatModel(int itemDefinition, TFClassType playerClass, char[] model, int maxlength)
 {
+	/* Whether this class may wear it at all, asked before the model is looked up
+
+	A hat with a generic model_player passes the lookup below for every class, and the game then
+	refuses the equip: TF2Util_EquipPlayerWearable throws "wearable entity N not attached to player",
+	eighteen times in one of Peppy's sessions. The throw unwinds Timer_GiveBotCosmetics, so the rest
+	of that bot's cosmetics are lost as well.
+
+	A loadout slot of -1 is the schema saying this class does not wear this item. Returning false
+	here sends it down the same path as a hat with no model: dropped from the pool and drawn again,
+	so the refusal costs a redraw rather than an exception. */
+	if (TF2Econ_GetItemLoadoutSlot(itemDefinition, playerClass) == -1)
+		return false;
+
 	int index = view_as<int>(playerClass);
 	
 	if (index > 0 && index < sizeof(ITEMS_GAME_CLASS))
