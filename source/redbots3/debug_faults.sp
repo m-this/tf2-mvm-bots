@@ -19,6 +19,7 @@ ConVar redbots_debug_wedge_class;
 ConVar redbots_debug_refuse_ammo_paths;
 ConVar redbots_debug_old_wedge_recovery;
 ConVar redbots_debug_unreachable_goal;
+ConVar redbots_debug_trace_snipers;
 
 //The bot being held, and until when. One at a time: two wedged bots is a different test.
 static int m_iWedgedBot = -1;
@@ -46,7 +47,42 @@ void DebugFaults_Init()
 		"Use the pre-2.21.3 wedge recovery, which only ever tried the area the bot stands in. For measuring what that fix is worth.",
 		FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
+	redbots_debug_trace_snipers = CreateConVar("sm_redbots_debug_trace_snipers", "0",
+		"Write every sniper's action stack and position to the console each tenth of a second, to read back after a watchdog trip. 0 is off.",
+		FCVAR_NOTIFY, true, 0.0, true, 1.0);
+
 	RegServerCmd("sm_redbots_debug_sniper_spots", Command_SniperSpots);
+
+	CreateTimer(0.1, Timer_TraceSnipers, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+}
+
+/* Say what each sniper was doing, tick by tick, so the frame that hangs can be read back
+
+Three fixes for the sniper crash were written from the core alone and all three failed a
+measurement, the last one still tripping the watchdog with CTFBotSniperLurk refused outright. So
+the search that runs away is not the one the core's top frame suggested. The last line printed
+before WatchDog! names the action that was actually running. See mvm-bj8. */
+public Action Timer_TraceSnipers(Handle timer)
+{
+	if (redbots_debug_trace_snipers == null || !redbots_debug_trace_snipers.BoolValue)
+		return Plugin_Continue;
+
+	for (int client = 1; client <= MaxClients; client++)
+	{
+		if (!IsClientInGame(client) || !IsPlayerAlive(client))
+			continue;
+
+		if (!g_bIsDefenderBot[client] || TF2_GetPlayerClass(client) != TFClass_Sniper)
+			continue;
+
+		char actions[512]; ActionStackOf(client, actions, sizeof(actions));
+		float here[3]; here = GetAbsOrigin(client);
+
+		PrintToServer("[snipertrace] %.2f bot %d at %.0f %.0f %.0f doing %s",
+			GetGameTime(), client, here[0], here[1], here[2], actions);
+	}
+
+	return Plugin_Continue;
 }
 
 //How many refusals are still owed to this bot, counted down as they are handed out
