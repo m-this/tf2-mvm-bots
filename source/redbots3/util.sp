@@ -291,11 +291,9 @@ void EconItemSpawnGiveTo(int item, int client)
 	else
 	{
 		EquipPlayerWeapon(client, item);
-		// TF2Util_SetPlayerActiveWeapon(client, item);
 	}
 	
-	//NOTE: Bot players always have their items visible in PvE modes
-	// SetEntProp(item, Prop_Send, "m_bValidatedAttachedEntity", 1);
+	//NOTE: bot items are always visible in PvE, so m_bValidatedAttachedEntity does not need setting
 }
 
 int GiveItemToPlayer(int client, char[] classname, int itemDefIndex, int level, int quality)
@@ -1130,34 +1128,10 @@ int GetNearestReviveMarker(int client, const float max_distance)
 	return bestEntity;
 }
 
-/* void PowerupBottle_Reset(int bottle)
-{
-	SetEntProp(bottle, Prop_Send, "m_bActive", false);
-} */
-
-/* void PowerupBottle_SetNumCharges(int bottle, int numCharges)
-{
-	SetEntProp(bottle, Prop_Send, "m_usNumCharges", numCharges);
-	
-	TF2Attrib_SetByName(bottle, "powerup charges", float(numCharges));
-} */
-
 int PowerupBottle_GetNumCharges(int bottle)
 {
 	return GetEntProp(bottle, Prop_Send, "m_usNumCharges");
 }
-
-/* int GetCostOfCanteenType(PowerupBottleType_t type)
-{
-	switch (type)
-	{
-		case POWERUP_BOTTLE_CRITBOOST:	return 100;
-		case POWERUP_BOTTLE_UBERCHARGE:	return 75;
-		case POWERUP_BOTTLE_RECALL:	return 10;
-		case POWERUP_BOTTLE_REFILL_AMMO:	return 25;
-		case POWERUP_BOTTLE_BUILDINGS_INSTANT_UPGRADE:	return 50;
-	}
-} */
 
 //CTFPowerupBottle::GetPowerupType
 int PowerupBottle_GetType(int bottle)
@@ -1624,7 +1598,6 @@ int GetCapturableAreaTrigger(TFTeam team)
 {
 	int trigger = -1;
 	
-	//Look for a capture area trigger associated with a control point
 	while ((trigger = FindEntityByClassname(trigger, "trigger_*")) != -1)
 	{
 		//Only want capture areas
@@ -1654,7 +1627,6 @@ int GetCapturableAreaTrigger(TFTeam team)
 			
 			char sName[32]; GetEntPropString(point, Prop_Data, "m_iName", sName, sizeof(sName));
 			
-			//Found the match?
 			if (strcmp(sName, sCapPointName, false) == 0)
 				return trigger;
 		}
@@ -1890,7 +1862,6 @@ bool GetBombInfo(BombInfo_t info)
 {
 	int iAreaCount = TheNavAreas.Count;
 
-	//Check that this map has any nav areas
 	if (iAreaCount <= 0)
 		return false;
 
@@ -1903,7 +1874,6 @@ bool GetBombInfo(BombInfo_t info)
 		//Skip spawn areas
 		if (area.HasAttributeTF(BLUE_SPAWN_ROOM) || area.HasAttributeTF(RED_SPAWN_ROOM))
 		{
-			//PrintToServer("Skip spawn area.. #%i", area.GetID());
 			continue;
 		}
 		
@@ -1922,10 +1892,6 @@ bool GetBombInfo(BombInfo_t info)
 		if (GetEntProp(flag, Prop_Send, "m_nFlagStatus") == TF_FLAGINFO_HOME)
 			continue;
 		
-		//Ignore bombs not on our team
-		//if (GetEntProp(flag, Prop_Send, "m_iTeamNum") != view_as<int>(TFTeam_Blue))
-			//continue;
-			
 		float flag_pos[3];
 		
 		int owner = BaseEntity_GetOwnerEntity(flag);
@@ -1956,9 +1922,6 @@ bool GetBombInfo(BombInfo_t info)
 			closest_flag_pos = flag_pos;
 		}
 	}
-	
-	//float range_back = FindConVar("tf_bot_engineer_mvm_sentry_hint_bomb_backward_range").FloatValue;
-	//float range_fwd  = FindConVar("tf_bot_engineer_mvm_sentry_hint_bomb_forward_range").FloatValue;
 	
 	float range_fwd   = 2300.0;
 	float range_back  = 1000.0;
@@ -2589,7 +2552,6 @@ CNavArea PickBuildArea(int client, float SentryRange = 1300.0)
 {
 	int iAreaCount = TheNavAreas.Count;
 
-	//Check that this map has any nav areas
 	if (iAreaCount <= 0)
 		return NULL_AREA;
 	
@@ -2640,7 +2602,6 @@ CNavArea PickBuildArea(int client, float SentryRange = 1300.0)
 
 	float limit = NestDistanceLimit();
 	
-	//Loop all nav areas
 	for (int i = 0; i < iAreaCount; i++)
 	{	
 		CTFNavArea area = view_as<CTFNavArea>(TheNavAreas.Get(i));
@@ -2800,7 +2761,6 @@ CNavArea PickBuildAreaPreRound(int client, float SentryRange = 1300.0)
 {
 	int iAreaCount = TheNavAreas.Count;
 
-	//Check that this map has any nav areas
 	if (iAreaCount <= 0)
 		return NULL_AREA;
 
@@ -3304,7 +3264,6 @@ stock void MovePlayerTowardsGoal(int client, const float vGoal[3], float vVel[3]
 	float to[3]; 
 	SubtractVectors(vGoal, vFeet, to);
 
-	/*float goalDistance = */
 	NormalizeVector(to, to);
 
 	float ahead = GetVectorDotProduct(to, vForward);
@@ -3314,23 +3273,19 @@ stock void MovePlayerTowardsGoal(int client, const float vGoal[3], float vVel[3]
 
 	if (ahead > epsilon)
 	{
-		//PressForwardButton();
 		vVel[0] = PLAYER_SIDESPEED;
 	}
 	else if (ahead < -epsilon)
 	{
-		//PressBackwardButton();
 		vVel[0] = -PLAYER_SIDESPEED;
 	}
 
 	if (side <= -epsilon)
 	{
-		//PressLeftButton();
 		vVel[1] = -PLAYER_SIDESPEED;
 	}
 	else if (side >= epsilon)
 	{
-		//PressRightButton();
 		vVel[1] = PLAYER_SIDESPEED;
 	}
 }

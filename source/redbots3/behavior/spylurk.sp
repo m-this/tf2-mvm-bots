@@ -6,7 +6,6 @@ BehaviorAction CTFBotSpyLurkMvM()
 	action.Update = CTFBotSpyLurkMvM_Update;
 	action.ShouldAttack = CTFBotSpyLurkMvM_ShouldAttack;
 	action.IsHindrance = CTFBotSpyLurkMvM_IsHindrance;
-	// action.SelectMoreDangerousThreat = CTFBotSpyLurkMvM_SelectMoreDangerousThreat;
 	
 	return action;
 }
@@ -60,7 +59,6 @@ static Action CTFBotSpyLurkMvM_Update(BehaviorAction action, int actor, float in
 			
 			if (threatRange < circleStrafeRange)
 			{
-				// SnapViewToPosition(actor, WorldSpaceCenter(target));
 				AimHeadTowards(myBot.GetBodyInterface(), WorldSpaceCenter(target), MANDATORY, 0.1, Address_Null, "Aim stab");
 				
 				if (!isBehindVictim)
@@ -141,21 +139,6 @@ static Action CTFBotSpyLurkMvM_Update(BehaviorAction action, int actor, float in
 
 static Action CTFBotSpyLurkMvM_ShouldAttack(BehaviorAction action, INextBot nextbot, CKnownEntity knownEntity, QueryResultType& result)
 {
-	/* int me = action.Actor;
-	int iThreat = knownEntity.GetEntity();
-	
-	if (iThreat != m_iAttackTarget[me] && BaseEntity_IsPlayer(iThreat))
-	{
-		int myWeapon = BaseCombatCharacter_GetActiveWeapon(me);
-		
-		if (myWeapon != -1 && TF2Util_GetWeaponID(myWeapon) == TF_WEAPON_KNIFE && nextbot.IsRangeLessThan(iThreat, 71.0) && HasBackstabPotential(iThreat))
-		{
-			//If we can backstab them, we might as well
-			result = ANSWER_YES;
-			return Plugin_Changed;
-		}
-	} */
-	
 	//Don't as we will just make ourselves look stupid
 	result = ANSWER_NO;
 	return Plugin_Changed;
@@ -175,31 +158,6 @@ static Action CTFBotSpyLurkMvM_IsHindrance(BehaviorAction action, INextBot nextb
 	result = ANSWER_UNDEFINED;
 	return Plugin_Changed;
 }
-
-/* static Action CTFBotSpyLurkMvM_SelectMoreDangerousThreat(BehaviorAction action, Address nextbot, int entity, Address threat1, Address threat2, Address& knownEntity)
-{
-	int iThreat1 = view_as<CKnownEntity>(threat1).GetEntity();
-	
-	if (BaseEntity_IsPlayer(iThreat1) && TF2_IsMiniBoss(iThreat1))
-	{
-		//Giants are high priority, and consequently their medics are too
-		knownEntity = view_as<Address>(GetHealerOfThreat(view_as<INextBot>(nextbot), view_as<CKnownEntity>(threat1)));
-		
-		return Plugin_Changed;
-	}
-	
-	int iThreat2 = view_as<CKnownEntity>(threat2).GetEntity();
-	
-	if (BaseEntity_IsPlayer(iThreat2) && TF2_IsMiniBoss(iThreat2))
-	{
-		knownEntity = view_as<Address>(GetHealerOfThreat(view_as<INextBot>(nextbot), view_as<CKnownEntity>(threat2)));
-		
-		return Plugin_Changed;
-	}
-	
-	//Use default targeting, which prioritizes closer threats first
-	return Plugin_Continue;
-} */
 
 static float GetStabRangeForTarget(int target)
 {

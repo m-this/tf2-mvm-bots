@@ -22,8 +22,6 @@ public Action CTFBotGotoUpgrade_OnStart(BehaviorAction action, int actor, Behavi
 	{
 		//We couldn't find an upgrade station to path to, so let's just pretend we're at one
 		TF2_SetInUpgradeZone(actor, true);
-		
-		// return action.Done("No upgrade station");
 	}
 	else if (GameRules_GetRoundState() == RoundState_RoundRunning)
 	{
@@ -34,10 +32,6 @@ public Action CTFBotGotoUpgrade_OnStart(BehaviorAction action, int actor, Behavi
 			TF2_SetInUpgradeZone(actor, true);
 	}
 	
-	// UpdateLookAroundForEnemies(actor, false);
-	
-	// EquipWeaponSlot(actor, TFWeaponSlot_Melee);
-	
 	return action.Continue();
 }
 
@@ -47,9 +41,6 @@ public Action CTFBotGotoUpgrade_Update(BehaviorAction action, int actor, float i
 		return action.ChangeTo(CTFBotUpgrade(), "Reached upgrade station; buying upgrades");
 	
 	int station = m_iStation[actor];
-	
-	// if (!IsValidEntity(station))
-		// return action.Done("Upgrade station is invalid");
 	
 	//Moved from OnStart for technical reasons
 	float center[3];

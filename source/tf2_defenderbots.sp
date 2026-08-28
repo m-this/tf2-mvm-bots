@@ -617,11 +617,6 @@ public void OnMapStart()
 	CreateBotPreferenceMenu();
 }
 
-/* public void OnMapEnd()
-{
-	RemoveAllDefenderBots("BM3 OnMapEnd");
-} */
-
 public void OnClientDisconnect(int client)
 {
 	if (client == g_iPlayerForcedPref)
@@ -656,8 +651,6 @@ public void OnClientPutInServer(int client)
 	m_flDeadRethinkTime[client] = 0.0;
 	g_iBuybackNumber[client] = 0;
 	g_iBuyUpgradesNumber[client] = 0;
-	
-	// m_flNextSnipeFireTime[client] = 0.0;
 	
 #if defined MOD_ROLL_THE_DICE_REVAMPED
 	m_flNextRollTime[client] = 0.0;
@@ -1381,10 +1374,6 @@ public Action Command_RedoBotTeamLineup(int client, int args)
 #if defined TESTING_ONLY
 public Action Command_BotsReadyNow(int client, int args)
 {
-	/* for (int i = 1; i <= MaxClients; i++)
-		if (g_bIsDefenderBot[i] && !IsPlayerReady(i))
-			FakeClientCommand(i, "tournament_player_readystate 1"); */
-	
 	int target = GetClientAimTarget(client);
 	SpawnSapper(client, target);
 	
@@ -2277,7 +2266,6 @@ void GetRandomDefenderBotName(char[] buffer, int maxlen)
 {
 	if (m_adtBotNames.Length == 0)
 	{
-		// LogError("GetRandomDefenderBotName: No bot names were ever parsed!");
 		strcopy(buffer, maxlen, "You forgot to give me a name!");
 		return;
 	}
@@ -2969,7 +2957,6 @@ void SetupSniperSpotHints()
 			if (ent != -1)
 			{
 				DispatchKeyValueVector(ent, "origin", vec);
-				// DispatchKeyValue(ent, "targetname", "db_sniper");
 				DispatchKeyValue(ent, "team", "2");
 				DispatchKeyValue(ent, "hint", "0");
 				DispatchSpawn(ent);

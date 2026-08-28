@@ -19,8 +19,6 @@ static Action CTFBotDefenderAttack_OnStart(BehaviorAction action, int actor, Beh
 	
 	m_flRevalidateTarget[actor] = GetGameTime() + 3.0;
 	
-	// UpdateLookAroundForEnemies(actor, true);
-	
 	return action.Continue();
 }
 

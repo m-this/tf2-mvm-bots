@@ -419,8 +419,6 @@ methodmap BotAim
 		new_eye_angle[1] = AngleNormalize(new_eye_angle[1]);
 		new_eye_angle[2] = 0.0;
 		
-		//PrintToServer("x %f y %f z %f", new_eye_angle[0], new_eye_angle[1], new_eye_angle[2]);
-		// SnapEyeAngles(this.index, new_eye_angle);
 		TeleportEntity(this.index, NULL_VECTOR, new_eye_angle, NULL_VECTOR);
 	}
 	public void AimHeadTowards(const float vec[3], LookAtPriorityType priority, float duration = 0.0, const char[] reason = "")
@@ -568,17 +566,9 @@ methodmap BotAim
 		}
 		
 		int threat = m_hAimTarget[this.index]; //this->GetVisionInterface()->GetPrimaryKnownThreat(false);
-	//	if (threat = nullptr || threat->GetEntity() == nullptr || !threat->IsVisibleRecently()) 
 		if (!IsValidTarget(threat))
 		{
 			m_hAimTarget[this.index] = -1;
-			
-			//Unscope because target isnt valid.
-			//if (IsSniperRifle(this.index) && TF2_IsPlayerInCondition(this.index, TFCond_Zoomed)/* && !GetEntProp(this.index, Prop_Send, "m_bRageDraining")*/)
-			//{
-				//this.PressAltFireButton(0.1);
-			//}
-			
 			return;
 		}
 		
@@ -610,24 +600,6 @@ methodmap BotAim
 		
 		if (myWeaponID == TF_WEAPON_FLAMETHROWER)
 		{
-		/*	CTFFlameThrower *flamethrower = static_cast<CTFFlameThrower *>(weapon);
-			if (flamethrower->CanAirBlast() && actor->ShouldFireCompressionBlast()) 
-			{
-				actor->PressAltFireButton();
-				return;
-			}*/
-			
-	/*		if (threat->GetTimeSinceLastSeen() < 1.0) 
-			{
-				float threat_to_actor[3];
-				SubtractVectors(GetAbsOrigin(this.index), GetAbsOrigin(threat), threat_to_actor);
-				
-				if(GetVectorLength(threat_to_actor) < GetMaxAttackRange(this.index)) 
-				{
-					this.PressFireButton(FindConVar("tf_bot_fire_weapon_min_time").FloatValue);
-				}
-			}*/
-			
 			float threat_to_actor[3];
 			SubtractVectors(GetAbsOrigin(this.index), GetAbsOrigin(threat), threat_to_actor);
 			
@@ -650,8 +622,6 @@ methodmap BotAim
 		
 		if (myWeaponID == TF_WEAPON_COMPOUND_BOW)
 		{
-			//PrintCenterText(this.index, "%f", GetCurrentCharge(GetActiveWeapon(this.index)));
-			
 			if (GetCurrentCharge(myWeapon) >= 0.5 && TF2_IsLineOfFireClear2(this.index, WorldSpaceCenter(threat)))
 			{
 				return;
@@ -666,14 +636,8 @@ methodmap BotAim
 			// TODO: bunch of stuff related to IntervalTimer @ 0x5c
 			// ...
 			
-		/*	if (!TF2_IsPlayerInCondition(this.index, TFCond_Zoomed))
-			{
-				//Scope in
-				this.PressAltFireButton(0.1);
-			}*/
 			if (HasEntProp(myWeapon, Prop_Send, "m_flChargedDamage") && GetEntPropFloat(myWeapon, Prop_Send, "m_flChargedDamage") >= 40.0 && this.IsHeadSteady())
 			{
-				//Shoot
 				this.PressFireButton();
 			}
 			

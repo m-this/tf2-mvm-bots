@@ -122,14 +122,7 @@ bool CTFBotCampBomb_IsPossible(int client)
 		return false;
 	}
 	
-	// float hatchPosition[3]; hatchPosition = GetBombHatchPosition();
 	float bombPosition[3]; bombPosition = WorldSpaceCenter(flag);
-	
-	/* if (GetVectorDistance(hatchPosition, bombPosition) > BOMB_HATCH_RANGE_OKAY)
-	{
-		//The bomb is stil pretty far from the hatch
-		return false;
-	} */
 	
 	int iEnt = -1;
 	const float maxWatchRadius = 1000.0;

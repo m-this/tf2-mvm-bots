@@ -91,7 +91,6 @@ static any GetOffset(const char[] cls, const char[] prop)
 
 int GetLastDamageType(int client)
 {
-	// return ReadInt(GetEntityAddress(client) + view_as<Address>(offset));
 	return GetEntData(client, GetOffset("CTFPlayer", "m_LastDamageType"));
 }
 

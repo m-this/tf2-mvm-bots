@@ -602,8 +602,6 @@ void EquipBestTankWeapon(int client)
 		if (weapon == -1)
 			continue;
 		
-		// int id = TF2Util_GetWeaponID(weapon);
-		
 		int score;
 		
 		switch (TF2_GetPlayerClass(client))

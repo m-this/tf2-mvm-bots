@@ -29,8 +29,6 @@ public Action CTFBotGetHealth_OnStart(BehaviorAction action, int actor, Behavior
 	float health_ratio = float(GetClientHealth(actor)) / float(TEMP_GetPlayerMaxHealth(actor));
 	float ratio = ClampFloat((health_ratio - tf_bot_health_critical_ratio.FloatValue) / (tf_bot_health_ok_ratio.FloatValue - tf_bot_health_critical_ratio.FloatValue), 0.0, 1.0);
 	
-	//	if (TF2_IsPlayerInCondition(actor, TFCond_OnFire))
-//		ratio = 0.0;
 	
 	//((100 / 175) - 0.8) / (0.3 - 0.8)
 	
@@ -200,8 +198,6 @@ bool CTFBotGetHealth_IsPossible(int actor)
 	float health_ratio = float(GetClientHealth(actor)) / float(TEMP_GetPlayerMaxHealth(actor));
 	float ratio = ClampFloat((health_ratio - tf_bot_health_critical_ratio.FloatValue) / (tf_bot_health_ok_ratio.FloatValue - tf_bot_health_critical_ratio.FloatValue), 0.0, 1.0);
 	
-//	if (TF2_IsPlayerInCondition(actor, TFCond_OnFire))
-//		ratio = 0.0;
 	
 	float far_range = tf_bot_health_search_far_range.FloatValue;
 	float max_range = ratio * (tf_bot_health_search_near_range.FloatValue - far_range);
@@ -210,7 +206,6 @@ bool CTFBotGetHealth_IsPossible(int actor)
 	//Skip lag.
 	if (m_iHealthPack[actor] != -1 && IsValidHealth(m_iHealthPack[actor]))
 	{
-		// UpdateLookAroundForEnemies(actor, true);
 		return true;
 	}
 
@@ -240,6 +235,5 @@ bool CTFBotGetHealth_IsPossible(int actor)
 
 	m_bHealthPossible[actor] = bPossible;
 	
-	// UpdateLookAroundForEnemies(actor, true);
 	return bPossible;
 }

@@ -628,7 +628,6 @@ void ResetNextBot(int client)
 	m_flNextBottleUseTime[client] = 0.0;
 	
 	m_iAttackTarget[client] = -1;
-	// m_flRevalidateTarget[client] = 0.0;
 	m_iTarget[client] = -1;
 	m_flNextMarkTime[client] = 0.0;
 	m_iCurrencyPack[client] = -1;
@@ -722,7 +721,6 @@ public void OnActionCreated(BehaviorAction action, int actor, const char[] name)
 	{
 		if (StrEqual(name, "MainAction"))
 		{
-			// action.SelectMoreDangerousThreat = CTFBotMainAction_SelectMoreDangerousThreat;
 			action.SelectTargetPoint = CTFBotMainAction_SelectTargetPoint;
 			action.ShouldAttack = CTFBotMainAction_ShouldAttack;
 		}
@@ -922,8 +920,6 @@ public Action CTFBotMainAction_SelectMoreDangerousThreat(BehaviorAction action, 
 	
 	//Target the healer
 	knownEntity = HealerOrThreat(nextbot, knownEntity);
-	
-	// PrintToChatAll("CTFBotMainAction_SelectMoreDangerousThreat");
 	
 	return Plugin_Changed;
 }
@@ -2294,53 +2290,6 @@ bool IsPathToEntityPossible(int bot_entidx, int goal_entidx, float &length = -1.
 	return success;
 }
 
-/* bool CNavArea_IsVisible(CNavArea area, float eye[3], float visSpot[3] = NULL_VECTOR)
-{
-	float offset = 0.75 * 71;
-
-	float center[3]; area.GetCenter(center); center[2] += offset;
-	
-	// check center first
-	Handle result = TR_TraceRayEx(eye, center, MASK_OPAQUE|CONTENTS_MONSTER, RayType_EndPoint);
-	
-	if (TR_GetFraction(result) == 1.0)
-	{
-		// we can see this area
-		if (!IsNullVector(visSpot))
-			area.GetCenter(visSpot);
-		
-		delete result;
-		return true;
-	}
-	
-	delete result;
-	
-	float corner[3];
-	
-	for (NavCornerType c = NORTH_WEST; c < NUM_CORNERS; ++c)
-	{
-		area.GetCorner(c, corner);
-		corner[2] += offset;
-		
-		result = TR_TraceRayEx(eye, corner, MASK_OPAQUE|CONTENTS_MONSTER, RayType_EndPoint);
-		
-		if (TR_GetFraction(result) == 1.0)
-		{
-			// we can see this area
-			if (!IsNullVector(visSpot))
-				visSpot = corner;
-			
-			delete result;
-			return true;
-		}
-		
-		delete result;
-	}
-	
-	delete result;
-	return false;
-} */
-
 bool IsAmmoLow(int client)
 {
 	int primary = GetPlayerWeaponSlot(client, TFWeaponSlot_Primary);
@@ -2385,22 +2334,7 @@ void ResetIntentionInterface(int bot_entidx)
 
 void UpdateLookAroundForEnemies(int client, bool bVal)
 {
-	//Method 1
 	SetLookingAroundForEnemies(client, bVal);
-	
-	//Method 2
-	/* if (bVal)
-	{
-		VS_ClearBotAttributes(client);
-		
-		//Restore things defender bots should have
-		if (TF2_GetPlayerClass(client) == TFClass_Medic)
-			VS_AddBotAttribute(client, PROJECTILE_SHIELD);
-	}
-	else
-	{
-		VS_AddBotAttribute(client, IGNORE_ENEMIES);
-	} */
 }
 
 bool IsCombatWeapon(int client, int weapon)
@@ -2483,16 +2417,6 @@ float GetDesiredAttackRange(int client)
 	
 	return 500.0;
 }
-
-/* void ForgetAllEnemies(int bot_entidx)
-{
-	INextBot bot = CBaseNPC_GetNextBotOfEntity(bot_entidx);
-	IVision vis = bot.GetVisionInterface();
-		
-	for (int i = 1; i <= MaxClients; i++)
-		if (IsClientInGame(i) && IsPlayerAlive(i) && TF2_GetClientTeam(i) == GetPlayerEnemyTeam(bot_entidx))
-			vis.ForgetEntity(i);
-} */
 
 //Extension of the original function
 bool OpportunisticallyUseWeaponAbilities(int client, int activeWeapon, INextBot bot, const CKnownEntity threat)
@@ -2775,15 +2699,6 @@ void EquipBestWeaponForThreat(int client, const CKnownEntity threat)
 	else
 		gun = melee;
 	
-	//TODO: not accurate, should be using offset of variable m_difficulty instead
-	/* if (GetEntProp(client, Prop_Send, "m_nBotSkill") == CTFBot_EASY)
-	{
-		if (gun != -1)
-			TF2Util_SetPlayerActiveWeapon(client, gun);
-		
-		return;
-	} */
-	
 	if (threat == NULL_KNOWN_ENTITY || !threat.WasEverVisible() || threat.GetTimeSinceLastSeen() > 5.0)
 	{
 		if (gun != -1)
@@ -2946,8 +2861,6 @@ void EquipBestWeaponForThreat(int client, const CKnownEntity threat)
 		TF2Util_SetPlayerActiveWeapon(client, gun);
 }
 
-/* Get the medic healing this threat only if we know about him and he's in our FOV
-otherwise return the original threat if there is no known healer right now */
 /* The Medic behind whatever we just picked, when there is one
 
 Shooting the patient of a Quick-Fix Medic is shooting through the heal rate, which is the whole
