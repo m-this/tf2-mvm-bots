@@ -43,7 +43,12 @@ enum
 	FEATURE_COUNT
 }
 
-//Same order as the enum above, and the compiler checks the count matches
+/* Same order as the enum above, and only the count is checked
+
+The compiler counts the entries and says nothing about their order, so a name inserted in the wrong
+place silently renames three convars: "ammo_failover" sat at FEATURE_WATCH_IDLE_BOTS for a release,
+which made sm_redbots_feature_watch_lurking_snipers drive the idle watchdog instead. An A/B armed
+the wrong feature and read as a measurement. Add a name where its feature is. */
 static const char FEATURE_NAME[FEATURE_COUNT][] =
 {
 	"threat_priority",
@@ -63,9 +68,9 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"medic_shield",
 	"path_length_cap",
 	"engineer_climbs",
-	"ammo_failover",
 	"watch_idle_bots",
-	"watch_lurking_snipers"
+	"watch_lurking_snipers",
+	"ammo_failover"
 };
 
 static ConVar g_arrFeatureConVars[FEATURE_COUNT];
