@@ -14,7 +14,7 @@ Do not guess. The test-bed decides. Repeat these steps:
 1. Reproduce the bug on the test-bed.
 2. Read the run report. If it does not show the bug, add the statistic that does.
 3. Make one change.
-4. Start `go run ./testbed/cmd/testbed -arm on:<cvar>=1 -arm off:<cvar>=0`. The last arm is the control.
+4. From `../tf2-mvm-bots-go`, start `go run ./cmd/testbed -arm on:<cvar>=1 -arm off:<cvar>=0`. The last arm is the control.
 5. Compare the two run reports. Keep the change if the numbers improve.
 6. If the numbers do not improve, remove the change and try a different one.
 7. Go back to step 3 until the numbers are good enough.
@@ -33,7 +33,7 @@ A small win on one map is noise. Widen the sample before you keep the change.
 
 ```bash
 testbed/build.sh   # build the plugin
-go run ./testbed/cmd/testbed  # play arms of one mission and report them
+cd ../tf2-mvm-bots-go && go run ./cmd/testbed  # play arms of one mission and report them
                               # -maps plays several, one after another
 ```
 

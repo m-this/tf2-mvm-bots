@@ -19,8 +19,9 @@ TFBots that can play Mann vs Machine.
 with every wave: cleared or lost, how long, how many robots and defenders died,
 how many backstabs, what the engineers lost. It also samples every bot and every
 building every five seconds, so "the engineer was stood in a house" and "that
-dispenser fed nobody" are numbers rather than reports. `testbed/cmd/testbed` plays a
-mission, `go run ./testbed/report` reads a run and compares two.
+dispenser fed nobody" are numbers rather than reports. The runner and the reports
+are Go and live in the sibling checkout since `mvm-x2c`: `cmd/testbed` plays a
+mission and `report` reads a run and compares two, both from `../tf2-mvm-bots-go`.
 
 See `testbed/README.md` for running it, `docs/testbed-metrics.md` for what the
 numbers mean, and `docs/how-bots-break.md` before debugging anything: the faults

@@ -17,17 +17,25 @@ person and everything is written down.
 
 ## Running it
 
+The runner and the reports are Go, and since `mvm-x2c` they live in the sibling
+checkout: run them from `../tf2-mvm-bots-go`. This repository keeps what is not
+code, which is `build.sh`, the compose files, the popfiles and the map configs,
+and the runner reaches all of it from there.
+
 ```sh
-go run ./testbed/cmd/testbed -arm plain:                  # two waves of Decoy
-go run ./testbed/cmd/testbed -mission mvm_decoy_advanced -arm plain:
-go run ./testbed/cmd/testbed -waves 12 -timeout 60m -arm plain:
-go run ./testbed/cmd/testbed -maps "mvm_decoy mvm_coaltown" -arm plain:
+cd ../tf2-mvm-bots-go
+
+go run ./cmd/testbed -arm plain:                  # two waves of Decoy
+go run ./cmd/testbed -mission mvm_decoy_advanced -arm plain:
+go run ./cmd/testbed -waves 12 -timeout 60m -arm plain:
+go run ./cmd/testbed -maps "mvm_decoy mvm_coaltown" -arm plain:
 ```
 
 Then compare two runs:
 
 ```sh
-go run ./testbed/report testbed/results/after.jsonl testbed/results/before.jsonl
+go run ./report ../tf2-mvm-bots/testbed/results/after.jsonl \
+	../tf2-mvm-bots/testbed/results/before.jsonl
 ```
 
 Needs Docker and Python 3.
@@ -124,9 +132,9 @@ is a property of geometry, so it takes all of them to tell a map-shaped bug from
 a mod-shaped one.
 
 ```sh
-go run ./testbed/cmd/testbed -maps "..." -waves 6 -arm plain:
-go run ./testbed/cmd/testbed -maps "..." -waves 4 -tag night -arm plain:
-go run ./testbed/sweepreport testbed/results/sweep-night
+go run ./cmd/testbed -maps "..." -waves 6 -arm plain:
+go run ./cmd/testbed -maps "..." -waves 4 -tag night -arm plain:
+go run ./sweepreport ../tf2-mvm-bots/testbed/results/sweep-night
 ```
 
 The sweep report adds two tables the per-run report has no way to produce: what
@@ -138,9 +146,9 @@ A feature is a named switch (`source/redbots3/features.sp`), which means the
 same build can play both sides of an argument:
 
 ```sh
-go run ./testbed/cmd/testbed -maps "mvm_coaltown mvm_decoy" \
+go run ./cmd/testbed -maps "mvm_coaltown mvm_decoy" \
   -arm on:sm_redbots_feature_demo_sticky_first=1 -arm off:sm_redbots_feature_demo_sticky_first=0
-go run ./testbed/sweepreport results/ab-demo_sticky_first/on \
+go run ./sweepreport ../tf2-mvm-bots/results/ab-demo_sticky_first/on \
                              results/ab-demo_sticky_first/off
 ```
 
@@ -260,12 +268,12 @@ does not say whether the bots look right, and somebody still has to watch them.
 
 ## Running an A/B
 
-`go run ./testbed/cmd/testbed` replaces the shell for anything being measured.
+`go run ./cmd/testbed` replaces the shell for anything being measured.
 It builds, restarts the server onto what it built, plays each arm, and prints
 the comparison.
 
 ```
-go run ./testbed/cmd/testbed \
+go run ./cmd/testbed \
   -map mvm_decoy -mission mvm_decoy_advanced \
   -arm on:sm_redbots_feature_watch_idle_bots=1 \
   -arm off:sm_redbots_feature_watch_idle_bots=0 \

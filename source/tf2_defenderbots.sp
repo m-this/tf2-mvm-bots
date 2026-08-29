@@ -254,7 +254,7 @@ Address g_pMannVsMachineUpgrades;
 #endif
 
 #include "redbots3/archipelago.sp"
-#include "redbots3/features.sp"
+#include "redbots3/generated/features.sp"
 #include "redbots3/blu_assist.sp"
 #include "redbots3/util.sp"
 #include "redbots3/weapon_tuning.sp"

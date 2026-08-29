@@ -1,3 +1,7 @@
+/* Generated from internal/tables/feature.go. Do not edit.
+
+The table it comes from is the only place these names are written. */
+
 /* Ways of playing that can be switched off, so two of them can be compared
 
 Every behaviour in this mod is an argument until somebody measures it, and measuring one means
@@ -9,14 +13,9 @@ A feature is a named switch with a default. It becomes a convar, so a mission ca
 one line of a config, and the set that was on is written into the wave results, so a file of
 numbers says which mod produced it without anybody having to remember.
 
-Adding one is a line in LoadFeatures and a call to Feature() where the behaviour lives. Removing
+Adding one is an entry in the Go table and a call to Feature() where the behaviour lives. Removing
 one is deleting both, which is the point: a switch nobody has turned off in a month is a
-behaviour, and it should stop being a switch.
-
-The names live in one array of fixed strings and nothing copies them about. The first version of
-this kept a description per feature in an enum struct and copied both in with strcopy, which is
-three ways to get a length wrong for no gain: the description is only ever handed straight to
-CreateConVar, so it can be written where it is used. */
+behaviour, and it should stop being a switch. */
 
 enum
 {
@@ -42,15 +41,16 @@ enum
 	FEATURE_AMMO_FAILOVER,
 	FEATURE_MEDIC_ANSWERS_CALL,
 	FEATURE_GENERATED_THREAT_PRIORITY,
+	FEATURE_ENGINEER_ENTRANCE_FIRST,
 	FEATURE_COUNT
 }
 
-/* Same order as the enum above, and only the count is checked
+/* Same order as the enum above, and both are written by the generator
 
-The compiler counts the entries and says nothing about their order, so a name inserted in the wrong
-place silently renames three convars: "ammo_failover" sat at FEATURE_WATCH_IDLE_BOTS for a release,
-which made sm_redbots_feature_watch_lurking_snipers drive the idle watchdog instead. An A/B armed
-the wrong feature and read as a measurement. Add a name where its feature is. */
+A name inserted in the wrong place used to rename three convars: "ammo_failover" sat at
+FEATURE_WATCH_IDLE_BOTS for a release, which made sm_redbots_feature_watch_lurking_snipers drive
+the idle watchdog. An A/B armed the wrong feature and read as a measurement. The constant is now
+the name in capitals, so the two cannot part company. */
 static const char FEATURE_NAME[FEATURE_COUNT][] =
 {
 	"threat_priority",
@@ -74,7 +74,8 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"watch_lurking_snipers",
 	"ammo_failover",
 	"medic_answers_call",
-	"generated_threat_priority"
+	"generated_threat_priority",
+	"engineer_entrance_first"
 };
 
 static ConVar g_arrFeatureConVars[FEATURE_COUNT];
@@ -85,7 +86,7 @@ static ConVar MakeFeature(int id, const char[] description, bool on = true)
 	char name[64]; Format(name, sizeof(name), "sm_redbots_feature_%s", FEATURE_NAME[id]);
 
 	/* A feature ships on once it has been measured, and off until then
-	
+
 	The switch exists to turn something off and measure the difference, and that is the whole point
 	of it: a behaviour that has not cleared the spread of the arm it was measured against is not
 	yet a behaviour this mod claims. See the rule in docs/testbed-metrics.md. */
@@ -134,11 +135,14 @@ void LoadFeatures()
 		"Buy the resistance the coming wave's robots call for, rather than ranking resistances last.");
 
 	/* Measured and switched off: six waves of Decoy, defender deaths per wave
-	   [0,3,5,7,9,10] without it against [11,12,14,15,15,17] with it. The two
-	   spreads do not touch, so the worst wave without the mini beat the best
-	   wave with it. Sentries lost doubled, 7 against 14. See mvm-8ws. */
+	[0,3,5,7,9,10] without it against [11,12,14,15,15,17] with it. The two
+	spreads do not touch, so the worst wave without the mini beat the best
+	wave with it. Sentries lost doubled, 7 against 14. See mvm-8ws. */
 	g_arrFeatureConVars[FEATURE_ENGINEER_DISPOSABLE] = MakeFeature(FEATURE_ENGINEER_DISPOSABLE,
 		"The engineer buys the disposable sentry and stands a mini beside his nest.", false);
+
+	g_arrFeatureConVars[FEATURE_ATTACK_STRAFE] = MakeFeature(FEATURE_ATTACK_STRAFE,
+		"A bot that has arrived at its firing position keeps sidestepping instead of standing still.");
 
 	g_arrFeatureConVars[FEATURE_SOLDIER_CLOSES_IN] = MakeFeature(FEATURE_SOLDIER_CLOSES_IN,
 		"A rocket is fought at a grenade's distance rather than twelve hundred units out.");
@@ -159,54 +163,60 @@ void LoadFeatures()
 		"Let the medic put up the projectile shield, and buy the rage that fills it.");
 
 	/* Off until a run says otherwise. An unreachable goal makes NavAreaBuildPath walk the whole
-	   nav mesh, and Mannhattan produced an 1833 ms frame where Decoy never passed 153. See
-	   mvm-cf3. */
+	nav mesh, and Mannhattan produced an 1833 ms frame where Decoy never passed 153. See
+	mvm-cf3. */
 	g_arrFeatureConVars[FEATURE_PATH_LENGTH_CAP] = MakeFeature(FEATURE_PATH_LENGTH_CAP,
 		"Stop a path search that has walked far enough, instead of letting an unreachable goal cost the whole mesh.", false);
 
 	/* Off until a Bigrock run says otherwise. The exit spot there is 70 units up a rock the
-	   engineer cannot walk onto, so he gives up and builds where he stands, in the bot lane.
-	   This is the first jump in the mod aimed at a piece of ground. See mvm-fgs. */
+	engineer cannot walk onto, so he gives up and builds where he stands, in the bot lane.
+	This is the first jump in the mod aimed at a piece of ground. See mvm-fgs. */
 	g_arrFeatureConVars[FEATURE_ENGINEER_CLIMBS] = MakeFeature(FEATURE_ENGINEER_CLIMBS,
 		"The engineer crouch jumps onto a teleporter spot above him, and falls back to the nest ring rather than to his feet.", false);
 
-	/* Off until a run says otherwise. The pack was validated once and then repathed to every
-	   second with the answer thrown away, so a route that stopped existing left the bot walking
-	   an empty path until the pack expired. See mvm-zx0. */
-	g_arrFeatureConVars[FEATURE_AMMO_FAILOVER] = MakeFeature(FEATURE_AMMO_FAILOVER,
-		"A bot whose path to the ammo it picked keeps failing takes the next pack, then gives up, rather than walking at a wall.", false);
-
 	/* Off until a run says otherwise. The stuck watchdog only armed for a bot that was pathing, so
-	   an engineer frozen with an empty action stack was invisible to it: 45 seconds at one spot on
-	   Mannhunt and not one stuck line. See mvm-ipf. */
+	an engineer frozen with an empty action stack was invisible to it: 45 seconds at one spot on
+	Mannhunt and not one stuck line. See mvm-ipf. */
 	g_arrFeatureConVars[FEATURE_WATCH_IDLE_BOTS] = MakeFeature(FEATURE_WATCH_IDLE_BOTS,
 		"The stuck watchdog also rescues a bot that has no behaviour at all, not only one that cannot reach its goal.", false);
 
-	/* Off until a run says otherwise. A sniper whose lurk cannot reach its spot asks the game for a
-	   path every update, and three stock snipers on Decoy killed the server: the core names
-	   CTFBotSniperLurk::Update over NavAreaBuildPath under the watchdog. See mvm-bj8.
+	/* A sniper whose lurk cannot reach its spot asks the game for a path every update, and three
+	stock snipers on Decoy killed the server: the core names CTFBotSniperLurk::Update over
+	NavAreaBuildPath under the watchdog. See mvm-bj8.
 
-	   On rather than off, against the usual rule, because the fault is confirmed twice from a
-	   player's own server and the test-bed has never once reproduced it. Peppy's second bundle ran
-	   v2.33.0 with the rescue built in and his sniper still sat at one position for 577 samples: the
-	   switch was never set, and a fix nobody turns on is not a fix.
+	On rather than off, against the usual rule, because the fault is confirmed twice from a
+	player's own server and the test-bed has never once reproduced it. Peppy's second bundle ran
+	v2.33.0 with the rescue built in and his sniper still sat at one position for 577 samples: the
+	switch was never set, and a fix nobody turns on is not a fix.
 
-	   It costs nothing when snipers work. It fires only on a rifle sniper who is not pathing and has
-	   not moved for STUCK_TIME while further than SNIPER_AT_SPOT from every spot the map offers. */
+	It costs nothing when snipers work. It fires only on a rifle sniper who is not pathing and has
+	not moved for STUCK_TIME while further than SNIPER_AT_SPOT from every spot the map offers. */
 	g_arrFeatureConVars[FEATURE_WATCH_LURKING_SNIPERS] = MakeFeature(FEATURE_WATCH_LURKING_SNIPERS,
 		"The stuck watchdog also rescues a sniper parked nowhere near a spot, which is the one it used to miss.");
 
+	/* Off until a run says otherwise. The pack was validated once and then repathed to every
+	second with the answer thrown away, so a route that stopped existing left the bot walking
+	an empty path until the pack expired. See mvm-zx0. */
+	g_arrFeatureConVars[FEATURE_AMMO_FAILOVER] = MakeFeature(FEATURE_AMMO_FAILOVER,
+		"A bot whose path to the ammo it picked keeps failing takes the next pack, then gives up, rather than walking at a wall.", false);
+
 	/* Off until a run says otherwise. Reported twice, by Cowser and by Peppy: a human presses the
-	   medic call and the bot medic carries on healing whichever bot it had picked, which reads as
-	   the medic being broken. See mvm-w9b. */
+	medic call and the bot medic carries on healing whichever bot it had picked, which reads as
+	the medic being broken. See mvm-w9b. */
 	g_arrFeatureConVars[FEATURE_MEDIC_ANSWERS_CALL] = MakeFeature(FEATURE_MEDIC_ANSWERS_CALL,
 		"A player who calls for a medic takes the beam, and a player outranks a bot for it either way.", false);
 
+	/* Off until a run says otherwise, and this one is meant to change nothing. It is the port in
+	mvm-z83.6 wired up: the two are proved identical over the whole domain under SourcePawn's own
+	VM, so an arm that moves is the edge filling the record wrong, not the decision. */
 	g_arrFeatureConVars[FEATURE_GENERATED_THREAT_PRIORITY] = MakeFeature(FEATURE_GENERATED_THREAT_PRIORITY,
 		"Rank threats with the table generated from the Go, rather than with the hand written chain.", false);
 
-	g_arrFeatureConVars[FEATURE_ATTACK_STRAFE] = MakeFeature(FEATURE_ATTACK_STRAFE,
-		"A bot that has arrived at its firing position keeps sidestepping instead of standing still.");
+	/* Off until a run says otherwise. The entrance used to wait for the nest, so the engineer built
+	it, walked to the nest, built there, and walked back to spawn for the entrance. Peppy asked
+	for the entrance first and the walk is what the test-bed measures. See mvm-dh8. */
+	g_arrFeatureConVars[FEATURE_ENGINEER_ENTRANCE_FIRST] = MakeFeature(FEATURE_ENGINEER_ENTRANCE_FIRST,
+		"The engineer puts his teleporter entrance up in spawn before he walks out to build the nest.", false);
 
 	/* What is on, as one string, for whoever reads the results later
 
