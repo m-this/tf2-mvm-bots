@@ -36,7 +36,7 @@ stock int GetNearestSappableObject(int client, float maxDistance = 1000.0)
 			continue;
 		}
 		float distance = GetVectorDistance(origin, GetAbsOrigin(ent));
-		if (distance <= bestDistance && distance <= maxDistance)
+		if ((distance <= bestDistance) && (distance <= maxDistance))
 		{
 			bestDistance = distance;
 			bestEnt = ent;
@@ -77,7 +77,39 @@ stock int GetNearestEnemyTeleporter(int client, float maxDistance = 999999.0)
 			continue;
 		}
 		float distance = GetVectorDistance(origin, GetAbsOrigin(ent));
-		if (distance <= bestDistance && distance <= maxDistance)
+		if ((distance <= bestDistance) && (distance <= maxDistance))
+		{
+			bestDistance = distance;
+			bestEnt = ent;
+		}
+	}
+	return bestEnt;
+}
+
+stock int GetNearestCurrencyPack(int client, float maxDistance = 999999.0)
+{
+	float origin[3];
+	GetClientAbsOrigin(client, origin);
+	float bestDistance = 999999.0;
+	int bestEnt = -1;
+	int ent = -1;
+	for (;;)
+	{
+		ent = FindEntityByClassname(ent, "item_currency*");
+		if (ent == -1)
+		{
+			break;
+		}
+		if (GetEntProp(ent, Prop_Send, "m_bDistributed") == 1)
+		{
+			continue;
+		}
+		if ((GetEntityFlags(ent) & FL_ONGROUND) == 0)
+		{
+			continue;
+		}
+		float distance = GetVectorDistance(origin, GetAbsOrigin(ent));
+		if ((distance <= bestDistance) && (distance <= maxDistance))
 		{
 			bestDistance = distance;
 			bestEnt = ent;
@@ -110,7 +142,7 @@ stock bool IsPlayerHealingSomething(int client)
 	{
 		return false;
 	}
-	return TF2Util_GetWeaponID(weapon) == TF_WEAPON_MEDIGUN && GetEntPropEnt(weapon, Prop_Send, "m_hHealingTarget") != -1;
+	return (TF2Util_GetWeaponID(weapon) == TF_WEAPON_MEDIGUN) && (GetEntPropEnt(weapon, Prop_Send, "m_hHealingTarget") != -1);
 }
 
 stock int GetNearestSappablePlayer(int client, float maxDistance, bool giantsOnly = false, TFClassType class = TFClass_Unknown, float speedCheck = 0.0)
@@ -131,7 +163,7 @@ stock int GetNearestSappablePlayer(int client, float maxDistance, bool giantsOnl
 			continue;
 		}
 		float distance = GetVectorDistance(WorldSpaceCenter(i), origin);
-		if (distance <= bestDistance && distance <= maxDistance)
+		if ((distance <= bestDistance) && (distance <= maxDistance))
 		{
 			bestDistance = distance;
 			bestEntity = i;
@@ -158,7 +190,7 @@ stock int GetFarthestSappablePlayer(int client, float maxDistance, bool giantsOn
 			continue;
 		}
 		float distance = GetVectorDistance(WorldSpaceCenter(i), origin);
-		if (distance >= bestDistance && distance <= maxDistance)
+		if ((distance >= bestDistance) && (distance <= maxDistance))
 		{
 			bestDistance = distance;
 			bestEntity = i;
@@ -189,7 +221,7 @@ stock int GetNearestSappablePlayerHealingSomeone(int client, float maxDistance, 
 			continue;
 		}
 		float distance = GetVectorDistance(WorldSpaceCenter(i), origin);
-		if (distance <= bestDistance && distance <= maxDistance)
+		if ((distance <= bestDistance) && (distance <= maxDistance))
 		{
 			bestDistance = distance;
 			bestEntity = i;
@@ -224,11 +256,11 @@ stock bool Go_sappableCandidate(int client, int i, TFTeam enemyTeam, bool giants
 	{
 		return false;
 	}
-	if (class > TFClass_Unknown && TF2_GetPlayerClass(i) != class)
+	if ((class > TFClass_Unknown) && (TF2_GetPlayerClass(i) != class))
 	{
 		return false;
 	}
-	if (speedCheck > 0.0 && GetEntPropFloat(i, Prop_Send, "m_flMaxspeed") < speedCheck)
+	if ((speedCheck > 0.0) && (GetEntPropFloat(i, Prop_Send, "m_flMaxspeed") < speedCheck))
 	{
 		return false;
 	}
@@ -263,7 +295,7 @@ stock int GetEnemyPlayerNearestToPosition(int client, float position[3], float m
 			continue;
 		}
 		float distance = GetVectorDistance(WorldSpaceCenter(i), position);
-		if (distance <= bestDistance && distance <= maxDistance)
+		if ((distance <= bestDistance) && (distance <= maxDistance))
 		{
 			bestDistance = distance;
 			bestEntity = i;
@@ -357,7 +389,7 @@ stock int FindEnemyNearestToMe(int client, float maxDistance, bool giantsOnly = 
 		{
 			continue;
 		}
-		if (class > TFClass_Unknown && TF2_GetPlayerClass(i) != class)
+		if ((class > TFClass_Unknown) && (TF2_GetPlayerClass(i) != class))
 		{
 			continue;
 		}
@@ -366,7 +398,7 @@ stock int FindEnemyNearestToMe(int client, float maxDistance, bool giantsOnly = 
 			continue;
 		}
 		float distance = GetVectorDistance(WorldSpaceCenter(i), origin);
-		if (distance <= bestDistance && distance <= maxDistance)
+		if ((distance <= bestDistance) && (distance <= maxDistance))
 		{
 			bestDistance = distance;
 			bestEntity = i;
@@ -397,7 +429,7 @@ stock int GetBestTargetForSpy(int client, float maxDistance)
 		for (int i = 0; i < TF2_GetNumHealers(target); i++)
 		{
 			int healer = TF2Util_GetPlayerHealer(target, i);
-			if (healer != -1 && BaseEntity_IsPlayer(healer) && GetClientTeam(healer) != myTeam)
+			if ((healer != -1) && BaseEntity_IsPlayer(healer) && (GetClientTeam(healer) != myTeam))
 			{
 				target = healer;
 				break;

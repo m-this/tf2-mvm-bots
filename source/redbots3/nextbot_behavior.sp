@@ -595,7 +595,7 @@ public Action Command_RecoverSpawnBots(int client, int args)
 #include "behavior/spycheck.sp"
 #include "behavior/stickytrap.sp"
 #include "behavior/spylurk.sp"
-#include "behavior/spysap.sp"
+#include "generated/spysap.sp"
 #include "behavior/spysapplayer.sp"
 #include "behavior/medicrevive.sp"
 #include "behavior/medicheal.sp"
@@ -605,7 +605,7 @@ public Action Command_RecoverSpawnBots(int client, int args)
 #include "behavior/attacktank.sp"
 #include "behavior/destroyteleporter.sp"
 #include "behavior/guardpoint.sp"
-#include "behavior/collectnearmoney.sp"
+#include "generated/collectnearmoney.sp"
 
 void InitNextBotPathing()
 {

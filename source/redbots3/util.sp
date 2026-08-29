@@ -1355,36 +1355,6 @@ int FindOnlyOneVisibleEntity(int client, int ent1, int ent2)
 	return -2;
 }
 
-int GetNearestCurrencyPack(int client, const float max_distance = 999999.0)
-{
-	float origin[3]; GetClientAbsOrigin(client, origin);
-	
-	float bestDistance = 999999.0;
-	int bestEnt = -1;
-	int ent = -1;
-	
-	while ((ent = FindEntityByClassname(ent, "item_currency*")) != -1)
-	{
-		//This pack has already been distributed to the team
-		if (GetEntProp(ent, Prop_Send, "m_bDistributed") == 1)
-			continue;
-		
-		//Wait for it to reach the ground the first
-		if (!(GetEntityFlags(ent) & FL_ONGROUND))
-			continue;
-		
-		float distance = GetVectorDistance(origin, GetAbsOrigin(ent));
-		
-		if (distance <= bestDistance && distance <= max_distance)
-		{
-			bestDistance = distance;
-			bestEnt = ent;
-		}
-	}
-	
-	return bestEnt;
-}
-
 bool CanUsePrimayWeapon(int client)
 {
 	if (TF2_IsPlayerInCondition(client, TFCond_MeleeOnly))
