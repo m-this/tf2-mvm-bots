@@ -823,16 +823,23 @@ rather than an entity index, so something that occupies no player slot can still
 threat scan in this mod walks player slots and a tank occupies none, which is mvm-ds3, and this
 does not fix it. It makes fixing it possible.
 
-inGame is filled behind isPlayer and not beside it. The chain above tests them with ||, which short
-circuits, so IsClientInGame is never reached for something that is not a player. Calling it anyway
-to fill a field throws "Client index is invalid" on every tank. See mvm-z83.46. */
+Every field after isPlayer is filled behind it, not beside it, and the first version of this was
+not. The chain above reads the class, the miniboss flag and the carrier flag only after its player
+test has passed, and all three throw when asked about something that is not a player: measured,
+TF2_HasTheFlag threw 3933 times over four waves on tank_boss and obj_attachment_sapper, and each
+one aborted the whole threat choice for that tick.
+
+The decision reads none of them for a non-player, so filling them false costs nothing. That is
+asserted in internal/threat rather than assumed here. See mvm-z83.46. */
 static int ThreatPriorityGenerated(int threat, float rangeSq)
 {
 	bool isPlayer = BaseEntity_IsPlayer(threat);
 	bool inGame = isPlayer && IsClientInGame(threat);
-	TFClassType pclass = inGame ? TF2_GetPlayerClass(threat) : TFClass_Unknown;
 	
-	return ThreatPriorityOf(rangeSq, isPlayer, inGame, pclass,
+	if (!inGame)
+		return ThreatPriorityOf(rangeSq, isPlayer, false, TFClass_Unknown, false, false);
+	
+	return ThreatPriorityOf(rangeSq, isPlayer, true, TF2_GetPlayerClass(threat),
 		TF2_IsMiniBoss(threat), TF2_HasTheFlag(threat));
 }
 
