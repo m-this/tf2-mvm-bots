@@ -454,6 +454,11 @@ func main() {
 		printBreak(bots)
 	}
 
+	nowSetup, err := loadSetup(args[0])
+	if err == nil {
+		printSetup(nowSetup)
+	}
+
 	printSpread(after)
 
 	if len(args) == 1 {
@@ -469,4 +474,8 @@ func main() {
 	then := summarise(before)
 	print(args[1], then)
 	compare(now, then)
+
+	if thenSetup, err := loadSetup(args[1]); err == nil {
+		compareSetup(nowSetup, thenSetup)
+	}
 }

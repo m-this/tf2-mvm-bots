@@ -75,6 +75,32 @@ enough to tell "lost it once and rebuilt" from "never had one". */
  * each is six property reads twice a second, which is nothing. */
 #define REPAIR_SAMPLE_INTERVAL	0.5
 
+/* How often an engineer's feet are read during a break, and what counts as him not having walked
+
+The break is the whole of the setup question: what he built, in what order, and how much of the
+clock he spent getting to where he built it. A quarter of a second is fine for a distance summed
+over a two minute break, and it is short enough that a teleport lands in one sample rather than
+being smeared over several and read as walking.
+
+An engineer moves at 300 units a second, so a quarter second is 75 units and no more. Two hundred
+is comfortably past anything he can do on foot with a stutter in the way, and comfortably under
+the map-crossing jump a teleport back to the nest is. A displacement over the line is a teleport
+and is kept apart from the walk, because the two are the opposite measurement: the walk is the
+cost being removed and the teleport is what removes it.
+
+A respawn is also a jump and is not a teleport, so the last position is dropped whenever he is
+dead and seeded again when he comes back.
+
+The telemetry sampler already walks positions and printBreak already sums a distance out of them,
+and neither is usable here: it samples every five seconds, which is fifteen hundred units of
+walking, so it cannot tell a teleport from a sprint and rounds a winding path down to the straight
+line between two points five seconds apart. */
+#define SETUP_SAMPLE_INTERVAL	0.25
+#define SETUP_TELEPORT_UNITS	200.0
+
+//Sentry, dispenser, entrance, exit: the same four slots the repair sampling keys on, same order
+#define SETUP_SLOTS	4
+
 public Plugin myinfo =
 {
 	name = "MvM Defender Bots: wave statistics",
@@ -336,6 +362,7 @@ public void OnPluginStart()
 	HookEvent("player_healed", Event_PlayerHealed);
 	HookEvent("player_chargedeployed", Event_ChargeDeployed);
 	HookEvent("player_spawn", Event_PlayerSpawn);
+	HookEvent("player_builtobject", Event_BuiltObject);
 
 	g_Wave.Reset();
 }
@@ -544,6 +571,202 @@ static void SampleRepairs()
 	}
 }
 
+/* What the break bought, per engineer: the order he built in and the ground he covered doing it
+
+Peppy asked for the teleporter entrance to go up before the nest so the engineer does not walk back
+to spawn after building it, and mvm-dh8 is that change. Neither half of it can be judged by
+watching. "He seems quicker now" is the same sentence whether the order changed or not.
+
+So the break is measured rather than described. Every building carries the second of the break it
+was placed on, which is the order and the cost of the order in one number, and his feet are read
+four times a second, which splits into ground walked and ground teleported over. A change that
+works moves the entrance timestamp towards zero and the walk down, and leaves the sentry standing
+and upgraded at the gate; a change that only feels faster moves neither.
+
+Reset when a break begins and never when one ends, because the wave_begin event and the round state
+leaving BetweenRounds are not ordered against each other, and the numbers have to survive whichever
+comes first. */
+static float g_flBreakStart;
+static float g_flBreakSeconds;
+static bool g_bInBreak;
+
+static float g_flSetupWalked[MAXPLAYERS + 1];
+static float g_flSetupTeleported[MAXPLAYERS + 1];
+static int g_iSetupTeleports[MAXPLAYERS + 1];
+static float g_vSetupLast[MAXPLAYERS + 1][3];
+static bool g_bSetupLastValid[MAXPLAYERS + 1];
+static float g_flSetupBuiltAt[MAXPLAYERS + 1][SETUP_SLOTS];
+static float g_flNextSetupSample;
+
+//Which of the four an object is, or none: a sapper and a disposable sentry are neither
+static int SetupSlot(TFObjectType type, int mode)
+{
+	if (type == TFObject_Sentry)
+		return 0;
+
+	if (type == TFObject_Dispenser)
+		return 1;
+
+	if (type == TFObject_Teleporter)
+		return mode == 0 ? 2 : 3;
+
+	return -1;
+}
+
+static void ResetSetup()
+{
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		g_flSetupWalked[i] = 0.0;
+		g_flSetupTeleported[i] = 0.0;
+		g_iSetupTeleports[i] = 0;
+		g_bSetupLastValid[i] = false;
+
+		for (int t = 0; t < SETUP_SLOTS; t++)
+			g_flSetupBuiltAt[i][t] = -1.0;
+	}
+
+	g_flNextSetupSample = 0.0;
+}
+
+static void SampleSetup()
+{
+	bool between = GameRules_GetRoundState() == RoundState_BetweenRounds;
+
+	if (between != g_bInBreak)
+	{
+		g_bInBreak = between;
+
+		if (between)
+		{
+			ResetSetup();
+			g_flBreakStart = GetGameTime();
+			g_flBreakSeconds = 0.0;
+		}
+		else if (g_flBreakStart > 0.0)
+		{
+			g_flBreakSeconds = GetGameTime() - g_flBreakStart;
+		}
+	}
+
+	if (!g_bInBreak || GetGameTime() < g_flNextSetupSample)
+		return;
+
+	g_flNextSetupSample = GetGameTime() + SETUP_SAMPLE_INTERVAL;
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || TF2_GetClientTeam(i) != TFTeam_Red)
+			continue;
+
+		if (TF2_GetPlayerClass(i) != TFClass_Engineer)
+			continue;
+
+		//Dead is not still, and coming back is not a teleport
+		if (!IsPlayerAlive(i))
+		{
+			g_bSetupLastValid[i] = false;
+
+			continue;
+		}
+
+		float at[3]; GetClientAbsOrigin(i, at);
+
+		if (g_bSetupLastValid[i])
+		{
+			float moved = GetVectorDistance(g_vSetupLast[i], at);
+
+			if (moved > SETUP_TELEPORT_UNITS)
+			{
+				g_iSetupTeleports[i]++;
+				g_flSetupTeleported[i] += moved;
+			}
+			else
+			{
+				g_flSetupWalked[i] += moved;
+			}
+		}
+
+		g_vSetupLast[i] = at;
+		g_bSetupLastValid[i] = true;
+	}
+}
+
+/* The second of the break a building was placed on, kept for the first placement only
+
+Minus one is "he did not put this one down during this break", which is not the same as "it is not
+there": a teleporter that survived the last wave is still standing and does not get built again.
+What stands is on the engineer line, which reads the levels of all four. This says what the break
+cost, so a building he did not have to build costs nothing and belongs out of the average.
+
+He puts one down, tears it up and puts it down again on plenty of maps, and the second placement is
+a different question from the order he opened with. The first is the order. */
+static void Event_BuiltObject(Event event, const char[] name, bool dontBroadcast)
+{
+	if (!g_bInBreak || g_flBreakStart <= 0.0)
+		return;
+
+	int builder = GetClientOfUserId(event.GetInt("userid"));
+
+	if (builder < 1 || !IsClientInGame(builder) || TF2_GetClientTeam(builder) != TFTeam_Red)
+		return;
+
+	int building = event.GetInt("index");
+
+	if (!IsValidEntity(building))
+		return;
+
+	int mode = HasEntProp(building, Prop_Send, "m_iObjectMode")
+		? GetEntProp(building, Prop_Send, "m_iObjectMode") : 0;
+
+	int slot = SetupSlot(TF2_GetObjectType(building), mode);
+
+	if (slot < 0 || g_flSetupBuiltAt[builder][slot] >= 0.0)
+		return;
+
+	g_flSetupBuiltAt[builder][slot] = GetGameTime() - g_flBreakStart;
+}
+
+/* How long the break has run, whether or not it has ended
+
+Every break in the first run of this came out as zero seconds. The wave_begin event fires while the
+round state is still BetweenRounds, so the state change this used to be computed on had not
+happened yet when the line was written, and a walk of seventeen thousand units was reported with
+nothing to divide it by. Read live instead, and kept if the break really has ended. */
+static float BreakSeconds()
+{
+	if (g_bInBreak && g_flBreakStart > 0.0)
+		return GetGameTime() - g_flBreakStart;
+
+	return g_flBreakSeconds;
+}
+
+//One line per engineer, written where the wave begins, saying what the break before it bought
+static void WriteSetup()
+{
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || TF2_GetClientTeam(i) != TFTeam_Red)
+			continue;
+
+		if (TF2_GetPlayerClass(i) != TFClass_Engineer)
+			continue;
+
+		char name[MAX_NAME_LENGTH]; GetClientName(i, name, sizeof(name));
+
+		char line[ENGINEER_LINE_LENGTH];
+		FormatEx(line, sizeof(line),
+			"{\"event\":\"setup\",\"map\":\"%s\",\"wave\":%d,\"who\":\"%s\",\"break_s\":%.1f,"
+			... "\"walked\":%.0f,\"teleports\":%d,\"teleported\":%.0f,"
+			... "\"sentry_at_s\":%.1f,\"dispenser_at_s\":%.1f,\"entrance_at_s\":%.1f,\"exit_at_s\":%.1f}",
+			g_sMap, g_iWave, name, BreakSeconds(),
+			g_flSetupWalked[i], g_iSetupTeleports[i], g_flSetupTeleported[i],
+			g_flSetupBuiltAt[i][0], g_flSetupBuiltAt[i][1], g_flSetupBuiltAt[i][2], g_flSetupBuiltAt[i][3]);
+
+		WriteLine(line);
+	}
+}
+
 public void OnGameFrame()
 {
 	float now = GetEngineTime();
@@ -582,6 +805,7 @@ public void OnGameFrame()
 
 	SampleEngineers();
 	SampleRepairs();
+	SampleSetup();
 	SampleTelemetry();
 	CollectWaveCredits();
 }
@@ -615,6 +839,12 @@ public void OnMapStart()
 	g_iWave = 0;
 	g_flWaveStart = 0.0;
 	g_Wave.Reset();
+
+	//A map load is not the end of a break, and the round state on the first frame is not read yet
+	g_bInBreak = false;
+	g_flBreakStart = 0.0;
+	g_flBreakSeconds = 0.0;
+	ResetSetup();
 }
 
 static void Event_WaveBegin(Event event, const char[] name, bool dontBroadcast)
@@ -657,6 +887,7 @@ static void Event_WaveBegin(Event event, const char[] name, bool dontBroadcast)
 	teleporter comes from and where a nest that never reached level three shows up. At the end it
 	says what survived. */
 	WriteEngineers("begin");
+	WriteSetup();
 }
 
 static void Event_WaveComplete(Event event, const char[] name, bool dontBroadcast)
