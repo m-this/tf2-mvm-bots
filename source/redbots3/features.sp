@@ -41,6 +41,7 @@ enum
 	FEATURE_WATCH_LURKING_SNIPERS,
 	FEATURE_AMMO_FAILOVER,
 	FEATURE_MEDIC_ANSWERS_CALL,
+	FEATURE_GENERATED_THREAT_PRIORITY,
 	FEATURE_COUNT
 }
 
@@ -72,7 +73,8 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"watch_idle_bots",
 	"watch_lurking_snipers",
 	"ammo_failover",
-	"medic_answers_call"
+	"medic_answers_call",
+	"generated_threat_priority"
 };
 
 static ConVar g_arrFeatureConVars[FEATURE_COUNT];
@@ -181,6 +183,9 @@ void LoadFeatures()
 	   the medic being broken. See mvm-w9b. */
 	g_arrFeatureConVars[FEATURE_MEDIC_ANSWERS_CALL] = MakeFeature(FEATURE_MEDIC_ANSWERS_CALL,
 		"A player who calls for a medic takes the beam, and a player outranks a bot for it either way.", false);
+
+	g_arrFeatureConVars[FEATURE_GENERATED_THREAT_PRIORITY] = MakeFeature(FEATURE_GENERATED_THREAT_PRIORITY,
+		"Rank threats with the table generated from the Go, rather than with the hand written chain.", false);
 
 	g_arrFeatureConVars[FEATURE_ATTACK_STRAFE] = MakeFeature(FEATURE_ATTACK_STRAFE,
 		"A bot that has arrived at its firing position keeps sidestepping instead of standing still.");

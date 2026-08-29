@@ -270,6 +270,7 @@ Address g_pMannVsMachineUpgrades;
 #include "redbots3/menu.sp"
 #include "redbots3/tf_upgrades.sp"
 #include "redbots3/debug_faults.sp"
+#include "redbots3/generated/threat_priority.sp"
 #include "redbots3/nextbot_behavior.sp"
 #include "redbots3/botaim.sp"
 

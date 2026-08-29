@@ -773,28 +773,9 @@ public void OnActionCreated(BehaviorAction action, int actor, const char[] name)
 
 /* What a robot is worth killing first
 
-The numbers are an order, not a measurement. Anything inside THREAT_URGENT_RANGE outranks the
-list: a bot that ignores the Heavy in front of it to shoot a Sniper across the map dies holding
-a good idea.
-
-Both distances were widened after measuring. At 400 units the order was costing more than it
-bought: ten runs on Decoy put defender deaths at 54 against the old code's 43, for the same waves
-cleared. 400 is a rocket's splash, not a firefight, so a bot would walk its aim off the Heavy
-shooting it as soon as anything better appeared anywhere. And a priority target beyond
-THREAT_PRIORITY_RANGE is not a target, it is a plan: past that the nearest one wins */
-#define THREAT_URGENT_RANGE		750.0
-#define THREAT_PRIORITY_RANGE	1500.0
-
-enum
-{
-	THREAT_PRIORITY_NONE = 0,
-	THREAT_PRIORITY_BOMB,
-	THREAT_PRIORITY_GIANT,
-	THREAT_PRIORITY_GIANT_BOMB,
-	THREAT_PRIORITY_SUPPORT,
-	THREAT_PRIORITY_MEDIC,
-	THREAT_PRIORITY_URGENT
-}
+The ranges, the enum and the generated table are in generated/threat_priority.sp, written from
+internal/threat in tf2-mvm-bots-go. The chain below is the one that shipped, kept beside it so the
+two can be played against each other: see FEATURE_GENERATED_THREAT_PRIORITY. */
 
 static int ThreatPriority(int threat, float rangeSq)
 {
@@ -833,6 +814,26 @@ static int ThreatPriority(int threat, float rangeSq)
 		return THREAT_PRIORITY_BOMB;
 	
 	return THREAT_PRIORITY_NONE;
+}
+
+/* The same question, asked of the generated table
+
+The record is what the move in mvm-z83.6 was for: the decision takes what is known about a threat
+rather than an entity index, so something that occupies no player slot can still be ranked. Every
+threat scan in this mod walks player slots and a tank occupies none, which is mvm-ds3, and this
+does not fix it. It makes fixing it possible.
+
+inGame is filled behind isPlayer and not beside it. The chain above tests them with ||, which short
+circuits, so IsClientInGame is never reached for something that is not a player. Calling it anyway
+to fill a field throws "Client index is invalid" on every tank. See mvm-z83.46. */
+static int ThreatPriorityGenerated(int threat, float rangeSq)
+{
+	bool isPlayer = BaseEntity_IsPlayer(threat);
+	bool inGame = isPlayer && IsClientInGame(threat);
+	TFClassType pclass = inGame ? TF2_GetPlayerClass(threat) : TFClass_Unknown;
+	
+	return ThreatPriorityOf(rangeSq, isPlayer, inGame, pclass,
+		TF2_IsMiniBoss(threat), TF2_HasTheFlag(threat));
 }
 
 public Action CTFBotMainAction_SelectMoreDangerousThreat(BehaviorAction action, INextBot nextbot, int entity, CKnownEntity threat1, CKnownEntity threat2, CKnownEntity& knownEntity)
@@ -911,8 +912,10 @@ public Action CTFBotMainAction_SelectMoreDangerousThreat(BehaviorAction action, 
 	because they are the two the rest of the team cannot reach, then giants, then whoever is
 	holding the bomb. A robot close enough to be killing the bot outranks all of it, because a
 	priority target is worth nothing to a corpse */
-	int priority1 = ThreatPriority(iThreat1, rangeSq1);
-	int priority2 = ThreatPriority(iThreat2, rangeSq2);
+	bool generated = Feature(FEATURE_GENERATED_THREAT_PRIORITY);
+	
+	int priority1 = generated ? ThreatPriorityGenerated(iThreat1, rangeSq1) : ThreatPriority(iThreat1, rangeSq1);
+	int priority2 = generated ? ThreatPriorityGenerated(iThreat2, rangeSq2) : ThreatPriority(iThreat2, rangeSq2);
 	
 	if (Feature(FEATURE_THREAT_PRIORITY) && priority1 != priority2)
 	{
