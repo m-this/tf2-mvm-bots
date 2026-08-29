@@ -596,7 +596,7 @@ public Action Command_RecoverSpawnBots(int client, int args)
 #include "behavior/stickytrap.sp"
 #include "behavior/spylurk.sp"
 #include "generated/spysap.sp"
-#include "behavior/spysapplayer.sp"
+#include "generated/spysapplayer.sp"
 #include "behavior/medicrevive.sp"
 #include "behavior/medicheal.sp"
 #include "behavior/attackforuber.sp"
