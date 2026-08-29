@@ -402,6 +402,7 @@ public void OnPluginStart()
 	RegAdminCmd("sm_recover_spawn_bots", Command_RecoverSpawnBots, ADMFLAG_GENERIC);
 	
 	AddCommandListener(Listener_TournamentPlayerReadystate, "tournament_player_readystate");
+	AddCommandListener(Listener_VoiceMenu, "voicemenu");
 	
 	AddNormalSoundHook(SoundHook_General);
 	
@@ -647,6 +648,8 @@ public void OnClientPutInServer(int client)
 
 	g_bHasUpgraded[client] = false;
 	g_bShoppedThisBreak[client] = false;
+	//A slot is reused, and a call left on the clock by whoever had it is not this player's call
+	ForgetMedicCall(client);
 	g_arrExtraButtons[client].Reset();
 	m_flDeadRethinkTime[client] = 0.0;
 	g_iBuybackNumber[client] = 0;

@@ -1847,6 +1847,34 @@ for it sooner than the game's own dying-patient rule would have. */
 //How much more health another body needs before it is worth breaking a beam for
 #define MEDIC_PATIENT_MARGIN	25
 
+/* How long a medic call is worth answering for
+
+The game gives one event and no state: nothing says the call is still wanted, and nothing says it
+was met. So the call is a countdown rather than a flag, and it is short. Long enough to cross the
+room he is being called across, short enough that a player who called once during a wave is not
+still holding the beam a minute later.
+
+Pressed again, it starts again, which is what a player who is still hurt does anyway. */
+#define MEDIC_CALL_ANSWER_TIME	10.0
+
+static float m_ctMedicCalled[MAXPLAYERS + 1];
+
+//Written from the voice command hook in events.sp, read by the patient ranking below
+void NoteMedicCall(int client)
+{
+	m_ctMedicCalled[client] = GetGameTime() + MEDIC_CALL_ANSWER_TIME;
+}
+
+void ForgetMedicCall(int client)
+{
+	m_ctMedicCalled[client] = 0.0;
+}
+
+static bool IsCallingForMedic(int client)
+{
+	return m_ctMedicCalled[client] > GetGameTime();
+}
+
 /* Which teammate a medigun is worth the most on
  *
  * A medigun is worth what the body in front of it is worth, so it belongs on the biggest one: the
@@ -1864,8 +1892,12 @@ static int BiggestBody(int medic, int current = -1)
 	int best = -1;
 	int bestHealth = 0;
 	bool bestIsHeavy = false;
+	bool bestIsPlayer = false;
+	bool bestIsCalling = false;
 	int currentHealth = 0;
 	bool currentIsHeavy = false;
+	bool currentIsPlayer = false;
+	bool currentIsCalling = false;
 	bool currentStands = false;
 
 	for (int i = 1; i <= MaxClients; i++)
@@ -1883,6 +1915,15 @@ static int BiggestBody(int medic, int current = -1)
 		bool isHeavy = TF2_GetPlayerClass(i) == TFClass_Heavy;
 		int health = TF2Util_GetEntityMaxHealth(i);
 
+		/* A player outranks every body, and a player who called outranks a player who did not
+
+		Reported twice, by Cowser and by Peppy: pressing the call did nothing visible, because the
+		ranking below only ever asked how big somebody was and a bot Heavy is bigger than any human.
+		Ranked rather than special-cased, so the tie-break at the bottom still applies and the beam
+		does not flicker between two players who both called. See mvm-w9b. */
+		bool isPlayer = Feature(FEATURE_MEDIC_ANSWERS_CALL) && !IsTFBotPlayer(i);
+		bool isCalling = isPlayer && IsCallingForMedic(i);
+
 		/* Said as a class rather than left to the arithmetic
 		
 		Maximum health picks the Heavy out most of the time, and most of the time is the problem: a
@@ -1893,13 +1934,23 @@ static int BiggestBody(int medic, int current = -1)
 			currentStands = true;
 			currentHealth = health;
 			currentIsHeavy = isHeavy;
+			currentIsPlayer = isPlayer;
+			currentIsCalling = isCalling;
 		}
 
-		if (best <= 0 || (isHeavy && !bestIsHeavy) || (isHeavy == bestIsHeavy && health > bestHealth))
+		bool better = best <= 0
+			|| (isCalling && !bestIsCalling)
+			|| (isCalling == bestIsCalling && isPlayer && !bestIsPlayer)
+			|| (isCalling == bestIsCalling && isPlayer == bestIsPlayer && isHeavy && !bestIsHeavy)
+			|| (isCalling == bestIsCalling && isPlayer == bestIsPlayer && isHeavy == bestIsHeavy && health > bestHealth);
+
+		if (better)
 		{
 			best = i;
 			bestHealth = health;
 			bestIsHeavy = isHeavy;
+			bestIsPlayer = isPlayer;
+			bestIsCalling = isCalling;
 		}
 	}
 
@@ -1912,10 +1963,24 @@ static int BiggestBody(int medic, int current = -1)
 	is not happening during it, so a tie keeps the man he has. */
 	if (currentStands && best > 0 && best != current)
 	{
-		bool betterClass = bestIsHeavy && !currentIsHeavy;
-		bool betterBody = bestIsHeavy == currentIsHeavy && bestHealth > currentHealth + MEDIC_PATIENT_MARGIN;
+		/* Both halves of the ask break the beam, and neither can make it flicker
 
-		if (!betterClass && !betterBody)
+		A call is worth the walk and the healing lost on the way, and a player is worth it over a
+		bot whether he called or not, which is the whole of what Cowser and Peppy asked for.
+
+		Neither can churn the way the margin below exists to stop. That churn comes of ranking on
+		maximum health, which several bodies sit within a few points of, so the winner flips every
+		ask. Whether somebody is a player does not flip, and a call runs down a clock and does not
+		come back on its own. Once the beam has moved for either, the reason it moved is still true
+		the next time this is asked. */
+		bool answersCall = bestIsCalling && !currentIsCalling;
+		bool betterSeat = bestIsCalling == currentIsCalling && bestIsPlayer && !currentIsPlayer;
+		bool betterClass = bestIsCalling == currentIsCalling && bestIsPlayer == currentIsPlayer
+			&& bestIsHeavy && !currentIsHeavy;
+		bool betterBody = bestIsCalling == currentIsCalling && bestIsPlayer == currentIsPlayer
+			&& bestIsHeavy == currentIsHeavy && bestHealth > currentHealth + MEDIC_PATIENT_MARGIN;
+
+		if (!answersCall && !betterSeat && !betterClass && !betterBody)
 			return current;
 	}
 

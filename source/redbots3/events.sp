@@ -13,6 +13,31 @@ void InitGameEventHooks()
 	HookEvent("player_death", Event_PlayerDeath);
 }
 
+/* The medic call, which the game gives as a voice command and not as an event
+
+There is no player_calls_for_medic. Hooking that name is what this tried first, and HookEvent
+throws on an event the game does not define, which took OnPluginStart down with it: the mod failed
+to load, RED filled with nobody, and the run refused itself. A listener cannot fail that way.
+
+"voicemenu 0 0" is MEDIC!. The first menu is the one with the call in it and the first entry is the
+call. Passed straight through: this reads the command and does not answer it. */
+Action Listener_VoiceMenu(int client, const char[] command, int argc)
+{
+	if (client < 1 || client > MaxClients || !IsClientInGame(client))
+		return Plugin_Continue;
+
+	if (argc < 2 || IsTFBotPlayer(client))
+		return Plugin_Continue;
+
+	char menu[4]; GetCmdArg(1, menu, sizeof(menu));
+	char entry[4]; GetCmdArg(2, entry, sizeof(entry));
+
+	if (StringToInt(menu) == 0 && StringToInt(entry) == 0)
+		NoteMedicCall(client);
+
+	return Plugin_Continue;
+}
+
 static void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 {
 	int client = GetClientOfUserId(event.GetInt("userid"));

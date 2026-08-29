@@ -40,6 +40,7 @@ enum
 	FEATURE_WATCH_IDLE_BOTS,
 	FEATURE_WATCH_LURKING_SNIPERS,
 	FEATURE_AMMO_FAILOVER,
+	FEATURE_MEDIC_ANSWERS_CALL,
 	FEATURE_COUNT
 }
 
@@ -70,7 +71,8 @@ static const char FEATURE_NAME[FEATURE_COUNT][] =
 	"engineer_climbs",
 	"watch_idle_bots",
 	"watch_lurking_snipers",
-	"ammo_failover"
+	"ammo_failover",
+	"medic_answers_call"
 };
 
 static ConVar g_arrFeatureConVars[FEATURE_COUNT];
@@ -173,6 +175,12 @@ void LoadFeatures()
 	   not moved for STUCK_TIME while further than SNIPER_AT_SPOT from every spot the map offers. */
 	g_arrFeatureConVars[FEATURE_WATCH_LURKING_SNIPERS] = MakeFeature(FEATURE_WATCH_LURKING_SNIPERS,
 		"The stuck watchdog also rescues a sniper parked nowhere near a spot, which is the one it used to miss.");
+
+	/* Off until a run says otherwise. Reported twice, by Cowser and by Peppy: a human presses the
+	   medic call and the bot medic carries on healing whichever bot it had picked, which reads as
+	   the medic being broken. See mvm-w9b. */
+	g_arrFeatureConVars[FEATURE_MEDIC_ANSWERS_CALL] = MakeFeature(FEATURE_MEDIC_ANSWERS_CALL,
+		"A player who calls for a medic takes the beam, and a player outranks a bot for it either way.", false);
 
 	g_arrFeatureConVars[FEATURE_ATTACK_STRAFE] = MakeFeature(FEATURE_ATTACK_STRAFE,
 		"A bot that has arrived at its firing position keeps sidestepping instead of standing still.");
