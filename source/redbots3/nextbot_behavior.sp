@@ -843,6 +843,54 @@ static int ThreatPriorityGenerated(int threat, float rangeSq)
 		TF2_IsMiniBoss(threat), TF2_HasTheFlag(threat));
 }
 
+/* Where the generated answer and the shipped chain part company, while the port is measured
+
+The differential test proves the decision and the table agree on every combination it can be asked
+about. It cannot prove the edge fills the record the way the chain reads it, because it drives both
+sides from the same record. Only a running game can answer that.
+
+Scaffolding, to be deleted with the measurement. It runs on the armed side only, so the other arm
+pays nothing, and it stops writing after twenty lines because a disagreement that happens at all is
+the finding and a log full of them is not more of one. */
+static int g_iThreatSplits;
+static int g_iThreatCompared;
+
+/* Say how much was compared, not only what disagreed
+
+Zero disagreements and never having run look identical in a log that only writes on a
+disagreement, and reading the first as the second is the fault mvm-z83.23 is about. */
+void ThreatPortAudit_Report()
+{
+	if (g_iThreatCompared == 0)
+		return;
+	
+	LogMessage("threat audit: %d compared, %d disagreed", g_iThreatCompared, g_iThreatSplits);
+	
+	g_iThreatCompared = 0;
+}
+
+static void ThreatPortAudit(int threat, float rangeSq)
+{
+	g_iThreatCompared++;
+	
+	if (g_iThreatSplits >= 20)
+		return;
+	
+	int shipped = ThreatPriority(threat, rangeSq);
+	int fromTable = ThreatPriorityGenerated(threat, rangeSq);
+	
+	if (shipped == fromTable)
+		return;
+	
+	g_iThreatSplits++;
+	
+	char classname[64];
+	GetEntityClassname(threat, classname, sizeof(classname));
+	
+	LogMessage("threat audit: entity %d/%s rangeSq %.0f, chain says %d, table says %d",
+		threat, classname, rangeSq, shipped, fromTable);
+}
+
 public Action CTFBotMainAction_SelectMoreDangerousThreat(BehaviorAction action, INextBot nextbot, int entity, CKnownEntity threat1, CKnownEntity threat2, CKnownEntity& knownEntity)
 {
 	int me = action.Actor;
@@ -923,6 +971,12 @@ public Action CTFBotMainAction_SelectMoreDangerousThreat(BehaviorAction action, 
 	
 	int priority1 = generated ? ThreatPriorityGenerated(iThreat1, rangeSq1) : ThreatPriority(iThreat1, rangeSq1);
 	int priority2 = generated ? ThreatPriorityGenerated(iThreat2, rangeSq2) : ThreatPriority(iThreat2, rangeSq2);
+	
+	if (generated)
+	{
+		ThreatPortAudit(iThreat1, rangeSq1);
+		ThreatPortAudit(iThreat2, rangeSq2);
+	}
 	
 	if (Feature(FEATURE_THREAT_PRIORITY) && priority1 != priority2)
 	{

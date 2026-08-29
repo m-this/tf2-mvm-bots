@@ -236,6 +236,7 @@ static void Event_MvmWaveBegin(Event event, const char[] name, bool dontBroadcas
 	published once on map start can be the defaults rather than what the server was asked for.
 	A wave beginning is after everything, every time. */
 	PublishActiveFeatures();
+	ThreatPortAudit_Report();
 	
 	//Whatever the queue has left is about a bomb that is about to move
 	EngineerNestRelocation_StopEvaluating();
