@@ -158,40 +158,6 @@ So the resets are a queue and the queue is drained a bot a tick. The wave is min
 queue is at most the server's player count, which is a rounding error against it. The same shape,
 and the same reason, as the nest relocation evaluator. */
 
-static void Event_MvmWaveBegin(Event event, const char[] name, bool dontBroadcast)
-{
-	//Nothing unless a debug convar is set, which is never on a real server
-	DebugFaults_OnWaveStart();
-	DebugFaults_OnWaveStartEmpty();
-
-	/* Publish here rather than only on a timer after the map loads
-
-	server.cfg runs at its own pace and a late-loaded plugin misses it entirely, so a list
-	published once on map start can be the defaults rather than what the server was asked for.
-	A wave beginning is after everything, every time. */
-	PublishActiveFeatures();
-	ThreatPortAudit_Report();
-	
-	//Whatever the queue has left is about a bomb that is about to move
-	EngineerNestRelocation_StopEvaluating();
-	
-	//A new wave is a new chance at a spot that refused him last time
-	EngineerTeleporter_ForgetGivingUp();
-	EngineerDisposable_ForgetGivingUp();
-	
-	//One a tick, because the frame this runs on is the one the server dies on
-	QueueBehaviourReset();
-	
-	//A hat the game refused is an edict nobody will ever free, and there is one per refusal
-	RemoveOrphanedWearables();
-	
-	if (redbots_manager_mode.IntValue == MANAGER_MODE_AUTO_BOTS)
-		ManageDefenderBots(true);
-	
-	//At this point the bots should already be here, so clear up the lineup that was used
-	FreeChosenBotTeam();
-}
-
 static void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
 {
 	int client = GetClientOfUserId(event.GetInt("userid"));

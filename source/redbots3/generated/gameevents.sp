@@ -33,3 +33,21 @@ public void Event_TeamplayRoundStart(Event event, const char[] name, bool dontBr
 	}
 }
 
+public void Event_MvmWaveBegin(Event event, const char[] name, bool dontBroadcast)
+{
+	DebugFaults_OnWaveStart();
+	DebugFaults_OnWaveStartEmpty();
+	PublishActiveFeatures();
+	ThreatPortAudit_Report();
+	EngineerNestRelocation_StopEvaluating();
+	EngineerTeleporter_ForgetGivingUp();
+	EngineerDisposable_ForgetGivingUp();
+	QueueBehaviourReset();
+	RemoveOrphanedWearables();
+	if (redbots_manager_mode.IntValue == MANAGER_MODE_AUTO_BOTS)
+	{
+		ManageDefenderBots(true);
+	}
+	FreeChosenBotTeam();
+}
+
