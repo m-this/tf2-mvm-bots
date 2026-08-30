@@ -233,7 +233,7 @@ public Action Command_DumpFront(int client, int args)
 	bool haveBomb = GetBombInfo(bomb);
 	for (int i = 1; i <= MaxClients; i++)
 	{
-		if (!IsClientInGame(i) || !IsPlayerAlive(i) || !g_bIsDefenderBot[i])
+		if (!IsClientInGame(i) || !IsPlayerAlive(i) || !IsDefenderBot(i))
 		{
 			continue;
 		}

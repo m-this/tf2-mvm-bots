@@ -84,7 +84,7 @@ stock void DebugFaults_OnWaveStart()
 	redbots_debug_wedge_class.GetString(wanted, 512);
 	for (int i = 1; i <= MaxClients; i++)
 	{
-		if (!IsClientInGame(i) || !g_bIsDefenderBot[i] || !IsPlayerAlive(i))
+		if (!IsClientInGame(i) || !IsDefenderBot(i) || !IsPlayerAlive(i))
 		{
 			continue;
 		}
@@ -136,7 +136,7 @@ stock void DebugFaults_OnWaveStartEmpty()
 	redbots_debug_wedge_class.GetString(wanted, 512);
 	for (int i = 1; i <= MaxClients; i++)
 	{
-		if (!IsClientInGame(i) || !g_bIsDefenderBot[i] || !IsPlayerAlive(i))
+		if (!IsClientInGame(i) || !IsDefenderBot(i) || !IsPlayerAlive(i))
 		{
 			continue;
 		}
