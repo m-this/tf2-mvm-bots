@@ -290,6 +290,11 @@ public void CTFBotMvMEngineerBuildTeleporter_OnEnd(BehaviorAction action, int ac
 	UpdateLookAroundForEnemies(actor, true);
 }
 
+stock void EngineerTeleporter_LastResult(int actor, char[] buffer, int maxlength)
+{
+	strcopy(buffer, maxlength, (m_sTeleporterLastResult[actor][0] == 0 ? "nothing yet" : m_sTeleporterLastResult[actor]));
+}
+
 stock bool EngineerTeleporter_HasGivenUp(int actor)
 {
 	return m_bTeleporterGaveUp[actor];

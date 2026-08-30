@@ -797,3 +797,72 @@ stock void EngineerNestRelocation_ResetAll()
 	}
 }
 
+public Action Command_DumpNest(int client, int args)
+{
+	ReplyToCommand(client, "%d nav areas on this map", TheNavAreas.Count);
+	int building = -1;
+	int standing = 0;
+	for (;;)
+	{
+		building = FindEntityByClassname(building, "obj_*");
+		if (building == -1)
+		{
+			break;
+		}
+		char class[512];
+		GetEntityClassname(building, class, 512);
+		int owner = GetEntPropEnt(building, Prop_Send, "m_hBuilder");
+		float at[3];
+		at = GetAbsOrigin(building);
+		char whose[512];
+		if ((owner > 0) && (owner <= MaxClients) && IsClientInGame(owner))
+		{
+			Format(whose, 512, "%N", owner);
+		}
+		else
+		{
+			Format(whose, 512, "nobody (orphan, owner index %d)", owner);
+		}
+		ReplyToCommand(client, "%s #%d at %.0f %.0f %.0f, built by %s", class, building, at[0], at[1], at[2], whose);
+		standing++;
+	}
+	ReplyToCommand(client, "%d buildings standing", standing);
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || (TF2_GetPlayerClass(i) != TFClass_Engineer))
+		{
+			continue;
+		}
+		float nest[3];
+		NestBuildPosition(m_aNestArea[i], nest);
+		ReplyToCommand(client, "%N: nest %.0f %.0f %.0f", i, nest[0], nest[1], nest[2]);
+		DumpBuilding(client, "sentry", GetObjectOfType(i, TFObject_Sentry));
+		DumpBuilding(client, "dispenser", GetObjectOfType(i, TFObject_Dispenser));
+		DumpBuilding(client, "entrance", GetObjectOfType(i, TFObject_Teleporter, TFObjectMode_Entrance));
+		DumpBuilding(client, "exit", GetObjectOfType(i, TFObject_Teleporter, TFObjectMode_Exit));
+		bool wants = ShouldBuildTeleporter(i);
+		char lastResult[512];
+		EngineerTeleporter_LastResult(i, lastResult, 64);
+		ReplyToCommand(client, "  teleporter: round %d, sentry safe %s, gave up %s, wants %s%s, last \"%s\"", GameRules_GetRoundState(), (m_ctSentrySafe[i] > GetGameTime() ? "yes" : "no"), (EngineerTeleporter_HasGivenUp(i) ? "yes" : "no"), (wants ? "yes" : "no"), (ActionsManager.LookupEntityActionByName(i, "DefenderBuildTeleporter") != INVALID_ACTION ? ", building one now" : ""), lastResult);
+		if (wants)
+		{
+			float spot[3];
+			EngineerTeleporter_Spot(i, spot);
+			ReplyToCommand(client, "  teleporter target: mode %d at %.0f %.0f %.0f", EngineerTeleporter_Mode(i), spot[0], spot[1], spot[2]);
+		}
+	}
+	return Plugin_Handled;
+}
+
+stock void DumpBuilding(int client, const char[] what, int building)
+{
+	if (building == INVALID_ENT_REFERENCE)
+	{
+		ReplyToCommand(client, "  %s: none", what);
+		return;
+	}
+	float origin[3];
+	origin = GetAbsOrigin(building);
+	ReplyToCommand(client, "  %s: level %d, %d of %d health, at %.0f %.0f %.0f%s", what, TF2_GetUpgradeLevel(building), BaseEntity_GetHealth(building), TF2Util_GetEntityMaxHealth(building), origin[0], origin[1], origin[2], (TF2_IsBuilding(building) ? ", still going up" : ""));
+}
+
