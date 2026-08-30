@@ -80,7 +80,7 @@ static void Event_MvmWaveFailed(Event event, const char[] name, bool dontBroadca
 		CreateTimer(0.1, Timer_UpdateChosenBotTeamComposition, _, TIMER_FLAG_NO_MAPCHANGE);
 		PrintToChatAll("%s Use command !viewbotlineup to view the next bot team composition", PLUGIN_PREFIX);
 	}
-	
+
 	if (redbots_manager_mode.IntValue == MANAGER_MODE_READY_BOTS)
 	{
 		//Global cooldown before players can ready up again
@@ -263,7 +263,28 @@ static void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
 	TFTeam team = view_as<TFTeam>(event.GetInt("team"));
 	TFTeam oldTeam = view_as<TFTeam>(event.GetInt("oldteam"));
 	bool isDisconnect = event.GetBool("disconnect");
-	
+
+	/* A managed defender belongs on RED for its whole connection.
+
+	If the game moves one elsewhere, RED is one seat short but the misplaced
+	client still occupies a server slot. On a full MvM server the refill timer
+	then cannot create the replacement it keeps asking for. Remove only that
+	managed client; the existing imbalance timer recreates the empty RED seat.
+
+	A normal kick also reports a team change. Leave disconnects alone so this
+	does not turn every intentional removal into a second kick. */
+	if (IsFakeClient(client))
+	{
+		if (!isDisconnect && g_bIsDefenderBot[client]
+			&& oldTeam == TFTeam_Red && team != TFTeam_Red)
+		{
+			LogMessage("Team recovery: managed defender %N left RED for team %d; recreating the seat", client, team);
+			ClearBuildingsBeforeKick(client);
+			KickClient(client, "BotManager3: restoring the RED lineup");
+		}
+		return;
+	}
+
 	if (!IsFakeClient(client))
 	{
 		/* When changing teams, update bot team composition for
@@ -279,7 +300,7 @@ static void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
 				HandleTeamPlayerCountChanged(TFTeam_Red, client);
 			}
 		}
-		
+
 #if defined CHANGETEAM_RESTRICTIONS
 		if (!isDisconnect && team == TFTeam_Red && oldTeam == TFTeam_Blue && !CheckCommandAccess(client, NULL_STRING, ADMFLAG_GENERIC, true))
 		{
