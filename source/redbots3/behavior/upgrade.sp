@@ -594,379 +594,43 @@ int GetUpgradePriority(int client, JSONObject info)
 	if (IsUpgradeWasted(client, attribute))
 		return -10;
 	
-	int priority = LoadoutUpgradePriority(client, slot, attribute);
+	/* The name becomes a number once, here, and the three tables switch on it
 	
-	if (priority > 0)
-		return priority;
+	generated/upgrade_rank.sp is written from internal/upgrade/table.go, which holds the scores
+	this used to compare ninety-four strings to reach. ATTRIBUTE_NONE is what a name the table
+	does not rank becomes, and every switch below falls through it to the general table, which is
+	what the comparison chain did with a name it did not recognise. */
+	int id = AttributeID(attribute);
 	
-	priority = ClassUpgradePriority(view_as<TFClassType>(info.GetInt("pclass")), slot, attribute);
+	int priority = 0;
 	
-	if (priority > 0)
-		return priority;
-	
-	return GeneralUpgradePriority(attribute);
-}
-
-/* The upgrade that is the reason to carry this weapon at all, by item definition index
-
-Zero when the weapon in that slot has no opinion, which is most of them: this only names the few
-where the loadout, not the class, decides what to buy first */
-static int LoadoutUpgradePriority(int client, int slot, const char[] attribute)
-{
-	/* An engineer whose gun is paid for in metal
-
-	The metal upgrades do not hang off the gun, so the switch below cannot answer for them however
-	the loadout is put together. A Widowmaker engineer without them fights the wave out of the same
-	supply the sentry is repaired from, and runs out of both. Under the sentry's own fire rate,
-	above everything else the class buys */
+	//The metal upgrades do not hang off the gun, so they are asked before the slot is
 	if (TF2_GetPlayerClass(client) == TFClass_Engineer && EngineerGunSpendsMetal(client))
-	{
-		if (StrEqual(attribute, "maxammo metal increased")) return 310;
-		if (StrEqual(attribute, "metal regen")) return 305;
-	}
-
-	if (slot < TF_LOADOUT_SLOT_PRIMARY || slot > TF_LOADOUT_SLOT_MELEE)
-		return 0;
-
-	int weapon = GetPlayerWeaponSlot(client, slot);
+		priority = UpgradeRankEngineerMetal(id);
 	
-	if (weapon < 1 || !HasEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex"))
-		return 0;
-	
-	switch (GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex"))
+	if (priority <= 0 && slot >= TF_LOADOUT_SLOT_PRIMARY && slot <= TF_LOADOUT_SLOT_MELEE)
 	{
-		case 35: //Kritzkrieg: the crits are the weapon, so the meter is what matters
-		{
-			if (StrEqual(attribute, "ubercharge rate bonus")) return 330;
-		}
-		case 411: //Quick-Fix: it heals rather than saves, so it should heal faster
-		{
-			if (StrEqual(attribute, "healing mastery")) return 330;
-			if (StrEqual(attribute, "ubercharge rate bonus")) return 300;
-		}
-		case 312: //Brass Beast: the damage minigun, and it cannot reposition to make up for less
-		{
-			if (StrEqual(attribute, "damage bonus")) return 320;
-		}
-		case 424: //Tomislav: it already fires fast, so damage per bullet beats more bullets
-		{
-			if (StrEqual(attribute, "damage bonus")) return 300;
-		}
-		case 752: //Hitman's Heatmaker: reach the shot sooner
-		{
-			if (StrEqual(attribute, "SRifle Charge rate increased")) return 300;
-		}
-		case 526: //Machina: every shot is a charged one, so damage rides on all of them
-		{
-			if (StrEqual(attribute, "damage bonus")) return 300;
-		}
-		case 996: //Loose Cannon: a faster cannonball is one a bot can actually land
-		{
-			if (StrEqual(attribute, "Projectile speed increased")) return 300;
-		}
-		case 997: //Rescue Ranger: every shot and every repair at range costs metal
-		{
-			if (StrEqual(attribute, "metal regen")) return 300;
-			if (StrEqual(attribute, "maxammo metal increased")) return 290;
-		}
-		case 730: //Beggar's Bazooka: it fires as fast as the button is pressed, so buying that twice is buying nothing
-		{
-			if (StrEqual(attribute, "fire rate bonus")) return 20;
-			//The clip is the burst, and the burst is the whole weapon
-			if (StrEqual(attribute, "clip size upgrade atomic")) return 280;
-			if (StrEqual(attribute, "clip size bonus upgrade")) return 280;
-		}
-		case 527: //Widowmaker: the shot is paid for in metal and paid back in damage dealt
-		{
-			if (StrEqual(attribute, "damage bonus")) return 300;
-			if (StrEqual(attribute, "fire rate bonus")) return 250;
-		}
-		case 528: //Short Circuit: it eats projectiles rather than robots, and eats metal doing it
-		{
-			if (StrEqual(attribute, "metal regen")) return 300;
-		}
-		case 141: //Frontier Justice: the crits are banked by the sentry, so the clip is what holds them
-		{
-			if (StrEqual(attribute, "clip size upgrade atomic")) return 260;
-			if (StrEqual(attribute, "clip size bonus upgrade")) return 260;
-			if (StrEqual(attribute, "damage bonus")) return 250;
-		}
+		int weapon = GetPlayerWeaponSlot(client, slot);
+		
+		if (weapon > 0 && HasEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex"))
+			priority = UpgradeRankLoadout(GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex"), id);
 	}
 	
-	return 0;
+	if (priority > 0)
+		return priority;
+	
+	priority = UpgradeRankClass(view_as<TFClassType>(info.GetInt("pclass")), slot, id);
+	
+	if (priority > 0)
+		return priority;
+	
+	return UpgradeRankGeneral(id);
 }
 
-/* What this class contributes with, which is not always the weapon in its hands */
-static int ClassUpgradePriority(TFClassType pclass, int slot, const char[] attribute)
-{
-	/* Blast resistance was given a floor for these two and it did not pay
-	
-	They explode themselves in every wave whatever the robots carry, so pricing the resistance by
-	the wave looked like the wrong question for them. The resistance does work: six waves on Decoy
-	took the Soldier's self damage from 3272 to 2147 and his deaths to his own rockets from three
-	to one.
-	
-	It bought nothing with it. Damage came out flat, 14187 to 13485, the waves cleared were the
-	same three either way, and the team died more, 40 against 50. The credits come out of upgrades
-	that do produce damage, and on this harness a five percent swing over six waves is inside the
-	noise anyway. Deleted rather than left switched off. */
 
-	switch (pclass)
-	{
-		case TFClass_Engineer:
-		{
-			/* The gun, which is bought with what the nest leaves over
 
-			Handled before the sentry lines below, and ranked under every one of them, because
-			the general table would otherwise put "damage bonus" at 260 and buy shotgun damage
-			ahead of the metal that keeps the sentry firing. A weapon that is the reason to carry
-			the loadout says so in LoadoutUpgradePriority instead, which runs before this */
-			if (slot == TF_LOADOUT_SLOT_PRIMARY || slot == TF_LOADOUT_SLOT_SECONDARY)
-			{
-				if (StrEqual(attribute, "damage bonus")) return 200;
-				if (StrEqual(attribute, "fire rate bonus")) return 190;
-				if (StrEqual(attribute, "clip size upgrade atomic")) return 150;
-				if (StrEqual(attribute, "clip size bonus upgrade")) return 150;
-				if (StrEqual(attribute, "faster reload rate")) return 140;
-				if (StrEqual(attribute, "maxammo primary increased")) return 130;
-				if (StrEqual(attribute, "maxammo secondary increased")) return 120;
 
-				//Anything else on the gun is worth less than the cheapest thing the nest wants
-				return 50;
-			}
 
-			/* The sentry is the damage. The shotgun only defends it
-
-			These rankings are the mod's own and they stay: the wiki puts dispenser range first and
-			sentry firing speed under what to avoid, and a play-test of this mod put the radius
-			where it is for a reason the wiki has no way to know about. A bot that is hurt or low
-			on ammo holds the bomb from a friendly dispenser rather than walking off to a health
-			pack, so the radius is how much of the team that covers, and it was reported as
-			"incredibly useful, a very good upgrade to max out early" from play here.
-
-			Measured beats read. If the ordering is to change it should change because a run said
-			so, not because a page did. */
-			if (StrEqual(attribute, "engy dispenser radius increased")) return 330;
-			if (StrEqual(attribute, "engy sentry fire rate increased")) return 320;
-			/* A second gun, now that something puts it somewhere on purpose
-
-			Every guide says never, and every guide is describing a person who drops one and
-			forgets it. It was refused here for a while for a better reason than that: nothing in
-			this mod placed it, so the game put it wherever the engineer happened to be facing,
-			and what that produced was minis pointing at walls.
-
-			behavior/engineerbuilddisposable.sp stands it beside the real one now, on ground that
-			can see what the real one sees, so the upgrade buys what it is supposed to buy. */
-			/* Off, this is not bought at all rather than bought late
-			
-			Two players have now reported the mini as the wrong purchase, and a third report was
-			"3 sentries with 2 engineers, THIS IS NOT POSSIBLE" — which it is, and this line is
-			how. At 310 it outranks building health at 260 and metal capacity at 210, so it is
-			bought before the nest is durable. Ranking it lower would still buy it on a rich wave,
-			and the objection is to buying it, so the switch refuses it outright. See mvm-8ws. */
-			if (StrEqual(attribute, "engy disposable sentries"))
-				return Feature(FEATURE_ENGINEER_DISPOSABLE) ? 310 : -10;
-			
-			if (StrEqual(attribute, "engy building health bonus")) return 260;
-			if (StrEqual(attribute, "metal regen")) return 220;
-			if (StrEqual(attribute, "maxammo metal increased")) return 210;
-			//The Jag swings faster, and swinging is what builds and repairs the nest
-			if (StrEqual(attribute, "melee attack rate bonus")) return 200;
-		}
-		case TFClass_Medic:
-		{
-			//A Medic that shoots is a Medic not healing, so its own damage comes last
-			if (StrEqual(attribute, "generate rage on heal")) return 320;
-			if (StrEqual(attribute, "ubercharge rate bonus")) return 300;
-			if (StrEqual(attribute, "healing mastery")) return 280;
-			if (StrEqual(attribute, "uber duration bonus")) return 230;
-			if (StrEqual(attribute, "overheal expert")) return 210;
-			if (StrEqual(attribute, "damage bonus")) return 40;
-			if (StrEqual(attribute, "fire rate bonus")) return 40;
-		}
-		case TFClass_Sniper:
-		{
-			/* One shot through a line of robots, then the speed to take the next one
-
-			"The first upgrade you should always get, regardless of context or starting credits,
-			is one tick of Explosive Headshot", then reload speed, then the rest of it.
-
-			Charge rate was ranked second here and the guides rank it nowhere: it is better to
-			land repeated quick shots than to hold one full-damage shot, so damage buys more than
-			charge does. */
-			if (StrEqual(attribute, "explosive sniper shot")) return 330;
-			if (StrEqual(attribute, "faster reload rate")) return 300;
-			if (StrEqual(attribute, "SRifle Charge rate increased")) return 60;
-		}
-		case TFClass_Spy:
-		{
-			if (slot == TF_LOADOUT_SLOT_MELEE)
-			{
-				//A backstab through a giant's armour is the whole class in this mode
-				//Full armour penetration first, then the swing speed, and the sapper long after
-				if (StrEqual(attribute, "armor piercing")) return 330;
-				if (StrEqual(attribute, "melee attack rate bonus")) return 280;
-				if (StrEqual(attribute, "robo sapper")) return 70;
-			}
-		}
-		case TFClass_Pyro:
-		{
-			/* The flames first, and as fast as the wallet allows
-
-			"You should try to max out your primary's damage as quickly as possible." Reflecting
-			what is aimed at the team comes after that, not before it. */
-			if (StrEqual(attribute, "damage bonus")) return 320;
-			if (StrEqual(attribute, "attack projectiles")) return 250;
-			/* Afterburn is the last thing to spend a credit on, whatever the flamethrower
-			It does not scale with the upgrade the way direct damage does, a robot dies before it
-			finishes ticking, and a giant outlives it. That holds for the Phlogistinator too: its
-			taunt fills from damage dealt, and direct flame damage is most of what it deals */
-			//Afterburn is refused outright in IsUpgradeWasted
-		}
-		case TFClass_Soldier:
-		{
-			/* Reload first, and everybody who writes about this class says so
-
-			A Soldier's damage is four rockets and then a wait, so the wait is what the credits
-			buy. Rocket Specialist next and exactly one tick of it, capped in
-			CTFBotPurchaseUpgrades_PurchaseUpgrade: the first removes the falloff, the rest widen
-			a blast radius nobody needed. Then damage, then the rest of the general table */
-			if (StrEqual(attribute, "faster reload rate")) return 310;
-			if (StrEqual(attribute, "rocket specialist")) return 290;
-			//"Very helpful throughout the whole game", and it goes under the damage, not over it
-			if (StrEqual(attribute, "heal on kill")) return 250;
-		}
-		case TFClass_DemoMan:
-		{
-			/* Reload, then fire rate, then everything else
-
-			Same shape as the Soldier and for the same reason: the launcher is a burst and a
-			reload, so the reload is the damage. Fire rate second because a sticky trap is
-			however many bombs he got down before the robots arrived.
-
-			Projectile speed is on the list because it is cheap and it is what makes a pipe land
-			on something that is walking, which is the shot a bot is worst at leading */
-			if (StrEqual(attribute, "faster reload rate")) return 310;
-			if (StrEqual(attribute, "fire rate bonus")) return 290;
-			if (StrEqual(attribute, "Projectile speed increased")) return 200;
-		}
-		case TFClass_Heavy:
-		{
-			/* Staying alive is the first upgrade, because a dead Heavy shoots nothing
-
-			"If you're dead, you're not shooting the robots" is the whole argument and it is the
-			first line of every Heavy guide. This class had one rule before, for shooting down
-			rockets, and took the general table's damage-first answer for everything else.
-
-			Firing speed is deliberately not raised here. The second tick of it does nothing at
-			all, which is a known bug rather than an opinion, so it is capped at one in
-			UpgradeTierCap and left to rank where the general table puts it. */
-			if (StrEqual(attribute, "heal on kill")) return 320;
-			//Shooting down the rockets aimed at the team
-			if (StrEqual(attribute, "attack projectiles")) return 230;
-		}
-		case TFClass_Scout:
-		{
-			//Milk marks a wave for the whole team, which is worth more than what one Scout shoots
-			if (StrEqual(attribute, "applies snare effect")) return 250;
-			/* Jump height is a person's tool and it stays at the bottom of the general table
-
-			The guides want two ticks of it early on Mannhattan and Decoy, for reaching credits on
-			a ledge before they expire. A person reads a ledge and jumps at it. A bot walks where
-			the nav mesh says it can walk, and buying it more jump does not add a route to the
-			mesh, so what the credits buy is a bot that jumps higher along the same path.
-
-			Worth revisiting if anything here ever aims a jump at a specific piece of ground. */
-			if (StrEqual(attribute, "mad milk syringes")) return 200;
-			//Money is the Scout's job here and it needs the legs to do it
-			if (StrEqual(attribute, "move speed bonus")) return 190;
-		}
-	}
-	
-	return 0;
-}
-
-/* What a resistance is worth, given whether the wave will actually deal that damage
-
-Below the damage upgrades on purpose. A team that kills the wave faster takes less of everything,
-and the guides all put resistances after the weapon is bought. Above the rest of the tail,
-because the alternative is what this mod did before, which was never buying one. */
-static int ResistancePriority(bool wanted)
-{
-	if (!Feature(FEATURE_WAVE_RESISTANCES))
-		return 35;
-	
-	return wanted ? 210 : 25;
-}
-
-/* Damage first, then what keeps it firing. What a bot buys when nothing above had an opinion */
-static int GeneralUpgradePriority(const char[] attribute)
-{
-	//--- The damage itself
-	if (StrEqual(attribute, "damage bonus")) return 260;
-	if (StrEqual(attribute, "fire rate bonus")) return 250;
-	if (StrEqual(attribute, "melee attack rate bonus")) return 200;
-	if (StrEqual(attribute, "projectile penetration")) return 190;
-	if (StrEqual(attribute, "projectile penetration heavy")) return 190;
-	if (StrEqual(attribute, "critboost on kill")) return 180;
-	
-	//--- Keeping it firing
-	if (StrEqual(attribute, "clip size upgrade atomic")) return 170;
-	if (StrEqual(attribute, "clip size bonus upgrade")) return 170;
-	if (StrEqual(attribute, "faster reload rate")) return 160;
-	if (StrEqual(attribute, "maxammo primary increased")) return 150;
-	if (StrEqual(attribute, "Projectile speed increased")) return 130;
-	if (StrEqual(attribute, "maxammo secondary increased")) return 120;
-	
-	//--- Worth having once the damage is bought
-	if (StrEqual(attribute, "heal on kill")) return 110;
-	if (StrEqual(attribute, "mark for death")) return 90;
-	if (StrEqual(attribute, "armor piercing")) return 85;
-	if (StrEqual(attribute, "attack projectiles")) return 80;
-	if (StrEqual(attribute, "increase buff duration")) return 75;
-	if (StrEqual(attribute, "effect bar recharge rate increased")) return 70;
-	if (StrEqual(attribute, "charge recharge rate increased")) return 70;
-	if (StrEqual(attribute, "generate rage on damage")) return 60;
-	if (StrEqual(attribute, "bleeding duration")) return 55;
-	
-	/* --- Not dying, which was ranked here on a premise that is not true
-
-	This block used to open with "a bot respawns every wave, so staying alive is what it needs
-	least". Bots do not respawn every wave, and the test-bed says explosions are between forty
-	five and sixty percent of every defender death on every map measured. A resistance ranked at
-	thirty five is a resistance nobody ever buys.
-
-	What the guides do about it is buy the resistance the coming wave calls for, and the wave bar
-	says what is coming before it starts. So a resistance is worth a middling amount when the
-	robots that deal that damage are in the wave, and very little when they are not: blast
-	resistance against a wave of Scouts is three hundred credits spent on nothing. */
-	if (StrEqual(attribute, "dmg taken from blast reduced"))
-		return ResistancePriority(WaveHasExplosiveRobots());
-	
-	if (StrEqual(attribute, "dmg taken from bullets reduced"))
-		return ResistancePriority(WaveHasBulletRobots());
-	
-	if (StrEqual(attribute, "dmg taken from fire reduced"))
-		return ResistancePriority(WaveHasFireRobots());
-	
-	if (StrEqual(attribute, "move speed bonus")) return 45;
-	if (StrEqual(attribute, "health regen")) return 40;
-	if (StrEqual(attribute, "dmg taken from crit reduced")) return 30;
-	if (StrEqual(attribute, "damage force reduction")) return 25;
-	if (StrEqual(attribute, "increased jump height")) return 10;
-	
-	return UnrankedUpgradePriority();
-}
-
-/* An upgrade no table above recognised
-
-The mod's own answer for every upgrade, kept for the ones this file does not name. It has to
-stay random: a constant would tie every unknown upgrade, and a tie is broken by whichever the
-game listed first, so a bot would buy the same wrong thing every wave of every mission */
-static int UnrankedUpgradePriority()
-{
-	return GetRandomInt(50, 100);
-}
 
 void KV_MvM_UpgradesBegin(int client)
 {
