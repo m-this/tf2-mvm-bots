@@ -490,52 +490,6 @@ bool IsUpgradeStationEnabled(int station)
 	return GetEntData(station, iOffsetIsEnabled, 1);
 }
 
-/* The whole bomb path: the travel distance to the hatch from the far end of it
-
-Spawn areas are left out because they carry no distance to the hatch, so the far end this finds is
-the first area the robots walk into rather than the room they walk out of */
-float BombPathLength()
-{
-	int iAreaCount = TheNavAreas.Count;
-	float longest = 0.0;
-
-	for (int i = 0; i < iAreaCount; i++)
-	{
-		CTFNavArea area = view_as<CTFNavArea>(TheNavAreas.Get(i));
-
-		if (area == NULL_AREA)
-			continue;
-
-		if (area.HasAttributeTF(BLUE_SPAWN_ROOM) || area.HasAttributeTF(RED_SPAWN_ROOM))
-			continue;
-
-		longest = MaxFloat(longest, GetTravelDistanceToBombTarget(area));
-	}
-
-	return longest;
-}
-
-/* How far from the hatch an engineer may nest, in travel distance
-
-A fraction of the bomb path rather than a number of units. The path is a few thousand units on
-Decoy and several times that on Rottenburg, and the same number of units is a defensible choke on
-one map and the robots' spawn door on the other.
-
-An engineer is worth more than the ground it holds: a nest at the front collapses to the first
-giant that walks into it, and the wave then runs at a team with no sentry for the rest of it.
-Nesting back means the sentry is still alive when the bomb reaches the ground that matters.
-
-Zero when the map has no bomb path to measure, and the caller then takes what it can get */
-float NestDistanceLimit()
-{
-	float length = BombPathLength();
-
-	if (length <= 0.0)
-		return 0.0;
-
-	return length * redbots_manager_engineer_nest_depth.FloatValue;
-}
-
 //Where each engineer holds, read by the nest scoring below and written by the engineer behaviours
 CNavArea m_aNestArea[MAXPLAYERS + 1] = {NULL_AREA, ...};
 
@@ -567,7 +521,6 @@ level three or spends mini sentries */
 A third of it. Closer than that and the sentry spends none of its range: the robots are already
 on top of it when it opens fire, the giant that walks in melees it, and the engineer holding it
 is standing in the fight rather than behind it */
-#define NEST_MIN_BOMB_RANGE_FRACTION 0.34
 
 /* How many pieces of the approach to sample, and what seeing all of them is worth
 
@@ -622,108 +575,6 @@ built on the same prefabs is covered without anybody authoring anything.
 None of it is trusted blindly. Every spot goes through the same nest score as everything else, so
 one deep in the robots' half loses to the nav mesh reasoning below on distance to the bomb. A
 hand written EngineerNest block still outranks all of it: somebody stood there. */
-
-//Put a limit on everything. Mannhattan carries twenty-seven; a map with a thousand is broken
-#define MAX_MAP_HINT_NESTS	64
-
-static ArrayList g_adtMapHintNests;
-static bool g_bMapHintNestsLoaded;
-
-//The map changed, so what the last map's entities said about it is worth nothing
-void ResetMapHintNests()
-{
-	g_bMapHintNestsLoaded = false;
-
-	if (g_adtMapHintNests != null)
-		g_adtMapHintNests.Clear();
-}
-
-static void CollectMapHintNests(const char[] classname)
-{
-	int entity = -1;
-
-	while ((entity = FindEntityByClassname(entity, classname)) != -1)
-	{
-		if (g_adtMapHintNests.Length >= MAX_MAP_HINT_NESTS)
-			return;
-
-		float origin[3]; origin = GetAbsOrigin(entity);
-
-		if (IsZeroVector(origin))
-			continue;
-
-		g_adtMapHintNests.PushArray(origin);
-	}
-}
-
-/* Read the first time an engineer asks, rather than at map start
-
-The entities are the map's own and they are spawned long before this, but reading them late costs
-nothing and does not depend on when a forward happens to fire relative to the level's entities */
-static ArrayList MapHintNests()
-{
-	if (g_adtMapHintNests == null)
-		g_adtMapHintNests = new ArrayList(3);
-
-	if (g_bMapHintNestsLoaded)
-		return g_adtMapHintNests;
-
-	g_bMapHintNestsLoaded = true;
-
-	CollectMapHintNests("bot_hint_sentrygun");
-	CollectMapHintNests("bot_hint_engineer_nest");
-
-	if (redbots_manager_debug.BoolValue)
-		PrintToServer("MapHintNests: %d nest spots from the map's own entities", g_adtMapHintNests.Length);
-
-	return g_adtMapHintNests;
-}
-
-//The best of the map's own nest spots, or NULL_AREA when the map carries none
-CNavArea PickMapHintNestArea(int client, const float target[3], float SentryRange)
-{
-	ArrayList spots = MapHintNests();
-
-	if (spots.Length == 0)
-		return NULL_AREA;
-
-	ArrayList areas = new ArrayList();
-
-	for (int i = 0; i < spots.Length; i++)
-	{
-		float spot[3]; spots.GetArray(i, spot);
-
-		CNavArea area = TheNavMesh.GetNearestNavArea(spot, false, 500.0, false, true, TEAM_ANY);
-
-		if (area == NULL_AREA)
-			continue;
-
-		CTFNavArea tfArea = view_as<CTFNavArea>(area);
-
-		//A spot inside either spawn room is one the engineer cannot hold, whoever it was put there for
-		if (tfArea.HasAttributeTF(BLUE_SPAWN_ROOM) || tfArea.HasAttributeTF(RED_SPAWN_ROOM))
-			continue;
-
-		areas.Push(area);
-	}
-
-	CNavArea best = BestNestArea(client, areas, target, SentryRange);
-
-	delete areas;
-
-	return best;
-}
-
-/* Whether a spot is close enough to the bomb to be worth holding, and far enough to survive it
-
-Both bounds matter and only one of them existed. A nest further up the path than the depth limit
-is a nest the wave walks past; a nest on top of the bomb is a sentry the first giant meleed, with
-a dispenser nobody but the engineer stands at, which is what a play-test found sitting on Decoy's
-hatch. Valve keeps its own engineer robots 1300 units off the bomb for the same reason */
-static bool IsNestRangeSane(float rangeToBomb, float SentryRange)
-{
-	return rangeToBomb >= SentryRange * NEST_MIN_BOMB_RANGE_FRACTION && rangeToBomb < SentryRange;
-}
 
 CNavArea PickBuildArea(int client, float SentryRange = 1300.0)
 {

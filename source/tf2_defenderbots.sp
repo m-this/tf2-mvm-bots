@@ -269,6 +269,7 @@ Address g_pMannVsMachineUpgrades;
 #include "redbots3/generated/lineoffire.sp"
 #include "redbots3/generated/nestscore.sp"
 #include "redbots3/generated/nestpick.sp"
+#include "redbots3/generated/nesthint.sp"
 #include "redbots3/generated/weapon_tuning.sp"
 #include "redbots3/generated/uber.sp"
 #include "redbots3/generated/demoman_stickies.sp"
