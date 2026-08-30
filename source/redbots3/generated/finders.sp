@@ -114,3 +114,112 @@ stock bool IsHealedByMedic(int client)
 	return false;
 }
 
+stock int FindBombNearestToHatch()
+{
+	float origin[3];
+	origin = GetBombHatchPosition();
+	float bestDistance = 999999.0;
+	int bestEntity = -1;
+	int ent = -1;
+	for (;;)
+	{
+		ent = FindEntityByClassname(ent, "item_teamflag");
+		if (ent == -1)
+		{
+			break;
+		}
+		if (CaptureFlag_IsHome(ent))
+		{
+			continue;
+		}
+		float distance = GetVectorDistance(origin, WorldSpaceCenter(ent));
+		if (distance <= bestDistance)
+		{
+			bestDistance = distance;
+			bestEntity = ent;
+		}
+	}
+	return bestEntity;
+}
+
+stock int FindBotNearestToBombNearestToHatch(int client)
+{
+	int bomb = FindBombNearestToHatch();
+	if (bomb <= 0)
+	{
+		return -1;
+	}
+	float origin[3];
+	origin = WorldSpaceCenter(bomb);
+	float bestDistance = 999999.0;
+	int bestEntity = -1;
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (i == client)
+		{
+			continue;
+		}
+		if (!IsClientInGame(i))
+		{
+			continue;
+		}
+		if (!IsPlayerAlive(i))
+		{
+			continue;
+		}
+		if (TF2_GetClientTeam(i) != GetPlayerEnemyTeam(client))
+		{
+			continue;
+		}
+		if (TF2Util_IsPointInRespawnRoom(WorldSpaceCenter(i)))
+		{
+			continue;
+		}
+		if (IsSentryBusterRobot(i))
+		{
+			continue;
+		}
+		float distance = GetVectorDistance(WorldSpaceCenter(i), origin);
+		if (distance <= bestDistance)
+		{
+			bestDistance = distance;
+			bestEntity = i;
+		}
+	}
+	return bestEntity;
+}
+
+stock int GerNearestTeammate(int client, float maxDistance)
+{
+	float origin[3];
+	origin = WorldSpaceCenter(client);
+	float bestDistance = 999999.0;
+	int bestEntity = -1;
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (i == client)
+		{
+			continue;
+		}
+		if (!IsClientInGame(i))
+		{
+			continue;
+		}
+		if (!IsPlayerAlive(i))
+		{
+			continue;
+		}
+		if (GetClientTeam(i) != GetClientTeam(client))
+		{
+			continue;
+		}
+		float distance = GetVectorDistance(WorldSpaceCenter(i), origin);
+		if ((distance <= bestDistance) && (distance <= maxDistance))
+		{
+			bestDistance = distance;
+			bestEntity = i;
+		}
+	}
+	return bestEntity;
+}
+

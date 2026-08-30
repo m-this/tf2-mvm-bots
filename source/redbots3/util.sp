@@ -488,75 +488,9 @@ int SpawnRoutePoints(int actor, const float spawn[3], float first, float step, f
 
 
 
-int FindBotNearestToBombNearestToHatch(int client)
-{
-	int iBomb = FindBombNearestToHatch();
-	
-	if (iBomb <= 0)
-		return -1;
-	
-	float flOrigin[3]; flOrigin = WorldSpaceCenter(iBomb);
-	
-	float flBestDistance = 999999.0;
-	int iBestEntity = -1;
-	
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (i == client)
-			continue;
-		
-		if (!IsClientInGame(i))
-			continue;
-		
-		if (!IsPlayerAlive(i))
-			continue;
-		
-		if (TF2_GetClientTeam(i) != GetPlayerEnemyTeam(client))
-			continue;
-		
-		if (TF2Util_IsPointInRespawnRoom(WorldSpaceCenter(i)))
-			continue;
-		
-		if (IsSentryBusterRobot(i))
-			continue;
-		
-		float flDistance = GetVectorDistance(WorldSpaceCenter(i), flOrigin);
-		
-		if (flDistance <= flBestDistance)
-		{
-			flBestDistance = flDistance;
-			iBestEntity = i;
-		}
-	}
-	
-	return iBestEntity;
-}
 
-int FindBombNearestToHatch()
-{
-	float flOrigin[3]; flOrigin = GetBombHatchPosition();
-	
-	float flBestDistance = 999999.0;
-	int iBestEntity = -1;
-	
-	int iEnt = -1;
-	
-	while ((iEnt = FindEntityByClassname(iEnt, "item_teamflag")) != -1)
-	{
-		if (CaptureFlag_IsHome(iEnt))
-			continue;
-		
-		float flDistance = GetVectorDistance(flOrigin, WorldSpaceCenter(iEnt));
-		
-		if (flDistance <= flBestDistance)
-		{
-			flBestDistance = flDistance;
-			iBestEntity = iEnt;
-		}
-	}
-	
-	return iBestEntity;
-}
+
+
 
 int SelectRandomReachableEnemy(int actor)
 {
@@ -633,38 +567,7 @@ int GetAcquiredCreditsOfAllWaves(bool withBonus = true)
 	return total;
 }
 
-int GerNearestTeammate(int client, const float max_distance)
-{
-	float origin[3]; origin = WorldSpaceCenter(client);
-	
-	float bestDistance = 999999.0;
-	int bestEntity = -1;
-	
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (i == client)
-			continue;
-		
-		if (!IsClientInGame(i))
-			continue;
-		
-		if (!IsPlayerAlive(i))
-			continue;
-		
-		if (GetClientTeam(i) != GetClientTeam(client))
-			continue;
-		
-		float distance = GetVectorDistance(WorldSpaceCenter(i), origin);
-		
-		if (distance <= bestDistance && distance <= max_distance)
-		{
-			bestDistance = distance;
-			bestEntity = i;
-		}
-	}
-	
-	return bestEntity;
-}
+
 
 int GetNearestReviveMarker(int client, const float max_distance)
 {
