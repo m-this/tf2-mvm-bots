@@ -126,3 +126,7 @@
 {"id":"int-a05a2350d341a1c4179e9709e78893e5","kind":"field_change","created_at":"2026-08-29T20:47:47.346062722Z","actor":"m-this","issue_id":"mvm-z83.16","extra":{"field":"status","new_value":"closed","old_value":"in_progress"}}
 {"id":"int-5487fb22c47a3ee78367c5971496f403","kind":"field_change","created_at":"2026-08-29T20:52:26.041461159Z","actor":"m-this","issue_id":"mvm-z83.53","extra":{"field":"priority","new_value":"2","old_value":"1"}}
 {"id":"int-1708675f1b1e27e6073e81f4c2e77890","kind":"field_change","created_at":"2026-08-29T21:49:22.370388721Z","actor":"m-this","issue_id":"mvm-z83.11","extra":{"field":"status","new_value":"closed","old_value":"open"}}
+{"id":"int-bf3b8386ff83a12ec922aa35aa1babf3","kind":"field_change","created_at":"2026-08-30T07:30:48.311060501Z","actor":"m-this","issue_id":"mvm-z83.59","extra":{"field":"status","new_value":"closed","old_value":"open"}}
+{"id":"int-3e93963c9f47119a60a60d9548daac3b","kind":"field_change","created_at":"2026-08-30T07:30:49.58677684Z","actor":"m-this","issue_id":"mvm-z83.60","extra":{"field":"status","new_value":"closed","old_value":"open"}}
+{"id":"int-6a9ae716484ae39d8177347745d60ad7","kind":"field_change","created_at":"2026-08-30T07:30:50.371440512Z","actor":"m-this","issue_id":"mvm-z83.54","extra":{"field":"status","new_value":"closed","old_value":"open"}}
+{"id":"int-d58771408f4edc14e1a6ede2c39738a9","kind":"field_change","created_at":"2026-08-30T07:30:51.139366147Z","actor":"m-this","issue_id":"mvm-z83.53","extra":{"field":"status","new_value":"closed","old_value":"open"}}
