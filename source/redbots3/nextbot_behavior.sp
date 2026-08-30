@@ -603,7 +603,7 @@ public Action Command_RecoverSpawnBots(int client, int args)
 #include "generated/attackforuber.sp"
 #include "generated/evadebuster.sp"
 #include "generated/campbomb.sp"
-#include "behavior/attacktank.sp"
+#include "generated/attacktank.sp"
 #include "generated/destroyteleporter.sp"
 #include "generated/guardpoint.sp"
 #include "generated/collectnearmoney.sp"
