@@ -74,3 +74,57 @@ stock bool IsZeroVector(float origin[3])
 	return (origin[0] == NULL_VECTOR[0]) && (origin[1] == NULL_VECTOR[1]) && (origin[2] == NULL_VECTOR[2]);
 }
 
+stock void SetPlayerReady(int client, bool state)
+{
+	if (IsPlayerReady(client) == state)
+	{
+		return;
+	}
+	FakeClientCommand(client, "tournament_player_readystate %d", state);
+}
+
+stock bool IsPluginMvMCreditsLoaded()
+{
+	return FindConVar("sm_mvmcredits_version") != null;
+}
+
+stock bool IsPluginRTDLoaded()
+{
+	return FindConVar("sm_rtd2_version") != null;
+}
+
+stock void UseActionSlotItem(int client)
+{
+	KeyValues kv = new KeyValues("use_action_slot_item_server");
+	FakeClientCommandKeyValues(client, kv);
+	delete kv;
+}
+
+stock void PlayerBuyback(int client)
+{
+	FakeClientCommand(client, "td_buyback");
+}
+
+stock bool IsServerFull()
+{
+	return GetClientCount(false) >= MaxClients;
+}
+
+stock int GetTeamHumanClientCount(int team)
+{
+	int count = 0;
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (IsClientInGame(i) && !IsFakeClient(i) && (GetClientTeam(i) == team))
+		{
+			count++;
+		}
+	}
+	return count;
+}
+
+stock int TEMP_GetPlayerMaxHealth(int client)
+{
+	return GetEntProp(GetPlayerResourceEntity(), Prop_Send, "m_iMaxHealth", client, _);
+}
+

@@ -552,44 +552,6 @@ stock float BuildReachTime(const float from[3], const float to[3])
 	return seconds > BUILD_WALK_TIME_MAX ? BUILD_WALK_TIME_MAX : seconds;
 }
 
-/* Saying it again is not free, so it is only said when the answer changes
-
-Readiness is reasserted every frame, on purpose, because several places set a bot ready and
-gating each of them would be four chances to miss one. What that turned into on the wire was a
-tournament_player_readystate command per bot per frame, and a ready screen flickering through
-every one of them. The command is the announcement; the flag is the state. */
-stock void SetPlayerReady(int client, bool state)
-{
-	if (IsPlayerReady(client) == state)
-		return;
-	
-	FakeClientCommand(client, "tournament_player_readystate %d", state);
-}
-
-stock bool IsPluginMvMCreditsLoaded()
-{
-	//tf_mvm_credits
-	return FindConVar("sm_mvmcredits_version") != null;
-}
-
-stock bool IsPluginRTDLoaded()
-{
-	//rtd
-	return FindConVar("sm_rtd2_version") != null;
-}
-
-stock void UseActionSlotItem(int client)
-{
-	KeyValues kv = new KeyValues("use_action_slot_item_server");
-	FakeClientCommandKeyValues(client, kv);
-	delete kv;
-}
-
-stock void PlayerBuyback(int client)
-{
-	FakeClientCommand(client, "td_buyback");
-}
-
 //From stocksoup/entity_tools.inc
 stock bool ParentEntity(int parent, int attachment, const char[] attachPoint = "",
 		bool maintainOffset = false) {
@@ -641,63 +603,6 @@ stock bool IsItemDefIndexSapper(int itemDefIndex)
 	return false;
 }
 
-stock float AngleDiff( float destAngle, float srcAngle )
-{
-	return AngleNormalize(destAngle - srcAngle);
-}
-
-stock float AngleNormalize( float angle )
-{
-	angle = angle - 360.0 * RoundToFloor(angle / 360.0);
-	while (angle > 180.0) angle -= 360.0;
-	while (angle < -180.0) angle += 360.0;
-	return angle;
-}
-
-stock float[] GetAbsVelocity(int entity)
-{
-	float vec[3];
-
-	CBaseEntity(entity).GetAbsVelocity(vec);
-	
-	return vec;
-}
-
-stock float VMX_VectorNormalize(float a1[3])
-{
-	float flLength = GetVectorLength(a1, true) + 0.0000000001;
-	float v4 = (1.0 / SquareRoot(flLength)); 
-	float den = v4 * ((3.0 - ((v4 * v4) * flLength)) * 0.5);
-	
-	ScaleVector(a1, den);
-	
-	return den * flLength;
-}
-
-stock float[] GetEyePosition(int client)
-{
-	float vec[3]; BaseEntity_EyePosition(client, vec);
-	
-	return vec;
-}
-
-stock float ApproachAngle( float target, float value, float speed )
-{
-	float delta = AngleDiff(target, value);
-	
-	if (speed < 0.0) 
-		speed = -speed;
-	
-	if (delta > speed) 
-		value += speed;
-	else if (delta < -speed) 
-		value -= speed;
-	else
-		value = target;
-	
-	return AngleNormalize(value);
-}
-
 stock float GetCurrentCharge(int iWeapon)
 {
 	if (!HasEntProp(iWeapon, Prop_Send, "m_flChargeBeginTime"))
@@ -713,11 +618,6 @@ stock float GetCurrentCharge(int iWeapon)
 	}
 	
 	return flCharge;
-}
-
-stock bool IsServerFull()
-{
-	return GetClientCount(false) >= MaxClients;
 }
 
 //From stocksoup/memory.inc
@@ -745,24 +645,6 @@ stock void PrintToChatTeam(int team, const char[] format, any ...)
 			PrintToChat(i, "%s", buffer);
 		}
 	}
-}
-
-stock int GetTeamHumanClientCount(int team)
-{
-	int count = 0;
-	
-	for (int i = 1; i <= MaxClients; i++)
-		if (IsClientInGame(i) && !IsFakeClient(i) && GetClientTeam(i) == team)
-			count++;
-	
-	return count;
-}
-
-/* TODO: remove this as we have a better way to do this
-we are only doing this for right now until we can solve a potential issue */
-stock int TEMP_GetPlayerMaxHealth(int client)
-{
-	return GetEntProp(GetPlayerResourceEntity(), Prop_Send, "m_iMaxHealth", _, client);
 }
 
 //This seems heavily based on PlayerLocomotion::Approach
