@@ -117,3 +117,20 @@ stock bool BuildStandPoint(float spot[3], float from[3], int attempt, int attemp
 	return true;
 }
 
+stock void CNavArea_GetRandomPoint(CNavArea area, float buffer[3])
+{
+	for (int i = 0; i < 3; i++)
+	{
+		buffer[i] = 0.0;
+	}
+	float eHi[3];
+	float eLo[3];
+	area.GetExtent(eLo, eHi);
+	float spot[3];
+	spot[0] = GetRandomFloat(eLo[0], eHi[0]);
+	spot[1] = GetRandomFloat(eLo[1], eHi[1]);
+	spot[2] = area.GetZ(spot[0], spot[1]);
+	buffer = spot;
+	return;
+}
+

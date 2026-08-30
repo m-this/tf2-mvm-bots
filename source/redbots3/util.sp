@@ -183,42 +183,8 @@ static bool TraceFilter_TFBot(int entity, int contentsMask, StringMap data)
 	return true;
 }
 
-//CNavArea::GetRandomPoint
-void CNavArea_GetRandomPoint(CNavArea area, float buffer[3])
-{
-	float eLo[3], eHi[3];
-	area.GetExtent(eLo, eHi);
-	
-	float spot[3];
-	spot[0] = GetRandomFloat(eLo[0], eHi[0]);
-	spot[1] = GetRandomFloat(eLo[1], eHi[1]);
-	spot[2] = area.GetZ(spot[0], spot[1]);
-	
-	buffer = spot;
-}
 
-bool IsTFBotPlayer(int client)
-{
-	//TODO: change this, as it's not entirely reliable
-	return IsFakeClient(client);
-}
 
-bool IsFinalWave()
-{
-	int rsrc = FindEntityByClassname(MaxClients + 1, "tf_objective_resource");
-	
-	if (rsrc != -1)
-	{
-		if (TF2_GetMannVsMachineWaveCount(rsrc) == TF2_GetMannVsMachineMaxWaveCount(rsrc))
-			return true;
-	}
-	else
-	{
-		LogError("IsFinalWave: Could find entity tf_objective_resource!");
-	}
-	
-	return false;
-}
 
 //Set up an entity for item creation
 int EconItemCreateNoSpawn(char[] classname, int itemDefIndex, int level, int quality)
@@ -318,15 +284,7 @@ int GiveItemToPlayer(int client, char[] classname, int itemDefIndex, int level, 
 
 
 
-bool IsSentryBusterRobot(int client)
-{
-	if (IsTFBotPlayer(client))
-		return GetTFBotMission(client) == CTFBot_MISSION_DESTROY_SENTRIES;
-	
-	char model[PLATFORM_MAX_PATH]; GetClientModel(client, model, PLATFORM_MAX_PATH);
-	
-	return StrEqual(model, "models/bots/demo/bot_sentry_buster.mdl");
-}
+
 
 //What the explosion reaches. Valve's own is smaller, and a bot that stops running early is dead
 #define BUSTER_BLAST_RANGE	400.0
@@ -455,42 +413,7 @@ int SpawnRoutePoints(int actor, const float spawn[3], float first, float step, f
 
 
 
-int SelectRandomReachableEnemy(int actor)
-{
-	TFTeam opposingTFTeam = GetPlayerEnemyTeam(actor);
-	
-	int playerarray[MAXPLAYERS + 1];
-	int playercount;
-	
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (i == actor)
-			continue;
-		
-		if (!IsClientInGame(i))
-			continue;
-		
-		if (!IsPlayerAlive(i))
-			continue;
-		
-		if (TF2_GetClientTeam(i) != opposingTFTeam)
-			continue;
-		
-		if (TF2Util_IsPointInRespawnRoom(WorldSpaceCenter(i)))
-			continue;
-		
-		if (IsSentryBusterRobot(i))
-			continue;
-		
-		playerarray[playercount] = i;
-		playercount++;
-	}
-	
-	if (playercount > 0)
-		return playerarray[GetRandomInt(0, playercount-1)];
-	
-	return -1;
-}
+
 
 
 
