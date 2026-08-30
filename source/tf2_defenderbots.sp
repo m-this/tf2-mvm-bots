@@ -272,6 +272,7 @@ Address g_pMannVsMachineUpgrades;
 #include "redbots3/generated/nesthint.sp"
 #include "redbots3/generated/buildarea.sp"
 #include "redbots3/generated/nestmove.sp"
+#include "redbots3/generated/bombinfo.sp"
 #include "redbots3/generated/weapon_tuning.sp"
 #include "redbots3/generated/uber.sp"
 #include "redbots3/generated/demoman_stickies.sp"
