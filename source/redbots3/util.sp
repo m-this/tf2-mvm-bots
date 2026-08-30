@@ -270,87 +270,6 @@ world coordinates it hands back stay true however far he walks afterwards.
 Returns how many points the route was long enough for, which is none when there is no route at all
 and none when the engineer is already inside the spawn room. */
 
-
-/* To trigger the robo sapper, you need to do several things
-- set a builder
-- set the object mode to MODE_SAPPER_ANTI_ROBOT or MODE_SAPPER_ANTI_ROBOT_RADIUS
-- parent the sapper to some entity
-- set the entity the sapper is being built on
-- then fire input Enable to call CObjectSapper::OnGoActive */
-int SpawnSapper(int owner, int entity, int weapon = -1)
-{
-	int sapper = CreateEntityByName("obj_attachment_sapper");
-	
-	if (sapper != -1)
-	{
-		AcceptEntityInput(sapper, "SetBuilder", owner);
-		
-		if (weapon > 0)
-			TF2_SetObjectMode(sapper, GetEntProp(weapon, Prop_Send, "m_iObjectMode"));
-		
-		ParentEntity(entity, sapper, BaseEntity_IsPlayer(entity) ? "head" : "weapon_bone");
-		SetEntPropEnt(sapper, Prop_Send, "m_hBuiltOnEntity", entity);
-		SetEntProp(sapper, Prop_Send, "m_bBuilding", 1);
-		DispatchSpawn(sapper);
-		RemoveEffects(sapper, EF_NODRAW);
-	}
-	
-	return sapper;
-}
-
-//Return a capture area trigger associated with a control point that the team can capture
-int GetCapturableAreaTrigger(TFTeam team)
-{
-	int trigger = -1;
-	
-	while ((trigger = FindEntityByClassname(trigger, "trigger_*")) != -1)
-	{
-		//Only want capture areas
-		if (!HasEntProp(trigger, Prop_Data, "CTriggerAreaCaptureCaptureThink"))
-			continue;
-		
-		//Ignore disabled triggers
-		if (GetEntProp(trigger, Prop_Data, "m_bDisabled"))
-			continue;
-		
-		//Apparently some community maps don't disable the trigger when capped
-		char sCapPointName[32]; GetEntPropString(trigger, Prop_Data, "m_iszCapPointName", sCapPointName, sizeof(sCapPointName));
-		
-		//Trigger has no point associated with it
-		if (strlen(sCapPointName) < 3)
-			continue;
-		
-		//Now find the matching control point
-		int point = -1;
-		
-		while ((point = FindEntityByClassname(point, "team_control_point")) != -1)
-		{
-			int iPointIndex = GetEntProp(point, Prop_Data, "m_iPointIndex");
-			
-			if (!TFGameRules_TeamMayCapturePoint(team, iPointIndex))
-				continue;
-			
-			char sName[32]; GetEntPropString(point, Prop_Data, "m_iName", sName, sizeof(sName));
-			
-			if (strcmp(sName, sCapPointName, false) == 0)
-				return trigger;
-		}
-	}
-	
-	return -1;
-}
-
-bool IsUpgradeStationEnabled(int station)
-{
-	static int iOffsetIsEnabled = -1;
-	
-	//m_bIsEnabled
-	if (iOffsetIsEnabled == -1)
-		iOffsetIsEnabled = FindDataMapInfo(station, "m_nStartDisabled") + 28;
-	
-	return GetEntData(station, iOffsetIsEnabled, 1);
-}
-
 //Where each engineer holds, read by the nest scoring below and written by the engineer behaviours
 CNavArea m_aNestArea[MAXPLAYERS + 1] = {NULL_AREA, ...};
 
@@ -435,19 +354,6 @@ None of it is trusted blindly. Every spot goes through the same nest score as ev
 one deep in the robots' half loses to the nav mesh reasoning below on distance to the bomb. A
 hand written EngineerNest block still outranks all of it: somebody stood there. */
 
-stock Address DereferencePointer(Address addr) {
-	// maybe someday we'll do 64-bit addresses
-	return view_as<Address>(LoadFromAddress(addr, NumberType_Int32));
-}
-
-stock int ReadInt(Address pAddr)
-{
-	if (pAddr == Address_Null)
-		return -1;
-	
-	return LoadFromAddress(pAddr, NumberType_Int32);
-}
-
 /* How long an engineer's walk to a build spot is allowed to take
 
 A flat clock is a clock that is right for one distance. Twelve seconds is generous inside a nest
@@ -461,19 +367,6 @@ and capped so nothing waits on an engineer for ever. */
 #define BUILD_WALK_TIME_MIN	12.0
 #define BUILD_WALK_TIME_MAX	40.0
 
-//From stocksoup/entity_tools.inc
-stock bool ParentEntity(int parent, int attachment, const char[] attachPoint = "",
-		bool maintainOffset = false) {
-	SetVariantString("!activator");
-	AcceptEntityInput(attachment, "SetParent", parent, attachment, 0);
-	
-	if (strlen(attachPoint) > 0) {
-		SetVariantString(attachPoint);
-		AcceptEntityInput(attachment,
-				maintainOffset? "SetParentAttachmentMaintainOffset" : "SetParentAttachment",
-				parent, parent);
-	}
-}
 
 stock void PrintToChatTeam(int team, const char[] format, any ...)
 {
