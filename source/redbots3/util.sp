@@ -130,50 +130,6 @@ char g_sRawPlayerClassNames[][] =
 	"random"
 };
 
-static bool TraceFilter_TFBot(int entity, int contentsMask, StringMap data)
-{
-	//NextBotTraceFilterIgnoreActors
-	if (CBaseEntity(entity).IsCombatCharacter())
-		return false;
-	
-	//CTraceFilterIgnoreFriendlyCombatItems
-	int iPassEnt = -1;
-	data.GetValue("m_pPassEnt", iPassEnt);
-	
-	int iCollisionGroup;
-	data.GetValue("m_collisionGroup", iCollisionGroup);
-	
-	int iIgnoreTeam;
-	data.GetValue("m_iIgnoreTeam", iIgnoreTeam);
-	
-	if (BaseEntity_IsCombatItem(entity))
-	{
-		if (BaseEntity_GetTeamNumber(entity) == iIgnoreTeam)
-			return false;
-		
-		//m_bCallerIsProjectile is false here
-	}
-	
-	//CTraceFilterSimple as BaseClass of CTraceFilterIgnoreFriendlyCombatItems
-	if (!StandardFilterRules(entity, contentsMask))
-		return false;
-	
-	if (iPassEnt != -1)
-	{
-		if (!PassServerEntityFilter(entity, iPassEnt))
-			return false;
-	}
-	
-	if (!ShouldCollide(entity, iCollisionGroup, contentsMask))
-		return false;
-	
-	if (!TFGameRules_ShouldCollide(iCollisionGroup, BaseEntity_GetCollisionGroup(entity)))
-		return false;
-	
-	//CTraceFilterChain checks if both filters are true
-	return true;
-}
-
 //Set up an entity for item creation
 int EconItemCreateNoSpawn(char[] classname, int itemDefIndex, int level, int quality)
 {
@@ -446,50 +402,6 @@ int GetCapturableAreaTrigger(TFTeam team)
 	}
 	
 	return -1;
-}
-
-//Return the only entity we can see, -2 if we can see them both
-int FindOnlyOneVisibleEntity(int client, int ent1, int ent2)
-{
-	if (!IsLineOfFireClearEntity(client, GetEyePosition(client), ent1))
-	{
-		return ent2;
-	}
-	
-	if (!IsLineOfFireClearEntity(client, GetEyePosition(client), ent2))
-	{
-		return ent1;
-	}
-	
-	return -2;
-}
-
-//bool CTFBot::IsLineOfFireClear( const Vector &from, const Vector &to ) const
-bool IsLineOfFireClearPosition(int client, const float from[3], const float to[3])
-{
-	StringMap adtProperties = new StringMap();
-	adtProperties.SetValue("m_pPassEnt", client);
-	adtProperties.SetValue("m_collisionGroup", COLLISION_GROUP_NONE);
-	adtProperties.SetValue("m_iIgnoreTeam", GetClientTeam(client));
-	
-	TR_TraceRayFilter(from, to, MASK_SOLID_BRUSHONLY, RayType_EndPoint, TraceFilter_TFBot, adtProperties);
-	adtProperties.Close();
-	
-	return !TR_DidHit();
-}
-
-//bool CTFBot::IsLineOfFireClear( const Vector &from, CBaseEntity *who ) const
-bool IsLineOfFireClearEntity(int client, const float from[3], int who)
-{
-	StringMap adtProperties = new StringMap();
-	adtProperties.SetValue("m_pPassEnt", client);
-	adtProperties.SetValue("m_collisionGroup", COLLISION_GROUP_NONE);
-	adtProperties.SetValue("m_iIgnoreTeam", GetClientTeam(client));
-	
-	TR_TraceRayFilter(from, WorldSpaceCenter(who), MASK_SOLID_BRUSHONLY, RayType_EndPoint, TraceFilter_TFBot, adtProperties);
-	adtProperties.Close();
-	
-	return !TR_DidHit() || TR_GetEntityIndex() == who;
 }
 
 bool GetBombInfo(BombInfo_t info)
