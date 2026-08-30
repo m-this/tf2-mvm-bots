@@ -309,51 +309,14 @@ int GiveItemToPlayer(int client, char[] classname, int itemDefIndex, int level, 
 	return item;
 }
 
-bool EquipWeaponSlot(int client, int slot)
-{
-	int weapon = GetPlayerWeaponSlot(client, slot);
-	
-	if (weapon != -1)
-		return TF2Util_SetPlayerActiveWeapon(client, weapon);
-	
-	return false;
-}
 
-float GetTimeSinceWeaponFired(int client)
-{
-	int iWeapon = BaseCombatCharacter_GetActiveWeapon(client);
-	
-	if (iWeapon == -1)
-		return 9999.0;
-		
-	float flLastFireTime = GetEntPropFloat(iWeapon, Prop_Send, "m_flLastFireTime");
-	
-	if (flLastFireTime <= 0.0)
-		return 9999.0;
-		
-	return GetGameTime() - flLastFireTime;
-}
 
-//CWeaponMedigun::GetMedigunType
-int GetMedigunType(int weapon)
-{
-	return TF2Attrib_HookValueInt(0, "set_weapon_mode", weapon);
-}
 
-int GetResistType(int weapon)
-{
-	return GetEntProp(weapon, Prop_Send, "m_nChargeResistType");
-}
 
-bool HasSniperRifle(int client)
-{
-	int iWeapon = GetPlayerWeaponSlot(client, TFWeaponSlot_Primary);
-	
-	if (iWeapon == -1)
-		return false;
-	
-	return WeaponID_IsSniperRifle(TF2Util_GetWeaponID(iWeapon));
-}
+
+
+
+
 
 bool IsSentryBusterRobot(int client)
 {
