@@ -505,71 +505,6 @@ adds one, would otherwise give every upgrade the same number: the sort would the
 than sensible, and every bot would buy the same wrong thing in the same order forever. Ranking the
 unknown at random degrades to the old behaviour one upgrade at a time instead, and leaves the ones
 this table does know still ahead of the resistances */
-/* Upgrades that do nothing for the weapons this bot is actually holding
-
-Reported on 1.8: Pyros buying Explode on Ignite with no Gas Passer, and airblast pushback while
-carrying a Phlogistinator, which has no airblast at all. Both are the upgrade menu offering
-everything the class can theoretically use rather than what this loadout can.
-
-The menu is right to offer them. Deciding is this mod's job. */
-static bool IsUpgradeWasted(int client, const char[] attribute)
-{
-	//Explode on Ignite is the Gas Passer's, and nothing else can be ignited into exploding
-	if (StrContains(attribute, "explode_on_ignite", false) != -1
-		|| StrContains(attribute, "explode on ignite", false) != -1)
-	{
-		int secondary = GetPlayerWeaponSlot(client, TFWeaponSlot_Secondary);
-
-		return secondary == -1 || TF2Util_GetWeaponID(secondary) != TF_WEAPON_JAR_GAS;
-	}
-
-	if (StrContains(attribute, "airblast", false) != -1)
-	{
-		int primary = GetPlayerWeaponSlot(client, TFWeaponSlot_Primary);
-
-		if (primary == -1 || TF2Util_GetWeaponID(primary) != TF_WEAPON_FLAMETHROWER)
-			return true;
-
-		//A flamethrower that cannot airblast, which is the Phlogistinator and anything like it
-		return TF2Attrib_GetByName(primary, "airblast disabled") != Address_Null;
-	}
-
-	/* Destroy Projectiles is an airblast on a Pyro and a spun-up minigun on a Heavy
-
-	Same attribute, two different things behind it, and the guides rate it for both because a
-	person carrying a Phlogistinator knows they have given up the airblast. The upgrade menu does
-	not, and this table did not either: the Pyro's own line ranked it at 250 while the loadout
-	handed him the one flamethrower that cannot do it. */
-	if (StrEqual(attribute, "attack projectiles") && TF2_GetPlayerClass(client) == TFClass_Pyro)
-	{
-		int primary = GetPlayerWeaponSlot(client, TFWeaponSlot_Primary);
-
-		if (primary == -1)
-			return true;
-
-		return TF2Attrib_GetByName(primary, "airblast disabled") != Address_Null;
-	}
-
-	/* The Projectile Shield, which nothing in this mod presses
-
-	Every guide puts one tick of it first for a Medic and they are right about a person: it is the
-	strongest thing a Medic can do to a wave. It is deployed with the special attack key, and no
-	behaviour here has ever pressed one, so what the rage meter fills is a button nobody uses.
-
-	Three hundred credits for that, ranked at the top of the Medic's list, every wave. It goes back
-	the moment something deploys it, and that is the TODO rather than this. */
-	if (StrEqual(attribute, "generate rage on heal"))
-		return !Feature(FEATURE_MEDIC_SHIELD);
-
-	/* Afterburn, which the wiki calls useless and a bot has even less use for
-
-	It does not scale the way direct damage does, a small robot dies before it finishes ticking,
-	and a giant outlives it. */
-	if (StrEqual(attribute, "weapon burn dmg increased") || StrEqual(attribute, "weapon burn time increased"))
-		return true;
-
-	return false;
-}
 
 int GetUpgradePriority(int client, JSONObject info)
 {
@@ -764,23 +699,7 @@ top until it maxes out, so the steps bought here in one go are the ones the next
 would have bought anyway. The bot just finishes sooner and says so once */
 
 //No stock upgrade has more steps than this, and asking for steps that do not exist buys nothing
-#define UPGRADE_TIERS_MAX	4
 
-/* Upgrades where the steps after the first buy nothing worth having
-
-Rocket Specialist is the one everybody names: the first tick removes the damage falloff and slows
-what it hits, and the three after it are three hundred credits each for a bigger blast radius
-nobody asked for. Buying all four is the single most expensive mistake a Soldier can make here,
-and the batching above would buy all four in one go.
-
-A cap of one, not a ban: the tick itself is worth having, which is why it ranks high */
-static int UpgradeTierCap(const char[] attribute)
-{
-	if (StrEqual(attribute, "rocket specialist"))
-		return 1;
-
-	return UPGRADE_TIERS_MAX;
-}
 
 bool CTFBotPurchaseUpgrades_PurchaseUpgrade(int actor, JSONObject info)
 {

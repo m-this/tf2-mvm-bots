@@ -229,7 +229,7 @@ stock bool ConfiguredDispenserSpot(int actor, float spot[3])
 	return found;
 }
 
-stock void CollectDispenserSpots(int actor, char wanted[512], ArrayList free, ArrayList refused)
+stock void CollectDispenserSpots(int actor, const char[] wanted, ArrayList free, ArrayList refused)
 {
 	ArrayList spots = g_arrMapConfig.adtDispenserLocation;
 	ArrayList zones = g_arrMapConfig.adtDispenserZone;
