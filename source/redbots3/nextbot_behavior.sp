@@ -580,7 +580,7 @@ public Action Command_RecoverSpawnBots(int client, int args)
 }
 
 #include "behavior/attack.sp"
-#include "behavior/markgiant.sp"
+#include "generated/markgiant.sp"
 #include "behavior/collectmoney.sp"
 #include "behavior/gotoupgrade.sp"
 #include "behavior/upgrade.sp"
