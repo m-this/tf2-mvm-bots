@@ -499,75 +499,12 @@ None of it is trusted blindly. Every spot goes through the same nest score as ev
 one deep in the robots' half loses to the nav mesh reasoning below on distance to the bomb. A
 hand written EngineerNest block still outranks all of it: somebody stood there. */
 
-stock bool DoesAnyPlayerUseThisName(const char[] name)
-{
-	char playerName[MAX_NAME_LENGTH];
-	
-	for (int i = 1; i <= MaxClients; i++)
-		if (IsClientConnected(i) && GetClientName(i, playerName, sizeof(playerName)) && StrEqual(playerName, name, false))
-			return true;
-	
-	return false;
-}
-
 stock int ReadInt(Address pAddr)
 {
 	if (pAddr == Address_Null)
 		return -1;
 	
 	return LoadFromAddress(pAddr, NumberType_Int32);
-}
-
-//Somewhat borrowed from [L4D2] Survivor Bot AI Improver
-stock void SnapViewToPosition(int iClient, const float fPos[3])
-{
-	float clientEyePos[3]; GetClientEyePosition(iClient, clientEyePos);
-	
-	float fDesiredDir[3]; MakeVectorFromPoints(clientEyePos, fPos, fDesiredDir);
-	GetVectorAngles(fDesiredDir, fDesiredDir);
-
-	float clientEyeAng[3]; GetClientEyeAngles(iClient, clientEyeAng);
-	
-	float fEyeAngles[3];
-	fEyeAngles[0] = (clientEyeAng[0] + NormalizeAngle(fDesiredDir[0] - clientEyeAng[0]));
-	fEyeAngles[1] = (clientEyeAng[1] + NormalizeAngle(fDesiredDir[1] - clientEyeAng[1]));
-	fEyeAngles[2] = 0.0;
-
-	TeleportEntity(iClient, NULL_VECTOR, fEyeAngles, NULL_VECTOR);
-}
-
-stock float NormalizeAngle(float fAngle)
-{
-	fAngle = (fAngle - RoundToFloor(fAngle / 360.0) * 360.0);
-	if (fAngle > 180.0)fAngle -= 360.0;
-	else if (fAngle < -180.0)fAngle += 360.0;
-	return fAngle;
-}
-
-stock bool IsValidClientIndex(int client)
-{
-	return client > 0 && client <= MaxClients && IsClientInGame(client);
-}
-
-stock bool IsBaseBoss(int entity)
-{
-	return HasEntProp(entity, Prop_Send, "m_lastHealthPercentage");
-}
-
-stock bool IsPlayerReady(int client)
-{
-	return view_as<bool>(GameRules_GetProp("m_bPlayerReady", 1, client));
-}
-
-stock bool IsMeleeWeapon(int entity)
-{
-	//THINKFUNC Smack
-	return HasEntProp(entity, Prop_Data, "CTFWeaponBaseMeleeSmack");
-}
-
-stock bool IsZeroVector(float origin[3])
-{
-	return origin[0] == NULL_VECTOR[0] && origin[1] == NULL_VECTOR[1] && origin[2] == NULL_VECTOR[2];
 }
 
 /* Every action the bot is running, innermost first, for the dump commands
