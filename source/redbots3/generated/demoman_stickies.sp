@@ -94,7 +94,7 @@ stock bool ShouldDetonateStickies(int client)
 	return worthItAlone || (caughtTotal >= STICKY_DETONATE_ENEMIES) || (bombsWithEnemies >= STICKY_DETONATE_BOMBS);
 }
 
-stock bool IsStickyOnTank(float stickyOrigin[3])
+stock bool IsStickyOnTank(const float stickyOrigin[3])
 {
 	int tank = -1;
 	for (;;)

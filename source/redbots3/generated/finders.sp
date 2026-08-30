@@ -29,7 +29,7 @@ stock bool MedicHasPatient(int client, int medigun)
 	return false;
 }
 
-stock int FindFriendlyDispenserNear(int client, float origin[3], float maxRange = DISPENSER_GUARD_RANGE)
+stock int FindFriendlyDispenserNear(int client, const float origin[3], float maxRange = DISPENSER_GUARD_RANGE)
 {
 	float bestDistance = maxRange;
 	int best = -1;
@@ -68,7 +68,7 @@ stock bool WantsDispenser(int client)
 	return IsAmmoLow(client);
 }
 
-stock int FindSentryBusterNear(float origin[3], TFTeam enemyTeam, float maxRange)
+stock int FindSentryBusterNear(const float origin[3], TFTeam enemyTeam, float maxRange)
 {
 	float bestDistance = maxRange;
 	int best = -1;
@@ -189,7 +189,7 @@ stock int FindBotNearestToBombNearestToHatch(int client)
 	return bestEntity;
 }
 
-stock int GerNearestTeammate(int client, float maxDistance)
+stock int GerNearestTeammate(int client, const float maxDistance)
 {
 	float origin[3];
 	origin = WorldSpaceCenter(client);

@@ -33,7 +33,7 @@ stock bool CanWeaponAirblast(int weapon)
 	return TF2Attrib_HookValueInt(0, "airblast_disabled", weapon) == 0;
 }
 
-stock int CountEnemiesNearPosition(int client, float origin[3], float radius)
+stock int CountEnemiesNearPosition(int client, const float origin[3], float radius)
 {
 	int count = 0;
 	TFTeam enemyTeam = GetPlayerEnemyTeam(client);

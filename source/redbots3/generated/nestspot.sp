@@ -83,7 +83,7 @@ stock void NestZoneOf(CNavArea area, char[] zone, int maxlength)
 	}
 }
 
-stock bool BuildStandPoint(float spot[3], float from[3], int attempt, int attempts, float reach, float stand[3])
+stock bool BuildStandPoint(const float spot[3], const float from[3], int attempt, int attempts, float reach, float stand[3])
 {
 	for (int i = 0; i < 3; i++)
 	{

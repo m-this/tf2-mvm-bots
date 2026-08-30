@@ -56,7 +56,7 @@ stock int GetControlPointByID(int pointID)
 	return -1;
 }
 
-stock int GetNearestReviveMarker(int client, float maxDistance)
+stock int GetNearestReviveMarker(int client, const float maxDistance)
 {
 	float origin[3];
 	GetClientAbsOrigin(client, origin);

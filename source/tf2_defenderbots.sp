@@ -266,6 +266,7 @@ Address g_pMannVsMachineUpgrades;
 #include "redbots3/generated/scan.sp"
 #include "redbots3/generated/blu_assist.sp"
 #include "redbots3/util.sp"
+#include "redbots3/generated/nestscore.sp"
 #include "redbots3/generated/weapon_tuning.sp"
 #include "redbots3/generated/uber.sp"
 #include "redbots3/generated/demoman_stickies.sp"

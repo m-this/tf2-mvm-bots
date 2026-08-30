@@ -646,7 +646,6 @@ level three or spends mini sentries */
 #define NEST_HATCH_CLEARANCE 180.0
 
 //Two nests closer together than this cover the same ground twice and die to the same blast
-#define NEST_SPACING 500.0
 
 //How far from the sentry to look for ground to move it to, away from a buster
 #define SENTRY_HAUL_SEARCH_RANGE 1200.0
@@ -664,64 +663,6 @@ Bounded because the term is computed for every candidate area: a map hands out a
 within a sentry's range of the bomb as its mesh happens to have, and a score is not worth an
 unbounded loop. Two dozen spread across the ground is enough to tell a ledge over the choke from
 a corner behind a wall */
-#define MAX_APPROACH_SAMPLES	24
-#define NEST_SIGHT_SCORE	80.0
-
-/* The ground the robots have to cross to reach the target
-
-Areas on the bomb path within a sentry's range of it, taken with a stride so that a mesh with
-hundreds of them still describes the whole approach rather than one corner of it */
-static void CollectBombApproachAreas(const float target[3], float SentryRange, ArrayList out)
-{
-	AreasCollector hAreas = TheNavMesh.CollectAreasInRadius(target, SentryRange);
-
-	int count = hAreas.Count();
-	int stride = count > MAX_APPROACH_SAMPLES ? count / MAX_APPROACH_SAMPLES : 1;
-
-	for (int i = 0; i < count && out.Length < MAX_APPROACH_SAMPLES; i += stride)
-	{
-		CTFNavArea area = view_as<CTFNavArea>(hAreas.Get(i));
-
-		if (!area.HasAttributeTF(BOMB_DROP))
-			continue;
-
-		if (area.HasAttributeTF(BLUE_SPAWN_ROOM) || area.HasAttributeTF(RED_SPAWN_ROOM))
-			continue;
-
-		out.Push(area);
-	}
-
-	delete hAreas;
-}
-
-/* What this area can actually shoot at, which is the thing a play-test said was missing
-
-"Their sentries are blocked by the walls." A nest was tested against one point, the bomb, and a
-line to one point says nothing about a lane. A spot with the bomb visible through a doorway and
-a wall across everything either side of it passed, and the sentry built there fires at whatever
-crosses the doorway and nothing else.
-
-The nav mesh already knows this. Visibility between areas is computed when the mesh is built, so
-asking it is a lookup rather than a trace, and the whole approach can be asked about for the cost
-of the one trace this replaces.
-
-A mesh built without visibility data answers no to everything. Then every candidate scores zero
-here and the other terms decide, which is what happened before this existed */
-static float NestSightScore(CTFNavArea area, ArrayList approach)
-{
-	if (approach == null || approach.Length == 0)
-		return 0.0;
-
-	int seen = 0;
-
-	for (int i = 0; i < approach.Length; i++)
-	{
-		if (area.IsCompletelyVisible(view_as<CNavArea>(approach.Get(i))))
-			seen++;
-	}
-
-	return (float(seen) / float(approach.Length)) * NEST_SIGHT_SCORE;
-}
 
 /* How good a nest this area is, higher being better
 
@@ -740,104 +681,6 @@ free to put the sentry in a corridor behind the fight while a ledge over the cho
 An engineer carrying a Gunslinger scores the opposite way on range and height. The mini sentry is
 built in two seconds and dies in one, so it is spent rather than held: it wants to be near the
 robots where it is worth the metal, not on a ledge where it plinks */
-float ScoreNestArea(int client, CTFNavArea area, const float target[3], float SentryRange, ArrayList approach = null)
-{
-	bool disposable = TF2_IsGunslingerEquipped(client);
-	
-	float center[3]; area.GetCenter(center);
-	center[2] += 50.0;
-	
-	float range = GetVectorDistance(center, target);
-	float ideal = SentryRange * (disposable ? 0.35 : 0.75);
-	float score = 100.0 - (FloatAbs(range - ideal) / SentryRange) * 100.0;
-	
-	if (!disposable)
-	{
-		float height = center[2] - target[2];
-		
-		if (height > 0.0)
-			score += MinFloat(height, 300.0) * 0.1;
-	}
-	
-	score += MinFloat(area.GetSizeX(), area.GetSizeY()) * 0.05;
-	
-	score += NestSightScore(area, approach);
-	
-	score += NestCrowdingPenalty(client, area, center);
-	
-	return score;
-}
-
-/* What this ground is worth less for somebody else already being on it
-
-The old rule skipped the one case that matters. An engineer whose nest area was this very area
-was passed over with a continue, so two engineers who scored the same area best both walked to it
-and stood there placing a sentry on top of a sentry, while an area merely near a held one was
-penalised. The same ground is the strongest reason to pick different ground, not a free pass.
-
-A sentry that is already standing there counts as well, whoever built it: a bot who has not
-chosen a nest yet, and a human engineer, are both invisible to a rule that only reads other
-bots' intentions. */
-static float NestCrowdingPenalty(int client, CTFNavArea area, const float center[3])
-{
-	float penalty = 0.0;
-	
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (i == client || !IsClientInGame(i))
-			continue;
-		
-		if (m_aNestArea[i] == view_as<CNavArea>(area))
-		{
-			penalty -= 100.0;
-		}
-		else if (m_aNestArea[i] != NULL_AREA)
-		{
-			float other[3]; m_aNestArea[i].GetCenter(other);
-			
-			if (GetVectorDistance(center, other) < NEST_SPACING)
-				penalty -= 50.0;
-		}
-		
-		int sentry = GetObjectOfType(i, TFObject_Sentry);
-		
-		if (sentry != INVALID_ENT_REFERENCE && GetVectorDistance(center, GetAbsOrigin(sentry)) < NEST_SPACING)
-			penalty -= 100.0;
-	}
-	
-	return penalty;
-}
-
-/* The best scoring area in the list, or NULL_AREA for an empty one
-
-The lists are tiers: a caller asks for the best of the areas that see the bomb before it asks for
-the best of the areas that merely face it, so the score only ever orders areas that are already
-equally good on the thing that matters most */
-CNavArea BestNestArea(int client, ArrayList areas, const float target[3], float SentryRange)
-{
-	CNavArea best = NULL_AREA;
-	float bestScore = 0.0;
-	
-	//The ground the robots cross to reach the target, sampled once for the whole list
-	ArrayList approach = new ArrayList();
-	CollectBombApproachAreas(target, SentryRange, approach);
-	
-	for (int i = 0; i < areas.Length; i++)
-	{
-		CTFNavArea area = view_as<CTFNavArea>(areas.Get(i));
-		float score = ScoreNestArea(client, area, target, SentryRange, approach);
-		
-		if (best == NULL_AREA || score > bestScore)
-		{
-			best = view_as<CNavArea>(area);
-			bestScore = score;
-		}
-	}
-	
-	delete approach;
-	
-	return best;
-}
 
 /* The authored nests worth offering this engineer
 
