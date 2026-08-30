@@ -279,17 +279,3 @@ and capped so nothing waits on an engineer for ever. */
 #define BUILD_WALK_TIME_MAX	40.0
 
 
-stock void PrintToChatTeam(int team, const char[] format, any ...)
-{
-	char buffer[254];
-	
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (IsClientInGame(i) && GetClientTeam(i) == team)
-		{
-			SetGlobalTransTarget(i);
-			VFormat(buffer, sizeof(buffer), format, 3);
-			PrintToChat(i, "%s", buffer);
-		}
-	}
-}
