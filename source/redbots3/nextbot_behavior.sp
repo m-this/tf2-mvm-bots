@@ -587,7 +587,6 @@ public Action Command_RecoverSpawnBots(int client, int args)
 #include "generated/upgrade_rank.sp"
 #include "behavior/upgrade.sp"
 #include "generated/getammo.sp"
-#include "healthammo_search.sp"
 #include "generated/movetofront.sp"
 #include "generated/gethealth.sp"
 #include "generated/engineeridle.sp"

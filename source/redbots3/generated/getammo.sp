@@ -19,6 +19,9 @@ BehaviorAction CTFBotGetAmmo()
 
 #define AMMO_ASK_INTERVAL (0.5)
 
+#define HEALTH_CANDIDATES_MAX (64)
+#define HEALTH_PATHS_MAX (4)
+
 int m_iAmmoPack[65];
 int m_arrAmmoCandidates[65][4];
 int m_iAmmoCandidateCount[65];
@@ -26,6 +29,14 @@ int m_iAmmoCandidate[65];
 int m_iAmmoRepathFails[65];
 float m_ctAmmoAsk[65];
 bool m_bAmmoPossible[65];
+static char g_strHealthAndAmmoEntities[][] =
+{
+	"func_regenerate",
+	"item_ammopack*",
+	"item_health*",
+	"obj_dispenser",
+	"tf_ammo_pack",
+};
 
 public Action CTFBotGetAmmo_OnStart(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
 {
@@ -236,5 +247,82 @@ stock bool CTFBotGetAmmo_IsPossible(int actor)
 	m_bAmmoPossible[actor] = bPossible;
 	delete ammo;
 	return bPossible;
+}
+
+stock void ComputeHealthAndAmmoVectors(int client, ArrayList found, float maxRange)
+{
+	ArrayList nearby = new ArrayList(2);
+	float myCentre[3];
+	myCentre = WorldSpaceCenter(client);
+	for (int i = 0; i < 5; i++)
+	{
+		int ammo = -1;
+		for (;;)
+		{
+			ammo = FindEntityByClassname(ammo, g_strHealthAndAmmoEntities[i]);
+			if (ammo == -1)
+			{
+				break;
+			}
+			if (nearby.Length >= HEALTH_CANDIDATES_MAX)
+			{
+				break;
+			}
+			if (BaseEntity_GetTeamNumber(ammo) == view_as<int>(GetPlayerEnemyTeam(client)))
+			{
+				continue;
+			}
+			float entityRange = GetVectorDistance(myCentre, WorldSpaceCenter(ammo));
+			if (entityRange > maxRange)
+			{
+				continue;
+			}
+			if (BaseEntity_IsBaseObject(ammo))
+			{
+				if (TF2_IsBuilding(ammo))
+				{
+					continue;
+				}
+				if ((TF2_GetObjectType(ammo) == TFObject_Dispenser) && (GetEntProp(ammo, Prop_Send, "m_iAmmoMetal") <= 0))
+				{
+					continue;
+				}
+			}
+			int at = nearby.Push(entityRange);
+			nearby.Set(at, ammo, 1);
+		}
+	}
+	nearby.SortCustom(SortByStraightLineRange);
+	int searches = 0;
+	for (int i = 0; (i < nearby.Length) && (searches < HEALTH_PATHS_MAX); i++)
+	{
+		int ammo = nearby.Get(i, 1);
+		searches++;
+		float length;
+		bool reachable = IsPathToVectorPossible(client, WorldSpaceCenter(ammo), length);
+		if (!reachable)
+		{
+			continue;
+		}
+		if (length > maxRange)
+		{
+			continue;
+		}
+		int at = found.Push(ammo);
+		found.Set(at, length, 1);
+	}
+	delete nearby;
+}
+
+stock int SortByStraightLineRange(int index1, int index2, Handle array, Handle hndl)
+{
+	ArrayList list = view_as<ArrayList>(array);
+	float first = view_as<float>(list.Get(index1, 0));
+	float second = view_as<float>(list.Get(index2, 0));
+	if (first < second)
+	{
+		return -1;
+	}
+	return (first > second ? 1 : 0);
 }
 
