@@ -259,7 +259,7 @@ Address g_pMannVsMachineUpgrades;
 #include "redbots3/blu_assist.sp"
 #include "redbots3/util.sp"
 #include "redbots3/weapon_tuning.sp"
-#include "redbots3/medic_uber.sp"
+#include "redbots3/generated/uber.sp"
 #include "redbots3/demoman_stickies.sp"
 #include "redbots3/offsets.sp"
 #include "redbots3/sdkcalls.sp"

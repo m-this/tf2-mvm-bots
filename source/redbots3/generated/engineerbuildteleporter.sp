@@ -125,7 +125,7 @@ public Action CTFBotMvMEngineerBuildTeleporter_Update(BehaviorAction action, int
 	{
 		if (!IsBuilderSetTo(actor, TFObject_Teleporter, m_nTeleporterMode[actor]))
 		{
-			FakeClientCommandThrottled(actor, m_nTeleporterMode[actor] == TFObjectMode_Entrance ? "build 1 0" : "build 1 1");
+			FakeClientCommandThrottled(actor, (m_nTeleporterMode[actor] == TFObjectMode_Entrance ? "build 1 0" : "build 1 1"));
 		}
 		AimHeadTowards(myBody, spot, MANDATORY, 0.1, Address_Null, "Placing teleporter");
 	}
@@ -208,7 +208,7 @@ stock bool TeleporterClimbToSpot(int actor, IBody myBody, float spot[3])
 	}
 	if ((rise > TELEPORTER_CLIMB_RISE_MAX) || (m_iTeleporterClimbs[actor] >= TELEPORTER_CLIMB_LIMIT))
 	{
-		SayClimb(actor, rise > TELEPORTER_CLIMB_RISE_MAX ? "too high to climb" : "out of climbs", rise, out);
+		SayClimb(actor, (rise > TELEPORTER_CLIMB_RISE_MAX ? "too high to climb" : "out of climbs"), rise, out);
 		return false;
 	}
 	if (out > TELEPORTER_CLIMB_RANGE)

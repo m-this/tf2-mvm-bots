@@ -84,7 +84,7 @@ stock void ReportEngineerStall(int actor, const char[] where)
 		return;
 	}
 	m_ctEngineerStallReport[actor] = GetGameTime() + ENGINEER_STALL_REPORT;
-	PrintToServer("[defenderbots] engineer %N has no sentry at %.1f: %s (nest %s, carrying %s, grabbing %s)", actor, GetGameTime(), where, Go_nestAreaOf(actor) == NULL_AREA ? "none" : "held", TF2_IsCarryingObject(actor) ? "yes" : "no", g_bGoingToGrabBuilding[actor] ? "yes" : "no");
+	PrintToServer("[defenderbots] engineer %N has no sentry at %.1f: %s (nest %s, carrying %s, grabbing %s)", actor, GetGameTime(), where, (Go_nestAreaOf(actor) == NULL_AREA ? "none" : "held"), (TF2_IsCarryingObject(actor) ? "yes" : "no"), (g_bGoingToGrabBuilding[actor] ? "yes" : "no"));
 }
 
 stock CNavArea Go_nestAreaOf(int actor)

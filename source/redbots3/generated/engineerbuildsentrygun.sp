@@ -190,6 +190,6 @@ public void CTFBotMvMEngineerBuildSentrygun_OnEnd(BehaviorAction action, int act
 {
 	g_arrPluginBot[actor].bPathing = false;
 	UpdateLookAroundForEnemies(actor, true);
-	LogBuildFailure(actor, "sentry", GetObjectOfType(actor, TFObject_Sentry) != INVALID_ENT_REFERENCE ? "ended with a sentry" : "ended with nothing");
+	LogBuildFailure(actor, "sentry", (GetObjectOfType(actor, TFObject_Sentry) != INVALID_ENT_REFERENCE ? "ended with a sentry" : "ended with nothing"));
 }
 
