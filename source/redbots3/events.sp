@@ -178,51 +178,6 @@ A/B died on exactly that frame, and the watchdog does not care that the work is 
 So the resets are a queue and the queue is drained a bot a tick. The wave is minutes long and the
 queue is at most the server's player count, which is a rounding error against it. The same shape,
 and the same reason, as the nest relocation evaluator. */
-#define BEHAVIOUR_RESET_INTERVAL	0.1
-
-static int m_iBehaviourResetNext;
-static Handle m_hBehaviourResetTimer;
-
-static void QueueBehaviourReset()
-{
-	StopBehaviourReset();
-	
-	m_iBehaviourResetNext = 1;
-	m_hBehaviourResetTimer = CreateTimer(BEHAVIOUR_RESET_INTERVAL, Timer_ResetOneBehaviour, _, TIMER_REPEAT);
-}
-
-//Killed by handle rather than deleted, because a map change closes it and leaves this one stale
-static void StopBehaviourReset()
-{
-	if (m_hBehaviourResetTimer != null)
-		KillTimer(m_hBehaviourResetTimer);
-	
-	m_hBehaviourResetTimer = null;
-}
-
-static Action Timer_ResetOneBehaviour(Handle timer)
-{
-	//Walked once, forwards, so a bot that joins mid-drain is not reset twice and none is skipped
-	while (m_iBehaviourResetNext <= MaxClients)
-	{
-		int client = m_iBehaviourResetNext++;
-		
-		if (!IsClientInGame(client) || !g_bIsDefenderBot[client] || !IsPlayerAlive(client))
-			continue;
-		
-		if (!ShouldResetBehavior(client))
-			continue;
-		
-		//Rethink what we're supposed to do
-		ResetIntentionInterface(client);
-		
-		return Plugin_Continue;
-	}
-	
-	m_hBehaviourResetTimer = null;
-	
-	return Plugin_Stop;
-}
 
 static void Event_MvmWaveBegin(Event event, const char[] name, bool dontBroadcast)
 {
@@ -478,19 +433,3 @@ static Action Timer_UpdateChosenBotTeamComposition(Handle timer)
 	return Plugin_Stop;
 }
 
-static bool ShouldResetBehavior(int client)
-{
-	//Looking for sniping spots, don't disturb
-	if (ActionsManager.LookupEntityActionByName(client, "SniperLurk") != INVALID_ACTION)
-		return false;
-	
-	//I'm healing people
-	if (ActionsManager.LookupEntityActionByName(client, "Heal") != INVALID_ACTION)
-		return false;
-	
-	//I am building shit
-	if (ActionsManager.LookupEntityActionByName(client, "DefenderEngineerIdle") != INVALID_ACTION)
-		return false;
-	
-	return true;
-}
