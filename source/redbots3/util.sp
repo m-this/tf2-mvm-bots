@@ -513,7 +513,6 @@ level three or spends mini sentries */
 //Two nests closer together than this cover the same ground twice and die to the same blast
 
 //How far from the sentry to look for ground to move it to, away from a buster
-#define SENTRY_HAUL_SEARCH_RANGE 1200.0
 
 /* How close to the bomb a nest is allowed to be, as a fraction of the sentry's range
 
@@ -574,118 +573,6 @@ built on the same prefabs is covered without anybody authoring anything.
 None of it is trusted blindly. Every spot goes through the same nest score as everything else, so
 one deep in the robots' half loses to the nav mesh reasoning below on distance to the bomb. A
 hand written EngineerNest block still outranks all of it: somebody stood there. */
-
-/* Ground to move a sentry to when a buster is walking towards it, or NULL_AREA for none
-
-Not a nest. The sentry is going back where it was as soon as the buster is dead, so this asks for
-one thing only: that the blast happens somewhere else. Far enough that the sentry survives it,
-near enough that the engineer is not carrying a building across the map while the wave arrives.
-
-Nothing here is clever about where the buster will walk. A buster chases the sentry that hurt it
-most, so it follows, and what the engineer buys is the time it takes to walk the difference. That
-time is what the team kills it in, and the blast that does land lands away from the dispenser and
-away from whoever was standing at the nest */
-CNavArea PickBusterRetreatArea(int sentry, int buster)
-{
-	float sentryOrigin[3]; sentryOrigin = GetAbsOrigin(sentry);
-	float busterOrigin[3]; busterOrigin = WorldSpaceCenter(buster);
-
-	//Anywhere the sentry ends up has to beat where it stands now by a blast, or it was not worth moving
-	float bestDistance = GetVectorDistance(sentryOrigin, busterOrigin) + BUSTER_BLAST_RANGE;
-	CNavArea best = NULL_AREA;
-
-	AreasCollector hAreas = TheNavMesh.CollectAreasInRadius(sentryOrigin, SENTRY_HAUL_SEARCH_RANGE);
-
-	int count = hAreas.Count();
-
-	//One engineer, once per buster, but the count belongs to the map rather than to this
-	if (count > 256)
-		count = 256;
-
-	for (int i = 0; i < count; i++)
-	{
-		CTFNavArea area = view_as<CTFNavArea>(hAreas.Get(i));
-
-		if (area.HasAttributeTF(BLUE_SPAWN_ROOM) || area.HasAttributeTF(RED_SPAWN_ROOM))
-			continue;
-
-		float center[3]; area.GetCenter(center);
-
-		float distance = GetVectorDistance(center, busterOrigin);
-
-		if (distance <= bestDistance)
-			continue;
-
-		bestDistance = distance;
-		best = view_as<CNavArea>(area);
-	}
-
-	delete hAreas;
-
-	return best;
-}
-
-
-/* Whether the ground this engineer holds has stopped being the best ground on offer
-
-Both areas go through ScoreNestArea against the same approach sample, so the two numbers are
-comparable: this asks what the nest picker would choose if it ran again now, and by how much that
-beats what the engineer already has.
-
-The gain has to be worth what moving costs. A relocation is a rebuild or a carry, either of which
-spends the opening of the next wave walking rather than shooting, so the default threshold is half
-of NEST_SIGHT_SCORE: what a nest gains by going from seeing half the approach to seeing all of it.
-Under that the difference is mostly the range and room terms wobbling as the bomb's reset position
-shifts between waves, and that is not a reason to give up a standing level three */
-bool ShouldRelocateNest(int client, CNavArea &destination, float SentryRange = 1300.0)
-{
-	destination = NULL_AREA;
-	
-	CNavArea current = m_aNestArea[client];
-	
-	//No nest yet, so there is nothing to compare against and the ordinary picker will build one
-	if (current == NULL_AREA)
-		return false;
-	
-	float target[3];
-	BombInfo_t bombinfo;
-	
-	if (GetBombInfo(bombinfo))
-	{
-		target[0] = bombinfo.vPosition[0];
-		target[1] = bombinfo.vPosition[1];
-		target[2] = bombinfo.vPosition[2];
-	}
-	else
-	{
-		target = GetBombHatchPosition();
-	}
-	
-	target[2] += 40.0;
-	
-	CNavArea candidate = PickBuildArea(client, SentryRange);
-	
-	if (candidate == NULL_AREA || candidate == current)
-		return false;
-	
-	ArrayList approach = new ArrayList();
-	CollectBombApproachAreas(target, SentryRange, approach);
-	
-	float gain = ScoreNestArea(client, view_as<CTFNavArea>(candidate), target, SentryRange, approach)
-		- ScoreNestArea(client, view_as<CTFNavArea>(current), target, SentryRange, approach);
-	
-	delete approach;
-	
-	if (redbots_manager_debug.BoolValue)
-		PrintToServer("ShouldRelocateNest: %N would gain %.1f by moving", client, gain);
-	
-	if (gain < redbots_manager_engineer_nest_relocate_score_gain_min.FloatValue)
-		return false;
-	
-	destination = candidate;
-	
-	return true;
-}
 
 stock bool DoesAnyPlayerUseThisName(const char[] name)
 {
