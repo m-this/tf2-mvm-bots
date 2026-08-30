@@ -18,67 +18,11 @@ upgrade station rewrites all wave, and they were not worth one more thing to bla
 Defender bots only, and never the invading robots: a wave is read by silhouette, and a robot in a
 hat is a robot somebody shoots a moment later than they should. */
 
-//How many times a bot may draw again when what it drew has no model to wear
-#define HAT_DRAW_TRIES			4
-
 
 /* Half a second after the bot spawns, not the moment it does
 
 The game gives its own items on spawn, and the custom loadout replaces them a tenth of a second
 later, and a hat handed to a bot in the middle of that is a hat the game throws away.
-
-Once per spawn, however many times it is asked. A bot's first spawn asks twice: the spawn that
-identifies it as ours, and the respawn that applies its loadout, which is close enough behind to
-be the same moment. Without the flag that is a hat created, worn and taken off again for every
-bot at the start of every wave. */
-void GiveBotCosmeticsSoon(int client)
-{
-	if (!redbots_manager_bot_hats.BoolValue)
-		return;
-	
-	if (g_bCosmeticsPending[client])
-		return;
-	
-	g_bCosmeticsPending[client] = true;
-	
-	/* Spread across a second rather than all landing on the same frame
-	
-	A team spawns together, so six of these used to be scheduled for the same tenth of a second and
-	fired on one frame. Dressing a bot creates an entity and precaches a model, and a precache
-	that has to go to disk is not a thing to do six times inside one tick of a server that is also
-	starting a wave. The half second is what it was; the rest is one bot after another. */
-	float when = 0.5 + 0.15 * float(client % 8);
-	
-	CreateTimer(when, Timer_GiveBotCosmetics, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
-}
-
-static Action Timer_GiveBotCosmetics(Handle timer, int userid)
-{
-	int client = GetClientOfUserId(userid);
-	
-	if (client < 1)
-		return Plugin_Stop;
-	
-	g_bCosmeticsPending[client] = false;
-	
-	if (!IsClientInGame(client) || !IsPlayerAlive(client) || !g_bIsDefenderBot[client])
-		return Plugin_Stop;
-	
-	/* Draw again when what the bot drew turns out not to be wearable, up to a few times
-
-	A hat the schema has no model for is dropped from the pool and the bot was left bare until its
-	next respawn, which for a defender that does not die is the rest of the mission. Every failure
-	takes that item out of the pool, so the tries cannot chase the same bad one twice. */
-	for (int attempt = 0; attempt < HAT_DRAW_TRIES; attempt++)
-	{
-		DrawWardrobe(client);
-		
-		if (!redbots_manager_bot_hats.BoolValue || WearHat(client))
-			break;
-	}
-	
-	return Plugin_Stop;
-}
 
 /* Put the drawn hat back on
 

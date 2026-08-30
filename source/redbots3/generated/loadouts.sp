@@ -351,3 +351,68 @@ stock int GetRandomWeaponForClass(const char[] class, const char[] slot)
 	return -1;
 }
 
+stock void LoadLoadoutFunctions()
+{
+	RegConsoleCmd("sm_redbot_upgraded", Command_BoughtUpgrades);
+}
+
+public Action Command_BoughtUpgrades(int client, int args)
+{
+	if (!redbots_manager_use_custom_loadouts.BoolValue)
+	{
+		return Plugin_Handled;
+	}
+	if (!IsFakeClient(client))
+	{
+		return Plugin_Handled;
+	}
+	int primaryWep = GetPlayerWeaponSlot(client, TFWeaponSlot_Primary);
+	int secondaryWep = GetPlayerWeaponSlot(client, TFWeaponSlot_Secondary);
+	int meleeWep = GetPlayerWeaponSlot(client, TFWeaponSlot_Melee);
+	ClearSavedAttributes(client);
+	int count;
+	Address attr;
+	if (IsValidEntity(primaryWep))
+	{
+		count = TF2Attrib_ListDefIndices(primaryWep, m_iAttribPrimary[client]);
+		if (count > 0)
+		{
+			for (int i = 0; i < count; i++)
+			{
+				attr = TF2Attrib_GetByDefIndex(primaryWep, m_iAttribPrimary[client][i]);
+				m_flAttrValPrimary[client][i] = TF2Attrib_GetValue(attr);
+			}
+		}
+	}
+	if (IsValidEntity(secondaryWep))
+	{
+		count = TF2Attrib_ListDefIndices(secondaryWep, m_iAttribSecondary[client]);
+		if (count > 0)
+		{
+			for (int i = 0; i < count; i++)
+			{
+				attr = TF2Attrib_GetByDefIndex(secondaryWep, m_iAttribSecondary[client][i]);
+				m_flAttrValSecondary[client][i] = TF2Attrib_GetValue(attr);
+			}
+		}
+	}
+	if (IsValidEntity(meleeWep))
+	{
+		count = TF2Attrib_ListDefIndices(meleeWep, m_iAttribMelee[client]);
+		if (count > 0)
+		{
+			for (int i = 0; i < count; i++)
+			{
+				attr = TF2Attrib_GetByDefIndex(meleeWep, m_iAttribMelee[client][i]);
+				m_flAttrValMelee[client][i] = TF2Attrib_GetValue(attr);
+			}
+		}
+	}
+	if (redbots_manager_debug.BoolValue)
+	{
+		PrintToChatAll("[Command_BoughtUpgrades] SAVED WEAPON STATS FOR %N", client);
+	}
+	g_bHasBoughtUpgrades[client] = true;
+	return Plugin_Handled;
+}
+

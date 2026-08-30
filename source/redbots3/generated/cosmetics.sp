@@ -14,6 +14,8 @@
 
 #define EQUIP_REGION_MEDAL ("medal")
 
+#define HAT_DRAW_TRIES (4)
+
 enum struct Go_Wardrobe
 {
 	bool Drawn;
@@ -300,5 +302,43 @@ stock ArrayList BuildHatPool(TFClassType playerClass)
 	}
 	items.Close();
 	return pool;
+}
+
+stock void GiveBotCosmeticsSoon(int client)
+{
+	if (!redbots_manager_bot_hats.BoolValue)
+	{
+		return;
+	}
+	if (g_bCosmeticsPending[client])
+	{
+		return;
+	}
+	g_bCosmeticsPending[client] = true;
+	float when = 0.5 + (0.15 * float(client % 8));
+	CreateTimer(when, Timer_GiveBotCosmetics, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
+}
+
+public Action Timer_GiveBotCosmetics(Handle timer, int userid)
+{
+	int client = GetClientOfUserId(userid);
+	if (client < 1)
+	{
+		return Plugin_Stop;
+	}
+	g_bCosmeticsPending[client] = false;
+	if (!IsClientInGame(client) || !IsPlayerAlive(client) || !g_bIsDefenderBot[client])
+	{
+		return Plugin_Stop;
+	}
+	for (int attempt = 0; attempt < HAT_DRAW_TRIES; attempt++)
+	{
+		DrawWardrobe(client);
+		if (!redbots_manager_bot_hats.BoolValue || WearHat(client))
+		{
+			break;
+		}
+	}
+	return Plugin_Stop;
 }
 
