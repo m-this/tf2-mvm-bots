@@ -89,15 +89,6 @@ enum eMissionDifficulty
 	MISSION_MAX_COUNT
 }
 
-enum
-{
-	STATS_CREDITS_DROPPED = 0,
-	STATS_CREDITS_ACQUIRED,
-	STATS_CREDITS_BONUS,
-	STATS_PLAYER_DEATHS,
-	STATS_BUYBACKS
-}
-
 char g_sPlayerUseMyNameResponse[][] =
 {
 	"You're very funny for using my name.",
@@ -388,67 +379,6 @@ int SpawnRoutePoints(int actor, const float spawn[3], float first, float step, f
 	return found;
 }
 
-float[] GetBombHatchPosition(bool bUseAbsOrigin = false)
-{
-	float vOrigin[3];
-
-	int iHole = FindEntityByClassname(-1, "func_capturezone");
-	
-	if (iHole != -1)
-		vOrigin = bUseAbsOrigin ? GetAbsOrigin(iHole) : WorldSpaceCenter(iHole);
-	
-	return vOrigin;
-}
-
-int GetAcquiredCreditsOfAllWaves(bool withBonus = true)
-{
-	int ent = FindEntityByClassname(MaxClients + 1, "tf_mann_vs_machine_stats");
-	
-	if (ent == -1)
-	{
-		LogError("GetAcquiredCreditsOfAllWaves: Could not find entity tf_mann_vs_machine_stats!");
-		return 0;
-	}
-	
-	int total = GetEntProp(ent, Prop_Send, "m_runningTotalWaveStats", _, STATS_CREDITS_ACQUIRED);
-	total += GetEntProp(ent, Prop_Send, "m_previousWaveStats", _, STATS_CREDITS_ACQUIRED);
-	total += GetEntProp(ent, Prop_Send, "m_currentWaveStats", _, STATS_CREDITS_ACQUIRED);
-	
-	if (withBonus)
-	{
-		total += GetEntProp(ent, Prop_Send, "m_runningTotalWaveStats", _, STATS_CREDITS_BONUS);
-		total += GetEntProp(ent, Prop_Send, "m_previousWaveStats", _, STATS_CREDITS_BONUS);
-		total += GetEntProp(ent, Prop_Send, "m_currentWaveStats", _, STATS_CREDITS_BONUS);
-	}
-	
-	return total;
-}
-
-int GetNearestReviveMarker(int client, const float max_distance)
-{
-	float origin[3]; GetClientAbsOrigin(client, origin);
-	
-	float bestDistance = 999999.0;
-	int bestEntity = -1;
-	
-	int iEnt = -1;
-	while ((iEnt = FindEntityByClassname(iEnt, "entity_revive_marker")) != -1)
-	{
-		if (BaseEntity_GetTeamNumber(iEnt) != GetClientTeam(client))
-			continue;
-		
-		float distance = GetVectorDistance(origin, GetAbsOrigin(iEnt));
-		
-		if (distance <= bestDistance && distance <= max_distance)
-		{
-			bestDistance = distance;
-			bestEntity = iEnt;
-		}
-	}
-	
-	return bestEntity;
-}
-
 /* To trigger the robo sapper, you need to do several things
 - set a builder
 - set the object mode to MODE_SAPPER_ANTI_ROBOT or MODE_SAPPER_ANTI_ROBOT_RADIUS
@@ -474,41 +404,6 @@ int SpawnSapper(int owner, int entity, int weapon = -1)
 	}
 	
 	return sapper;
-}
-
-void RemoveEffects(int entity, int nEffects)
-{
-	SetEntProp(entity, Prop_Send, "m_fEffects", GetEntProp(entity, Prop_Send, "m_fEffects") & ~nEffects);
-	
-	if (nEffects & EF_NODRAW)
-		CBaseEntity(entity).DispatchUpdateTransmitState();
-}
-
-//Based on CTFKnife::CanPerformBackstabAgainstTarget
-bool HasBackstabPotential(int client)
-{
-	//These are MvM-specific conditions, where stunned bots are usually allowed to be backstabbed
-	if (TF2_GetClientTeam(client) == TFTeam_Blue)
-	{
-		if (TF2_IsPlayerInCondition(client, TFCond_MVMBotRadiowave))
-			return true;
-		
-		if (TF2_IsPlayerInCondition(client, TFCond_Sapped) && !TF2_IsMiniBoss(client))
-			return true;
-	}
-	
-	return false;
-}
-
-int GetControlPointByID(int pointID)
-{
-	int ent = -1;
-	
-	while ((ent = FindEntityByClassname(ent, "team_control_point")) != -1)
-		if (GetEntProp(ent, Prop_Data, "m_iPointIndex") == pointID)
-			return ent;
-	
-	return -1;
 }
 
 //Return a capture area trigger associated with a control point that the team can capture
@@ -681,13 +576,6 @@ bool IsUpgradeStationEnabled(int station)
 		iOffsetIsEnabled = FindDataMapInfo(station, "m_nStartDisabled") + 28;
 	
 	return GetEntData(station, iOffsetIsEnabled, 1);
-}
-
-float[] GetAbsAngles(int entity)
-{
-	float vec[3]; CBaseEntity(entity).GetAbsAngles(vec);
-	
-	return vec;
 }
 
 /* The whole bomb path: the travel distance to the hatch from the far end of it
