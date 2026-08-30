@@ -591,7 +591,7 @@ public Action Command_RecoverSpawnBots(int client, int args)
 #include "behavior/engineerbuildsentrygun.sp"
 #include "behavior/engineerbuilddispenser.sp"
 #include "behavior/engineerbuildteleporter.sp"
-#include "behavior/engineerbuilddisposable.sp"
+#include "generated/engineerbuilddisposable.sp"
 #include "behavior/spycheck.sp"
 #include "generated/stickytrap.sp"
 #include "generated/spylurk.sp"
