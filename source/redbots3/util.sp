@@ -1069,53 +1069,6 @@ the between-waves period, when no tank exists yet, so asking the world is always
 
 m_iszMannVsMachineWaveClassNames is the row of class icons the wave bar draws. The game fills it
 in before the wave starts, and a wave with a tank in it carries the "tank" icon */
-#define MVM_WAVE_CLASS_ICONS_MAX	12
-#define MVM_TANK_CLASS_ICON			"tank"
-
-/* Does the coming wave carry robots of this kind?
-
-The icon names are the wave bar's, so they are the mission's own answer and they are filled in
-before the wave starts. Matched as a substring because the variants are all suffixed: a wave with
-demoknights and burst demos carries "demoknight" and "demo_burst", and both of them throw
-explosives at the team */
-bool WaveHasClassIcon(const char[] needle)
-{
-	int rsrc = FindEntityByClassname(MaxClients + 1, "tf_objective_resource");
-	
-	if (rsrc == -1)
-		return false;
-	
-	for (int i = 0; i < MVM_WAVE_CLASS_ICONS_MAX; i++)
-	{
-		char icon[64]; TF2_GetMannVsMachineWaveClassName(rsrc, i, icon, sizeof(icon));
-		
-		if (icon[0] != '\0' && StrContains(icon, needle, false) != -1)
-			return true;
-	}
-	
-	return false;
-}
-
-bool IsTankWave()
-{
-	return WaveHasClassIcon(MVM_TANK_CLASS_ICON);
-}
-
-//What the coming wave will actually kill the team with
-bool WaveHasExplosiveRobots()
-{
-	return WaveHasClassIcon("demo") || WaveHasClassIcon("soldier") || IsTankWave();
-}
-
-bool WaveHasBulletRobots()
-{
-	return WaveHasClassIcon("heavy") || WaveHasClassIcon("scout") || WaveHasClassIcon("sniper");
-}
-
-bool WaveHasFireRobots()
-{
-	return WaveHasClassIcon("pyro");
-}
 
 /* The nest spots the map itself carries, and where they come from
 
