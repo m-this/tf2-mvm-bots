@@ -1,5 +1,3 @@
-static int m_iWaveFailCounterTick;
-
 void InitGameEventHooks()
 {
 	HookEvent("player_spawn", Event_PlayerSpawn);
@@ -309,49 +307,6 @@ static Action Timer_PlayerSpawn(Handle timer, int data)
 		
 		SetRandomNameOnBot(data);
 	}
-	
-	return Plugin_Stop;
-}
-
-static Action Timer_WaveFailure(Handle timer)
-{
-	m_iWaveFailCounterTick = 0;
-	
-	if (GameRules_GetRoundState() != RoundState_BetweenRounds)
-		return Plugin_Stop;
-	
-	//Don't refund if we wanna keep them
-	//TODO: how we gonna do this for custom loadouts?
-	if (redbots_manager_keep_bot_upgrades.BoolValue)
-		return Plugin_Stop;
-	
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (IsClientInGame(i) && g_bIsDefenderBot[i])
-		{
-			/* NOTE: this isn't actually necessary, but the reason why I'm doing this is so we
-			or the population manager forgets about the bots' upgrades so they can 
-			just go and buy upgrades again in their upgrade behavior, though this is really 
-			just for the bots that failed a wave but were not kicked */
-			if (g_bHasUpgraded[i])
-			{
-				g_bHasBoughtUpgrades[i] = false;
-				VS_GrantOrRemoveAllUpgrades(i, true, true);
-				g_bHasUpgraded[i] = false;
-			}
-		}
-	}
-	
-	return Plugin_Stop;
-}
-
-static Action Timer_UpdateChosenBotTeamComposition(Handle timer)
-{
-	//These modes use their own way of composing a bot team
-	if (redbots_manager_bot_lineup_mode.IntValue == BOT_LINEUP_MODE_CHOOSE)
-		return Plugin_Stop;
-	
-	UpdateChosenBotTeamComposition();
 	
 	return Plugin_Stop;
 }
