@@ -59,47 +59,6 @@ static void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast
 	}
 }
 
-static void Event_MvmWaveFailed(Event event, const char[] name, bool dontBroadcast)
-{
-	OpenTheBreak();
-
-	//A lineup retyped mid-wave was held until now
-	Reseat_OnBreak();
-	
-	m_iWaveFailCounterTick++;
-	
-	//The same wave comes back down the same route, so there is nothing new to say about the nests
-	EngineerNestRelocation_ResetAll();
-	
-	if (redbots_manager_kick_bots.BoolValue)
-	{
-		RemoveAllDefenderBots("BotManager3: Wave failed!");
-		ManageDefenderBots(false);
-		CreateTimer(0.1, Timer_UpdateChosenBotTeamComposition, _, TIMER_FLAG_NO_MAPCHANGE);
-		PrintToChatAll("%s Use command !viewbotlineup to view the next bot team composition", PLUGIN_PREFIX);
-	}
-	
-	if (redbots_manager_mode.IntValue == MANAGER_MODE_READY_BOTS)
-	{
-		//Global cooldown before players can ready up again
-		g_flNextReadyTime = GetGameTime() + redbots_manager_ready_cooldown.FloatValue;
-		
-		if (m_iWaveFailCounterTick > 3)
-		{
-			//Mission restarted or changed, don't have a cooldown here
-			g_flNextReadyTime = 0.0;
-		}
-	}
-	
-	if (redbots_manager_bot_lineup_mode.IntValue == BOT_LINEUP_MODE_CHOOSE)
-	{
-		//In case the mission changed, let players pick the bot team
-		FreeChosenBotTeam();
-	}
-	
-	CreateTimer(0.1, Timer_WaveFailure, _, TIMER_FLAG_NO_MAPCHANGE);
-}
-
 static void Event_MvmWaveComplete(Event event, const char[] name, bool dontBroadcast)
 {
 	OpenTheBreak();

@@ -89,3 +89,31 @@ public Action Timer_UpdateChosenBotTeamComposition(Handle timer)
 	return Plugin_Stop;
 }
 
+public void Event_MvmWaveFailed(Event event, const char[] name, bool dontBroadcast)
+{
+	OpenTheBreak();
+	Reseat_OnBreak();
+	m_iWaveFailCounterTick++;
+	EngineerNestRelocation_ResetAll();
+	if (redbots_manager_kick_bots.BoolValue)
+	{
+		RemoveAllDefenderBots("BotManager3: Wave failed!");
+		ManageDefenderBots(false);
+		CreateTimer(0.1, Timer_UpdateChosenBotTeamComposition, _, TIMER_FLAG_NO_MAPCHANGE);
+		PrintToChatAll("%s Use command !viewbotlineup to view the next bot team composition", PLUGIN_PREFIX);
+	}
+	if (redbots_manager_mode.IntValue == MANAGER_MODE_READY_BOTS)
+	{
+		g_flNextReadyTime = GetGameTime() + redbots_manager_ready_cooldown.FloatValue;
+		if (m_iWaveFailCounterTick > 3)
+		{
+			g_flNextReadyTime = 0.0;
+		}
+	}
+	if (redbots_manager_bot_lineup_mode.IntValue == BOT_LINEUP_MODE_CHOOSE)
+	{
+		FreeChosenBotTeam();
+	}
+	CreateTimer(0.1, Timer_WaveFailure, _, TIMER_FLAG_NO_MAPCHANGE);
+}
+
