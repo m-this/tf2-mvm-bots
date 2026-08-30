@@ -183,9 +183,6 @@ static bool TraceFilter_TFBot(int entity, int contentsMask, StringMap data)
 	return true;
 }
 
-
-
-
 //Set up an entity for item creation
 int EconItemCreateNoSpawn(char[] classname, int itemDefIndex, int level, int quality)
 {
@@ -274,17 +271,6 @@ int GiveItemToPlayer(int client, char[] classname, int itemDefIndex, int level, 
 	
 	return item;
 }
-
-
-
-
-
-
-
-
-
-
-
 
 //What the explosion reaches. Valve's own is smaller, and a bot that stops running early is dead
 #define BUSTER_BLAST_RANGE	400.0
@@ -402,21 +388,6 @@ int SpawnRoutePoints(int actor, const float spawn[3], float first, float step, f
 	return found;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 float[] GetBombHatchPosition(bool bUseAbsOrigin = false)
 {
 	float vOrigin[3];
@@ -453,8 +424,6 @@ int GetAcquiredCreditsOfAllWaves(bool withBonus = true)
 	return total;
 }
 
-
-
 int GetNearestReviveMarker(int client, const float max_distance)
 {
 	float origin[3]; GetClientAbsOrigin(client, origin);
@@ -478,58 +447,6 @@ int GetNearestReviveMarker(int client, const float max_distance)
 	}
 	
 	return bestEntity;
-}
-
-int PowerupBottle_GetNumCharges(int bottle)
-{
-	return GetEntProp(bottle, Prop_Send, "m_usNumCharges");
-}
-
-//CTFPowerupBottle::GetPowerupType
-int PowerupBottle_GetType(int bottle)
-{
-	return GetEntProp(bottle, Prop_Send, "m_usAdvancedType");
-}
-
-int GetPowerupBottle(int client)
-{
-	int ent = -1;
-	
-	while ((ent = FindEntityByClassname(ent, "tf_powerup_bottle")) != -1)
-		if (BaseEntity_GetOwnerEntity(ent) == client)
-			break;
-	
-	return ent;
-}
-
-//CTFFlameThrower::CanAirBlast
-bool CanWeaponAirblast(int weapon)
-{
-	return TF2Attrib_HookValueInt(0, "airblast_disabled", weapon) == 0;
-}
-
-/* How many live enemies stand within radius of a point
-
-Counts the robot at the point too, so one alone answers one. Used to decide whether a rocket is
-worth aiming at the ground: splash pays when it catches a crowd and costs damage when it does not */
-int CountEnemiesNearPosition(int client, const float origin[3], float radius)
-{
-	int count = 0;
-	TFTeam enemyTeam = GetPlayerEnemyTeam(client);
-	
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (!IsClientInGame(i) || !IsPlayerAlive(i))
-			continue;
-		
-		if (TF2_GetClientTeam(i) != enemyTeam)
-			continue;
-		
-		if (GetVectorDistance(WorldSpaceCenter(i), origin) <= radius)
-			count++;
-	}
-	
-	return count;
 }
 
 /* To trigger the robo sapper, you need to do several things
@@ -634,80 +551,6 @@ int GetCapturableAreaTrigger(TFTeam team)
 	}
 	
 	return -1;
-}
-
-//CTFRevolver::CanHeadshot
-bool CanRevolverHeadshot(int weapon)
-{
-	return TF2Attrib_HookValueInt(0, "set_weapon_mode", weapon) == 1;
-}
-
-bool IsPlayerMoving(int client)
-{
-	float vec[3]; CBaseEntity(client).GetAbsVelocity(vec);
-	
-	return !IsZeroVector(vec);
-}
-
-bool CanWeaponAddUberOnHit(int weapon)
-{
-	return TF2Attrib_HookValueFloat(0.0, "add_onhit_ubercharge", weapon) > 0.0;
-}
-
-bool IsCloakedPlayerExposed(int client)
-{
-	if (TF2_IsPlayerInCondition(client, TFCond_OnFire))
-		return true;
-	
-	if (TF2_IsPlayerInCondition(client, TFCond_Jarated))
-		return true;
-	
-	if (TF2_IsPlayerInCondition(client, TFCond_CloakFlicker))
-		return true;
-	
-	if (TF2_IsPlayerInCondition(client, TFCond_Bleeding))
-		return true;
-	
-	if (TF2_IsPlayerInCondition(client, TFCond_Milked))
-		return true;
-	
-	if (TF2_IsPlayerInCondition(client, TFCond_Gas))
-		return true;
-	
-	return false;
-}
-
-int GetHealerOfPlayer(int client, bool bPlayerOnly = false)
-{
-	for (int i = 0; i < TF2_GetNumHealers(client); i++)
-	{
-		int healer = TF2Util_GetPlayerHealer(client, i);
-		
-		if (healer != -1)
-		{
-			if (bPlayerOnly && !BaseEntity_IsPlayer(healer))
-				continue;
-			
-			return healer;
-		}
-	}
-	
-	return -1;
-}
-
-bool IsHealedByObject(int client)
-{
-	for (int i = 0; i < TF2_GetNumHealers(client); i++)
-	{
-		int healer = TF2Util_GetPlayerHealer(client, i);
-		
-		if (!BaseEntity_IsBaseObject(healer))
-			continue;
-		
-		return true;
-	}
-	
-	return false;
 }
 
 //Return the only entity we can see, -2 if we can see them both
