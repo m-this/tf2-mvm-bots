@@ -579,7 +579,7 @@ public Action Command_RecoverSpawnBots(int client, int args)
 	return Plugin_Handled;
 }
 
-#include "behavior/attack.sp"
+#include "generated/attack.sp"
 #include "generated/markgiant.sp"
 #include "generated/collectmoney.sp"
 #include "generated/gotoupgrade.sp"
