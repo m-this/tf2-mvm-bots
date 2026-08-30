@@ -581,7 +581,7 @@ public Action Command_RecoverSpawnBots(int client, int args)
 
 #include "behavior/attack.sp"
 #include "generated/markgiant.sp"
-#include "behavior/collectmoney.sp"
+#include "generated/collectmoney.sp"
 #include "generated/gotoupgrade.sp"
 #include "behavior/upgrade.sp"
 #include "behavior/getammo.sp"
