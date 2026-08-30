@@ -20,9 +20,16 @@ stock void NestBuildPosition(CNavArea area, float out[3])
 	}
 	area.GetCenter(out);
 	float best = 400.0;
-	NestSpotFromList(g_arrMapConfig.adtEngineerNestLocation, out, best, out, best);
-	NestSpotFromList(g_arrMapConfig.adtNestTankOnlyLocation, out, best, out, best);
-	NestSpotFromList(g_arrMapConfig.adtNestNoTankLocation, out, best, out, best);
+	float closest;
+	float nearest[3];
+	NestSpotFromList(g_arrMapConfig.adtEngineerNestLocation, out, best, nearest, closest);
+	out = nearest;
+	best = closest;
+	NestSpotFromList(g_arrMapConfig.adtNestTankOnlyLocation, out, best, nearest, closest);
+	out = nearest;
+	best = closest;
+	NestSpotFromList(g_arrMapConfig.adtNestNoTankLocation, out, best, nearest, closest);
+	out = nearest;
 	return;
 }
 
