@@ -600,7 +600,7 @@ public Action Command_RecoverSpawnBots(int client, int args)
 #include "generated/medicrevive.sp"
 #include "behavior/medicheal.sp"
 #include "generated/attackforuber.sp"
-#include "behavior/evadebuster.sp"
+#include "generated/evadebuster.sp"
 #include "generated/campbomb.sp"
 #include "behavior/attacktank.sp"
 #include "generated/destroyteleporter.sp"
