@@ -276,6 +276,8 @@ Address g_pMannVsMachineUpgrades;
 #include "redbots3/generated/stocks.sp"
 #include "redbots3/generated/angles.sp"
 #include "redbots3/generated/movement.sp"
+#include "redbots3/generated/reflect.sp"
+#include "redbots3/generated/spawnroute.sp"
 #include "redbots3/generated/actionstack.sp"
 #include "redbots3/generated/weapon_tuning.sp"
 #include "redbots3/generated/uber.sp"

@@ -249,39 +249,6 @@ with a wall on one side is reached from another.
 Shared because the dispenser, the teleporter and the sentry all need it, and they all learned it
 separately before anybody wrote it down once. */
 
-/* The RED spawn nearest the engineer, for a map that names no teleporter entrance
-
-Which is most of them: Decoy names one exit and no entrance, so the engineers never built a
-teleporter at all, on any map, however long the players waited between waves. */
-bool NearestSpawnPoint(int actor, float spawn[3])
-{
-	int point = -1;
-	int nearest = -1;
-	float nearestRange = -1.0;
-	
-	while ((point = FindEntityByClassname(point, "info_player_teamspawn")) != -1)
-	{
-		if (GetEntProp(point, Prop_Data, "m_iTeamNum") != view_as<int>(TFTeam_Red))
-			continue;
-		
-		float origin[3]; GetEntPropVector(point, Prop_Data, "m_vecAbsOrigin", origin);
-		
-		float range = GetVectorDistance(GetAbsOrigin(actor), origin);
-		
-		if (nearestRange < 0.0 || range < nearestRange)
-		{
-			nearestRange = range;
-			nearest = point;
-		}
-	}
-	
-	if (nearest == -1)
-		return false;
-	
-	GetEntPropVector(nearest, Prop_Data, "m_vecAbsOrigin", spawn);
-	
-	return true;
-}
 
 /* Every point on the way out of spawn an attempt might use, and where to stand to build on each
 
@@ -302,38 +269,7 @@ world coordinates it hands back stay true however far he walks afterwards.
 
 Returns how many points the route was long enough for, which is none when there is no route at all
 and none when the engineer is already inside the spawn room. */
-int SpawnRoutePoints(int actor, const float spawn[3], float first, float step, float reach,
-	float spots[][3], float stands[][3], int pointsMax)
-{
-	CBaseCombatCharacter(actor).UpdateLastKnownArea();
-	
-	PathFollower route = PathFollower(_, Path_FilterIgnoreActors, Path_FilterOnlyActors);
-	
-	int found = 0;
-	
-	if (route.ComputeToPos(CBaseNPC_GetNextBotOfEntity(actor), spawn))
-	{
-		float length = route.GetLength();
-		
-		for (int i = 0; i < pointsMax; i++)
-		{
-			float fromSpawn = first + step * float(i);
-			
-			//The route runs out, and a point past the far end of it is not on the way out of spawn
-			if (length <= fromSpawn + reach)
-				break;
-			
-			route.GetPosition(length - fromSpawn, spots[i]);
-			route.GetPosition(length - fromSpawn - reach, stands[i]);
-			
-			found++;
-		}
-	}
-	
-	route.Destroy();
-	
-	return found;
-}
+
 
 /* To trigger the robo sapper, you need to do several things
 - set a builder
@@ -537,43 +473,6 @@ stock bool ParentEntity(int parent, int attachment, const char[] attachPoint = "
 				maintainOffset? "SetParentAttachmentMaintainOffset" : "SetParentAttachment",
 				parent, parent);
 	}
-}
-
-//TODO: should use an actual call to CBaseEntity::IsDeflectable
-stock bool CanBeReflected(int projectile)
-{
-	char classname[32]; GetEntityClassname(projectile, classname, sizeof(classname));
-	
-	if (StrEqual(classname, "tf_projectile_arrow", false)
-	|| StrEqual(classname, "tf_projectile_ball_ornament", false)
-	|| StrEqual(classname, "tf_projectile_cleaver", false)
-	|| StrEqual(classname, "tf_projectile_energy_ball", false)
-	|| StrEqual(classname, "tf_projectile_flare", false)
-	|| StrEqual(classname, "tf_projectile_healing_bolt", false)
-	|| StrContains(classname, "tf_projectile_jar", false) != -1
-	|| StrEqual(classname, "tf_projectile_pipe", false)
-	|| StrEqual(classname, "tf_projectile_rocket", false)
-	|| StrEqual(classname, "tf_projectile_sentryrocket", false)
-	|| StrEqual(classname, "tf_projectile_stun_ball", false)
-	|| StrEqual(classname, "tf_projectile_balloffire", false))
-	{
-		return true;
-	}
-	
-	return false;
-}
-
-stock bool IsItemDefIndexSapper(int itemDefIndex)
-{
-	switch (itemDefIndex)
-	{
-		case 735, 736, 810, 831, 933, 1080, 1102:
-		{
-			return true;
-		}
-	}
-	
-	return false;
 }
 
 stock void PrintToChatTeam(int team, const char[] format, any ...)
