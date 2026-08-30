@@ -255,6 +255,7 @@ Address g_pMannVsMachineUpgrades;
 
 #include "redbots3/archipelago.sp"
 #include "redbots3/generated/features.sp"
+#include "redbots3/generated/nestspot.sp"
 #include "redbots3/generated/buildings.sp"
 #include "redbots3/generated/scan.sp"
 #include "redbots3/generated/blu_assist.sp"

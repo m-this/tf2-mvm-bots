@@ -384,34 +384,6 @@ nothing in the game promises that: the loop reads them all and keeps the closest
 
 Busters still in the spawn room are skipped. One walks the whole length of the map to reach a
 sentry, and a team that starts running when it leaves the door spends the wave running */
-/* Where to actually build inside a nest area
-
-The area centre is not the spot. A nav area on a ledge runs back from the edge,
-so its centre is a couple of metres behind the drop and a sentry there cannot see
-what is underneath it. Reported on Decoy and Mannhattan: engineers building too
-far back from the high ground.
-
-When the nest came out of a map config, the authored origin is the answer,
-because somebody stood on it. Anything else falls back to the centre */
-#define NEST_SPOT_MATCH_RANGE	400.0
-
-void NestBuildPosition(CNavArea area, float out[3])
-{
-	//Before the GetCenter, not after it: reading the centre of a null area reads through a null
-	if (area == NULL_AREA)
-	{
-		out[0] = 0.0; out[1] = 0.0; out[2] = 0.0;
-		return;
-	}
-
-	area.GetCenter(out);
-
-	float best = NEST_SPOT_MATCH_RANGE;
-
-	NestSpotFromList(g_arrMapConfig.adtEngineerNestLocation, out, best);
-	NestSpotFromList(g_arrMapConfig.adtNestTankOnlyLocation, out, best);
-	NestSpotFromList(g_arrMapConfig.adtNestNoTankLocation, out, best);
-}
 
 /* Where a man stands to put a building on a spot, on the side the attempt asks for
 
@@ -422,53 +394,6 @@ with a wall on one side is reached from another.
 
 Shared because the dispenser, the teleporter and the sentry all need it, and they all learned it
 separately before anybody wrote it down once. */
-/* How far off the ring point the nav mesh may be, and how much height still counts as beside it
-
-A spot on raised ground has ninety units of thin air around it, and the height of the ring point
-used to be the height of the spot whatever was underneath. Coaltown's right-hand building is where
-that showed: the engineer paths at a coordinate hanging over the floor below, the nav mesh walks
-him to the ground in front of the building instead, and the arrival test never comes true. He
-stands there holding the toolbox until the give-up clock runs out. Reported from play.
-
-So the point is put wherever the nav mesh says the ground is, and refused when that ground is a
-storey off the spot: standing under a ledge is not standing beside it, and the next side round is
-a better answer than a building placed from down there. */
-#define BUILD_STAND_SEARCH	120.0
-#define BUILD_STAND_STOREY	100.0
-
-bool BuildStandPoint(const float spot[3], const float from[3], int attempt, int attempts, float reach, float stand[3])
-{
-	float away[3]; SubtractVectors(from, spot, away);
-	
-	away[2] = 0.0;
-	
-	//He is standing on it, so any side will do to start from
-	if (NormalizeVector(away, away) < 1.0)
-	{
-		away[0] = 1.0;
-		away[1] = 0.0;
-	}
-	
-	float yaw = ArcTangent2(away[1], away[0]) + DegToRad(360.0 / float(attempts) * float(attempt));
-	
-	stand[0] = spot[0] + Cosine(yaw) * reach;
-	stand[1] = spot[1] + Sine(yaw) * reach;
-	stand[2] = spot[2];
-	
-	CNavArea area = TheNavMesh.GetNearestNavArea(stand, false, BUILD_STAND_SEARCH, false, true, TEAM_ANY);
-	
-	if (area == NULL_AREA)
-		return false;
-	
-	float ground[3]; area.GetClosestPointOnArea(stand, ground);
-	
-	if (FloatAbs(ground[2] - spot[2]) > BUILD_STAND_STOREY)
-		return false;
-	
-	stand = ground;
-	
-	return true;
-}
 
 /* The RED spawn nearest the engineer, for a map that names no teleporter entrance
 
@@ -556,58 +481,7 @@ int SpawnRoutePoints(int actor, const float spawn[3], float first, float step, f
 	return found;
 }
 
-/* The zone the map gave the nest this engineer is holding, empty when it named none
 
-A zone is what lets a map say "this dispenser belongs to that nest" instead of leaving it to
-whichever happens to be nearest. Coaltown needed it: the ground behind the wall on the right is
-eight hundred units from the nest it serves and two hundred from a different one, so nearest is
-the wrong answer and no distance rule fixes that. */
-void NestZoneOf(CNavArea area, char[] zone, int maxlength)
-{
-	zone[0] = '\0';
-
-	if (area == NULL_AREA)
-		return;
-
-	ArrayList spots = g_arrMapConfig.adtEngineerNestLocation;
-	ArrayList zones = g_arrMapConfig.adtEngineerNestZone;
-
-	float centre[3]; area.GetCenter(centre);
-
-	float best = NEST_SPOT_MATCH_RANGE;
-
-	for (int i = 0; i < spots.Length && i < zones.Length; i++)
-	{
-		float spot[3]; spots.GetArray(i, spot);
-
-		float distance = GetVectorDistance(centre, spot);
-
-		if (distance < best)
-		{
-			best = distance;
-			zones.GetString(i, zone, maxlength);
-		}
-	}
-}
-
-//The authored spot nearest the centre we already have, when one is close enough to be this nest
-static void NestSpotFromList(ArrayList spots, float inout[3], float &best)
-{
-	float centre[3]; centre = inout;
-
-	for (int i = 0; i < spots.Length; i++)
-	{
-		float spot[3]; spots.GetArray(i, spot);
-
-		float distance = GetVectorDistance(centre, spot);
-
-		if (distance < best)
-		{
-			best = distance;
-			inout = spot;
-		}
-	}
-}
 
 /* Somebody for the medic to point the medigun at
 
