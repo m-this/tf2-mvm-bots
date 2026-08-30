@@ -102,19 +102,6 @@ static void Event_MvmWaveFailed(Event event, const char[] name, bool dontBroadca
 	CreateTimer(0.1, Timer_WaveFailure, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
-/* A break is a fresh shopping trip for everybody
- *
- * It used to be cleared when a wave began, which is when a break ends. So every bot that lived
- * through a wave was still marked as having shopped for the whole of the next break, and
- * GetDesiredBotAction has nothing else to offer an engineer or a medic between rounds: they stood
- * where the wave left them until it started again. A bot that died shopped normally, because a
- * spawn clears the same flag, which is what made it look intermittent. */
-static void OpenTheBreak()
-{
-	for (int i = 1; i <= MaxClients; i++)
-		g_bShoppedThisBreak[i] = false;
-}
-
 static void Event_MvmWaveComplete(Event event, const char[] name, bool dontBroadcast)
 {
 	OpenTheBreak();
@@ -153,14 +140,6 @@ static void Event_MvmWaveComplete(Event event, const char[] name, bool dontBroad
 #endif
 		}
 	}
-}
-
-static void Event_RevivePlayerNotify(Event event, const char[] name, bool dontBroadcast)
-{
-	int client = event.GetInt("entindex");
-	
-	//This event indicates someone attempted a revive on the client
-	g_bIsBeingRevived[client] = true;
 }
 
 /* Every defender rethinks what it is doing when a wave begins, one of them per tick
@@ -246,28 +225,6 @@ static void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
 				g_flEnableBotsCooldown[client] += 10.0;
 		}
 #endif
-	}
-}
-
-static Action Event_MvmMissionUpdate(Event event, const char[] name, bool dontBroadcast)
-{
-	//TFBot spies fire this event on death, so block it when a defender bot dies
-	if (g_bSpyKilled)
-		return Plugin_Handled;
-	
-	return Plugin_Continue;
-}
-
-static void Event_TeamplayRoundStart(Event event, const char[] name, bool dontBroadcast)
-{
-	//A new wave has its own Spies, and the last wave's paranoia is not evidence about this one
-	ResetSpyIntel();
-	
-	//Was the map reset?
-	if (event.GetBool("full_reset"))
-	{
-		SetupSniperSpotHints();
-		EngineerNestRelocation_ResetAll();
 	}
 }
 
