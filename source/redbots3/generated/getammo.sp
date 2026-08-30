@@ -48,7 +48,7 @@ public Action CTFBotGetAmmo_OnStart(BehaviorAction action, int actor, BehaviorAc
 	m_iAmmoCandidateCount[actor] = 0;
 	m_iAmmoCandidate[actor] = 0;
 	m_iAmmoRepathFails[actor] = 0;
-	for (; m_iAmmoCandidateCount[actor] < AMMO_CANDIDATES_MAX; )
+	while (m_iAmmoCandidateCount[actor] < AMMO_CANDIDATES_MAX)
 	{
 		int best = -1;
 		float flSmallestDistance = 0.0;

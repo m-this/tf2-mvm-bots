@@ -23,7 +23,7 @@ stock void StopBehaviourReset()
 
 public Action Timer_ResetOneBehaviour(Handle timer)
 {
-	for (; m_iBehaviourResetNext <= MaxClients; )
+	while (m_iBehaviourResetNext <= MaxClients)
 	{
 		int client = m_iBehaviourResetNext;
 		m_iBehaviourResetNext++;

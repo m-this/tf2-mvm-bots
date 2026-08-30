@@ -3,11 +3,11 @@
 stock float AngleNormalize(float angle)
 {
 	angle = angle - (360.0 * float(RoundToFloor(angle / 360.0)));
-	for (; angle > 180.0; )
+	while (angle > 180.0)
 	{
 		angle -= 360.0;
 	}
-	for (; angle < -180.0; )
+	while (angle < -180.0)
 	{
 		angle += 360.0;
 	}
