@@ -499,37 +499,17 @@ None of it is trusted blindly. Every spot goes through the same nest score as ev
 one deep in the robots' half loses to the nav mesh reasoning below on distance to the bomb. A
 hand written EngineerNest block still outranks all of it: somebody stood there. */
 
+stock Address DereferencePointer(Address addr) {
+	// maybe someday we'll do 64-bit addresses
+	return view_as<Address>(LoadFromAddress(addr, NumberType_Int32));
+}
+
 stock int ReadInt(Address pAddr)
 {
 	if (pAddr == Address_Null)
 		return -1;
 	
 	return LoadFromAddress(pAddr, NumberType_Int32);
-}
-
-/* Every action the bot is running, innermost first, for the dump commands
-
-Reasoning about which behaviour has a bot from the outside is guesswork, and this session spent two
-rounds of it on one medic. The stack says it outright. */
-static char m_sActionStack[512];
-
-static void CollectActionName(BehaviorAction action)
-{
-	char name[ACTION_NAME_LENGTH]; action.GetName(name, sizeof(name));
-	
-	if (m_sActionStack[0] != '\0')
-		StrCat(m_sActionStack, sizeof(m_sActionStack), " < ");
-	
-	StrCat(m_sActionStack, sizeof(m_sActionStack), name);
-}
-
-stock void ActionStackOf(int client, char[] buffer, int maxlength)
-{
-	m_sActionStack[0] = '\0';
-	
-	ActionsManager.Iterator(client, CollectActionName);
-	
-	strcopy(buffer, maxlength, m_sActionStack);
 }
 
 /* How long an engineer's walk to a build spot is allowed to take
@@ -544,13 +524,6 @@ and capped so nothing waits on an engineer for ever. */
 #define BUILD_WALK_SPEED	180.0
 #define BUILD_WALK_TIME_MIN	12.0
 #define BUILD_WALK_TIME_MAX	40.0
-
-stock float BuildReachTime(const float from[3], const float to[3])
-{
-	float seconds = BUILD_WALK_TIME_MIN + GetVectorDistance(from, to) / BUILD_WALK_SPEED;
-	
-	return seconds > BUILD_WALK_TIME_MAX ? BUILD_WALK_TIME_MAX : seconds;
-}
 
 //From stocksoup/entity_tools.inc
 stock bool ParentEntity(int parent, int attachment, const char[] attachPoint = "",
@@ -603,35 +576,6 @@ stock bool IsItemDefIndexSapper(int itemDefIndex)
 	return false;
 }
 
-stock float GetCurrentCharge(int iWeapon)
-{
-	if (!HasEntProp(iWeapon, Prop_Send, "m_flChargeBeginTime"))
-		return 0.0;
-	
-	float flCharge = 0.0;
-	
-	float flChargeBeginTime = GetEntPropFloat(iWeapon, Prop_Send, "m_flChargeBeginTime");
-	
-	if (flChargeBeginTime != 0.0)
-	{
-		flCharge = MinFloat(1.0, GetGameTime() - flChargeBeginTime);
-	}
-	
-	return flCharge;
-}
-
-//From stocksoup/memory.inc
-stock Address DereferencePointer(Address addr) {
-	// maybe someday we'll do 64-bit addresses
-	return view_as<Address>(LoadFromAddress(addr, NumberType_Int32));
-}
-
-stock void TFBot_NoticeThreat(int tfbot, int threat)
-{
-	//UpdateDelayedThreatNotices is called in CTFBotTacticalMonitor::Update, but that behavior can be interrupted so we use it here to ensure he's noticed
-	OSLib_RunScriptCode(tfbot, _, _, "self.DelayedThreatNotice(EntIndexToHScript(%d),0);self.UpdateDelayedThreatNotices()", threat);
-}
-
 stock void PrintToChatTeam(int team, const char[] format, any ...)
 {
 	char buffer[254];
@@ -644,53 +588,5 @@ stock void PrintToChatTeam(int team, const char[] format, any ...)
 			VFormat(buffer, sizeof(buffer), format, 3);
 			PrintToChat(i, "%s", buffer);
 		}
-	}
-}
-
-//This seems heavily based on PlayerLocomotion::Approach
-stock void MovePlayerTowardsGoal(int client, const float vGoal[3], float vVel[3])
-{
-	//WASD Movement
-	float forward3D[3];
-	BasePlayer_EyeVectors(client, forward3D);
-	
-	float vForward[3];
-	vForward[0] = forward3D[0];
-	vForward[1] = forward3D[1];
-	NormalizeVector(vForward, vForward);
-	
-	float right[3] 
-	right[0] = vForward[1];
-	right[1] = -vForward[0];
-
-	//PlayerLocomotion::GetFeet
-	float vFeet[3]; GetClientAbsOrigin(client, vFeet);
-	
-	float to[3]; 
-	SubtractVectors(vGoal, vFeet, to);
-
-	NormalizeVector(to, to);
-
-	float ahead = GetVectorDotProduct(to, vForward);
-	float side  = GetVectorDotProduct(to, right);
-	
-	const float epsilon = 0.25;
-
-	if (ahead > epsilon)
-	{
-		vVel[0] = PLAYER_SIDESPEED;
-	}
-	else if (ahead < -epsilon)
-	{
-		vVel[0] = -PLAYER_SIDESPEED;
-	}
-
-	if (side <= -epsilon)
-	{
-		vVel[1] = -PLAYER_SIDESPEED;
-	}
-	else if (side >= epsilon)
-	{
-		vVel[1] = PLAYER_SIDESPEED;
 	}
 }
