@@ -569,19 +569,6 @@ int FindOnlyOneVisibleEntity(int client, int ent1, int ent2)
 	return -2;
 }
 
-bool CanUsePrimayWeapon(int client)
-{
-	if (TF2_IsPlayerInCondition(client, TFCond_MeleeOnly))
-		return false;
-	
-	int weapon = GetPlayerWeaponSlot(client, TFWeaponSlot_Primary);
-	
-	if (weapon == -1)
-		return false;
-	
-	return true;
-}
-
 //bool CTFBot::IsLineOfFireClear( const Vector &from, const Vector &to ) const
 bool IsLineOfFireClearPosition(int client, const float from[3], const float to[3])
 {
@@ -766,49 +753,6 @@ CNavArea m_aNestAreaRelocate[MAXPLAYERS + 1] = {NULL_AREA, ...};
 An item definition index rather than a weapon id: the game gives the Gunslinger and the stock
 wrench the same TF_WEAPON_WRENCH, and it is the item that decides whether this engineer holds a
 level three or spends mini sentries */
-#define TF_ITEMDEF_GUNSLINGER		142
-#define TF_ITEMDEF_EUREKA_EFFECT	589
-#define TF_ITEMDEF_RESCUE_RANGER	997
-#define TF_ITEMDEF_WRANGLER		140
-#define TF_ITEMDEF_WIDOWMAKER		527
-#define TF_ITEMDEF_SHORT_CIRCUIT	528
-
-int GetLoadoutSlotItemDefinitionIndex(int client, int slot)
-{
-	int weapon = GetPlayerWeaponSlot(client, slot);
-	
-	if (weapon < 1 || !HasEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex"))
-		return -1;
-	
-	return GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
-}
-
-bool TF2_IsGunslingerEquipped(int client)
-{
-	return GetLoadoutSlotItemDefinitionIndex(client, TFWeaponSlot_Melee) == TF_ITEMDEF_GUNSLINGER;
-}
-
-bool TF2_IsRescueRangerEquipped(int client)
-{
-	return GetLoadoutSlotItemDefinitionIndex(client, TFWeaponSlot_Primary) == TF_ITEMDEF_RESCUE_RANGER;
-}
-
-/* Whether this engineer's gun is paid for out of the metal supply
-
-Every shot from one of these is a sentry repair that does not happen, which is what makes the
-metal upgrades the first thing such an engineer should buy rather than a convenience */
-bool EngineerGunSpendsMetal(int client)
-{
-	if (TF2_GetPlayerClass(client) != TFClass_Engineer)
-		return false;
-
-	switch (GetLoadoutSlotItemDefinitionIndex(client, TFWeaponSlot_Primary))
-	{
-		case TF_ITEMDEF_WIDOWMAKER, TF_ITEMDEF_RESCUE_RANGER: return true;
-	}
-
-	return GetLoadoutSlotItemDefinitionIndex(client, TFWeaponSlot_Secondary) == TF_ITEMDEF_SHORT_CIRCUIT;
-}
 
 //A nest on top of the hatch has nothing in front of it to shoot at
 #define NEST_HATCH_CLEARANCE 180.0
