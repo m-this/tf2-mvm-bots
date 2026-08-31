@@ -440,6 +440,7 @@ public Action Command_RecoverSpawnBots(int client, int args)
 #include "generated/readiness.sp"
 #include "generated/pathing.sp"
 #include "generated/stuckwatch.sp"
+#include "generated/mediccall.sp"
 #include "generated/attack.sp"
 #include "generated/markgiant.sp"
 #include "generated/collectmoney.sp"
@@ -1427,7 +1428,6 @@ action stops its update running and these two are not the part worth reimplement
 The charge is pressed rather than set: the deploy belongs to the game, and this only ever asks
 for it sooner than the game's own dying-patient rule would have. */
 //How much more health another body needs before it is worth breaking a beam for
-#define MEDIC_PATIENT_MARGIN	25
 
 /* How long a medic call is worth answering for
 
@@ -1437,139 +1437,6 @@ room he is being called across, short enough that a player who called once durin
 still holding the beam a minute later.
 
 Pressed again, it starts again, which is what a player who is still hurt does anyway. */
-#define MEDIC_CALL_ANSWER_TIME	10.0
-
-static float m_ctMedicCalled[MAXPLAYERS + 1];
-
-//Written from the voice command hook in events.sp, read by the patient ranking below
-void NoteMedicCall(int client)
-{
-	m_ctMedicCalled[client] = GetGameTime() + MEDIC_CALL_ANSWER_TIME;
-}
-
-void ForgetMedicCall(int client)
-{
-	m_ctMedicCalled[client] = 0.0;
-}
-
-static bool IsCallingForMedic(int client)
-{
-	return m_ctMedicCalled[client] > GetGameTime();
-}
-
-/* Which teammate a medigun is worth the most on
- *
- * A medigun is worth what the body in front of it is worth, so it belongs on the biggest one: the
- * Heavy, and failing that whoever has the most health to work with. Maximum health rather than a
- * class table, because that follows the health upgrades the team buys without anybody keeping a
- * list up to date.
- *
- * Where anybody is standing is deliberately not in this. The last version of this ranking had a
- * "nearby wins outright" bucket and that bucket was a fixed point: the medic stood next to whoever
- * he had, so whoever he had stayed the nearest, so he never moved. The walking is the game's job
- * again and the game is good at it. This only has to answer who.
- */
-static int BiggestBody(int medic, int current = -1)
-{
-	int best = -1;
-	int bestHealth = 0;
-	bool bestIsHeavy = false;
-	bool bestIsPlayer = false;
-	bool bestIsCalling = false;
-	int currentHealth = 0;
-	bool currentIsHeavy = false;
-	bool currentIsPlayer = false;
-	bool currentIsCalling = false;
-	bool currentStands = false;
-
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (i == medic || !IsClientInGame(i) || !IsPlayerAlive(i))
-			continue;
-
-		if (GetClientTeam(i) != GetClientTeam(medic))
-			continue;
-
-		//A medic healing a medic is two classes doing nothing
-		if (TF2_GetPlayerClass(i) == TFClass_Medic)
-			continue;
-
-		bool isHeavy = TF2_GetPlayerClass(i) == TFClass_Heavy;
-		int health = TF2Util_GetEntityMaxHealth(i);
-
-		/* A player outranks every body, and a player who called outranks a player who did not
-
-		Reported twice, by Cowser and by Peppy: pressing the call did nothing visible, because the
-		ranking below only ever asked how big somebody was and a bot Heavy is bigger than any human.
-		Ranked rather than special-cased, so the tie-break at the bottom still applies and the beam
-		does not flicker between two players who both called. See mvm-w9b. */
-		bool isPlayer = Feature(FEATURE_MEDIC_ANSWERS_CALL) && !IsTFBotPlayer(i);
-		bool isCalling = isPlayer && IsCallingForMedic(i);
-
-		/* Said as a class rather than left to the arithmetic
-		
-		Maximum health picks the Heavy out most of the time, and most of the time is the problem: a
-		Soldier who has bought health and a Heavy who has not are a coin toss, and the beam moving
-		off the Heavy for that is the beam on the wrong man. */
-		if (i == current)
-		{
-			currentStands = true;
-			currentHealth = health;
-			currentIsHeavy = isHeavy;
-			currentIsPlayer = isPlayer;
-			currentIsCalling = isCalling;
-		}
-
-		bool better = best <= 0
-			|| (isCalling && !bestIsCalling)
-			|| (isCalling == bestIsCalling && isPlayer && !bestIsPlayer)
-			|| (isCalling == bestIsCalling && isPlayer == bestIsPlayer && isHeavy && !bestIsHeavy)
-			|| (isCalling == bestIsCalling && isPlayer == bestIsPlayer && isHeavy == bestIsHeavy && health > bestHealth);
-
-		if (better)
-		{
-			best = i;
-			bestHealth = health;
-			bestIsHeavy = isHeavy;
-			bestIsPlayer = isPlayer;
-			bestIsCalling = isCalling;
-		}
-	}
-
-	/* A patient he already has keeps the beam unless somebody is plainly worth more
-	
-	Maximum health follows the upgrades the team buys, and mid wave several bodies sit within a few
-	points of each other, so the winner of this ranking flips between them every time it is asked.
-	Measured on Bavarian Botbash wave 3: the beam was on somebody in 34 of 125 samples, and the
-	patient changed almost every ask. A switch costs the walk to the new one and the healing that
-	is not happening during it, so a tie keeps the man he has. */
-	if (currentStands && best > 0 && best != current)
-	{
-		/* Both halves of the ask break the beam, and neither can make it flicker
-
-		A call is worth the walk and the healing lost on the way, and a player is worth it over a
-		bot whether he called or not, which is the whole of what Cowser and Peppy asked for.
-
-		Neither can churn the way the margin below exists to stop. That churn comes of ranking on
-		maximum health, which several bodies sit within a few points of, so the winner flips every
-		ask. Whether somebody is a player does not flip, and a call runs down a clock and does not
-		come back on its own. Once the beam has moved for either, the reason it moved is still true
-		the next time this is asked. */
-		bool answersCall = bestIsCalling && !currentIsCalling;
-		bool betterSeat = bestIsCalling == currentIsCalling && bestIsPlayer && !currentIsPlayer;
-		bool betterClass = bestIsCalling == currentIsCalling && bestIsPlayer == currentIsPlayer
-			&& bestIsHeavy && !currentIsHeavy;
-		bool betterBody = bestIsCalling == currentIsCalling && bestIsPlayer == currentIsPlayer
-			&& bestIsHeavy == currentIsHeavy && bestHealth > currentHealth + MEDIC_PATIENT_MARGIN;
-
-		if (!answersCall && !betterSeat && !betterClass && !betterBody)
-			return current;
-	}
-
-	return best;
-}
-
-
 /* How often the game is told who its patient should be
  *
  * Every frame would be arguing with the action rather than nudging it, and the beam does not need
