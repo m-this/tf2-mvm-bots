@@ -2971,52 +2971,6 @@ void EquipBestWeaponForThreat(int client, const CKnownEntity threat)
 
 /* The Medic behind whatever we just picked, when there is one
 
-Shooting the patient of a Quick-Fix Medic is shooting through the heal rate, which is the whole
-problem with that pair. Every path out of the threat selection goes through here now: it used to
-sit on the last one only, so a bot that could see the giant and not the Medic locked onto the
-giant and stayed there. Reported on Bavarian Botbash */
-static CKnownEntity HealerOrThreat(INextBot bot, const CKnownEntity threat)
-{
-	if (!threat || !BaseEntity_IsPlayer(threat.GetEntity()))
-		return threat;
-	
-	return GetHealerOfThreat(bot, threat);
-}
-
-CKnownEntity GetHealerOfThreat(INextBot bot, const CKnownEntity threat)
-{
-	if (!threat)
-		return NULL_KNOWN_ENTITY;
-	
-	int playerThreat = threat.GetEntity();
-	
-	for (int i = 0; i < TF2_GetNumHealers(playerThreat); i++)
-	{
-		int playerHealer = TF2Util_GetPlayerHealer(playerThreat, i);
-		
-		if (playerHealer != -1 && BaseEntity_IsPlayer(playerHealer))
-		{
-			CKnownEntity knownHealer = bot.GetVisionInterface().GetKnown(playerHealer);
-			
-			if (knownHealer && knownHealer.IsVisibleInFOVNow())
-				return knownHealer;
-		}
-	}
-	
-	return threat;
-}
-
-CKnownEntity SelectCloserThreat(INextBot bot, const CKnownEntity threat1, const CKnownEntity threat2)
-{
-	float rangeSq1 = bot.GetRangeSquaredTo(threat1.GetEntity());
-	float rangeSq2 = bot.GetRangeSquaredTo(threat2.GetEntity());
-	
-	if (rangeSq1 < rangeSq2)
-		return threat1;
-	
-	return threat2;
-}
-
 void MonitorKnownEntities(int client, IVision vision)
 {
 	if (nb_blind.BoolValue)
@@ -3067,17 +3021,6 @@ void MonitorKnownEntities(int client, IVision vision)
 			}
 		}
 	}
-}
-
-int GetCountOfBotsWithNamedAction(const char[] name, int ignore = -1)
-{
-	int count = 0;
-	
-	for (int i = 1; i <= MaxClients; i++)
-		if (i != ignore && IsClientInGame(i) && g_bIsDefenderBot[i] && ActionsManager.LookupEntityActionByName(i, name) != INVALID_ACTION)
-			count++;
-	
-	return count;
 }
 
 void UtilizeCompressionBlast(int client, INextBot bot, const CKnownEntity threat, int enhancedStage = 0)
@@ -3172,38 +3115,4 @@ This says nothing about which teleporter, because there is nothing here to say i
 gate on looking at all, which is where the cost is */
 
 //Far enough up the path that the walk back to the entrance is bought back by the ride
-#define TELEPORTER_WORTH_RIDING	1500.0
 
-/* Sending an engineer with no sentry to his own teleporter was tried and lost
- *
- * The measurement that suggested it is real: the team has no sentry for well over half of a
- * Coaltown wave, and more than half of that is the engineer alive and walking back from a spawn
- * three and a half thousand units from his nest. He builds a level three teleporter for exactly
- * that journey.
- *
- * Twelve waves on two maps, engineer_rides_home: sentry uptime fell from 69 percent to 54, the
- * worst gap grew from 95 seconds to 125, and the samples of him walking with no sentry went from
- * 20 to 58. Saying yes here does not put him on the teleporter, it puts him on a walk to the
- * entrance, which is back in the spawn he is trying to leave. The walk it saves is shorter than
- * the walk it costs, and the switch is gone rather than turned off.
- */
-static bool ShouldUseTeleporter(int client)
-{
-	BombInfo_t bombinfo;
-
-	//No bomb in play, so there is no fight to be late for and no reason to leave the ground
-	if (!GetBombInfo(bombinfo))
-		return false;
-
-	CTFNavArea myArea = view_as<CTFNavArea>(CBaseCombatCharacter(client).GetLastKnownArea());
-
-	if (myArea == NULL_AREA)
-		return false;
-
-	CTFNavArea bombArea = view_as<CTFNavArea>(TheNavMesh.GetNearestNavArea(bombinfo.vPosition));
-
-	if (bombArea == NULL_AREA)
-		return false;
-
-	return GetTravelDistanceToBombTarget(myArea) + TELEPORTER_WORTH_RIDING < GetTravelDistanceToBombTarget(bombArea);
-}
