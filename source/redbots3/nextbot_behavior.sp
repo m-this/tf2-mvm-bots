@@ -104,7 +104,6 @@ The mesh usually refuses from one particular piece of ground rather than for the
 the answer is to get off that ground. A step in the goal's direction, guarded the same way the
 attack strafe guards one, and the next computation is made from somewhere else. Counted, because a
 bot doing this often is a bot the map's nav mesh has a hole in. */
-#define PATH_NUDGE_STEP		120.0
 #define PATH_RETRY_INTERVAL	0.5
 
 /* How many paths the whole team may compute in one frame
@@ -118,34 +117,6 @@ bot doing this often is a bot the map's nav mesh has a hole in. */
  * Two a frame at 66 ticks is a hundred and thirty a second, which is far more than the 0.2 second
  * refresh below ever wants, so nobody waits for a path in practice. What it removes is the frame
  * where everybody asks at once. */
-#define PATHS_PER_FRAME	2
-
-static int m_iPathBudgetTick;
-static int m_iPathsThisTick;
-
-/* Whether there is room to compute a path this frame. Only the per-frame refresh asks: a behaviour
-that computes once when it starts has nothing to retry with, so it is never refused. */
-static bool TakePathBudget()
-{
-	int tick = GetGameTickCount();
-	
-	if (tick != m_iPathBudgetTick)
-	{
-		m_iPathBudgetTick = tick;
-		m_iPathsThisTick = 0;
-	}
-	
-	if (m_iPathsThisTick >= PATHS_PER_FRAME)
-		return false;
-	
-	m_iPathsThisTick++;
-	
-	return true;
-}
-
-static bool m_bPathFailed[MAXPLAYERS + 1];
-static int m_iPathFailures[MAXPLAYERS + 1];
-
 //A valid path can still drive a bot into a corner without getting it out of spawn.
 #define SPAWN_EXIT_WATCH_INTERVAL  1.0
 #define SPAWN_EXIT_STALL_TIME      6.0
@@ -257,110 +228,12 @@ static CNavArea FindNearestRecoveryAreaByClassname(int client, const char[] clas
 	return best;
 }
 
-int PathFailuresOf(int client)
-{
-	return m_iPathFailures[client];
-}
-
-//Whether the computation that produced the path this bot is holding actually succeeded
-bool PathFailedFor(int client)
-{
-	return m_bPathFailed[client];
-}
-
-void NudgeTowardsGoal(int client, INextBot myBot, const float goal[3])
-{
-	ILocomotion myLoco = myBot.GetLocomotionInterface();
-	
-	if (!myLoco.IsOnGround())
-		return;
-	
-	float myOrigin[3]; myOrigin = GetAbsOrigin(client);
-	float towards[3]; SubtractVectors(goal, myOrigin, towards);
-	
-	towards[2] = 0.0;
-	
-	if (NormalizeVector(towards, towards) < 1.0)
-		return;
-	
-	float step[3];
-	step[0] = myOrigin[0] + towards[0] * PATH_NUDGE_STEP;
-	step[1] = myOrigin[1] + towards[1] * PATH_NUDGE_STEP;
-	step[2] = myOrigin[2];
-	
-	if (!myLoco.IsPotentiallyTraversable(myOrigin, step, IMMEDIATELY) || myLoco.HasPotentialGap(myOrigin, step))
-		return;
-	
-	myLoco.Approach(step);
-}
-
-
-/* Computing a path and walking it, with the refusal noticed
- *
- * Every behaviour in this mod computes into m_pPath and then calls Update on it, and every one of
- * them discarded the bool the computation returns. An empty path walks the bot nowhere while the
- * behaviour above believes it is travelling.
- *
- * It was fixed in PluginBot_SimulateFrame and nowhere else, which left twenty other call sites
- * with it, including the one every fighting class uses. Measured on Coaltown: the Demoman's median
- * distance to the nearest robot is 1044 units while his attack action is trying to close him to
- * 600, and he is the second lowest scoring seat on the team.
- */
-void RepathToTarget(int actor, INextBot myBot, int target)
-{
-	float began = GetEngineTime();
-	bool built = m_pPath[actor].ComputeToTarget(myBot, target, PathLengthCap());
-
-	SayIfSlow(actor, began, "to a target");
-	NotePathResult(actor, built);
-}
-
 /* Write down a path search that cost real time
 
 The crash in the cores is a frame the watchdog killed, and the story is that a bot asking for an
 impossible path walks the whole mesh to find that out. Nothing has ever measured what one of these
 costs, so the story has never been checked: about thirty five attempts reproduced the wedge and not
 one long frame. This says what a search actually takes, which is the number the story rests on. */
-#define PATH_SLOW_MS	20.0
-
-static void SayIfSlow(int actor, float began, const char[] what)
-{
-	float ms = (GetEngineTime() - began) * 1000.0;
-
-	if (ms < PATH_SLOW_MS)
-		return;
-
-	LogMessage("Path: %N spent %.0fms searching %s", actor, ms, what);
-}
-
-void RepathToPos(int actor, INextBot myBot, const float goal[3])
-{
-	/* The crash condition, on demand: a goal with no path to it
-
-	A wedged bot is not expensive on its own. What the cores show is a bot asking for a path that
-	cannot exist, which sends NavAreaBuildPath across the whole mesh for an answer it never finds,
-	every time the behaviour resets. Pinning a bot somewhere he can still path from reproduces the
-	wedge and none of the cost, which is why six attempts under load produced no long frame at all.
-
-	So the injector can send the held bot at a point off the mesh instead. */
-	float unreachable[3];
-
-	if (DebugFaults_UnreachableGoal(actor, unreachable))
-	{
-		float began = GetEngineTime();
-		bool built = m_pPath[actor].ComputeToPos(myBot, unreachable, PathLengthCap());
-
-		SayIfSlow(actor, began, "a goal with no path");
-		NotePathResult(actor, built);
-		return;
-	}
-
-	float began = GetEngineTime();
-	bool built = m_pPath[actor].ComputeToPos(myBot, goal, PathLengthCap());
-
-	SayIfSlow(actor, began, "to a position");
-	NotePathResult(actor, built);
-}
 
 /* How far a path search may walk before it gives up, and 0.0 for no limit
 
@@ -370,22 +243,6 @@ Mannhattan produced and Decoy never did.
 
 The number is generous on purpose. It is not a leash on where a bot may go: it is the point past
 which the search has plainly failed, and every real route on these maps is far inside it. */
-#define PATH_LENGTH_CAP	6000.0
-
-static float PathLengthCap()
-{
-	return Feature(FEATURE_PATH_LENGTH_CAP) ? PATH_LENGTH_CAP : 0.0;
-}
-
-static void NotePathResult(int actor, bool built)
-{
-	bool failed = !built || m_pPath[actor].GetLength() <= 0.0;
-	
-	if (failed && !m_bPathFailed[actor])
-		m_iPathFailures[actor]++;
-	
-	m_bPathFailed[actor] = failed;
-}
 
 static CNavArea FindSpawnRecoveryArea(int client, char[] source, int sourceLength)
 {
@@ -581,6 +438,7 @@ public Action Command_RecoverSpawnBots(int client, int args)
 
 #include "generated/botqueries.sp"
 #include "generated/readiness.sp"
+#include "generated/pathing.sp"
 #include "generated/attack.sp"
 #include "generated/markgiant.sp"
 #include "generated/collectmoney.sp"
