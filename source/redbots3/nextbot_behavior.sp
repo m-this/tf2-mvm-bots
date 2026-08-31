@@ -579,6 +579,7 @@ public Action Command_RecoverSpawnBots(int client, int args)
 	return Plugin_Handled;
 }
 
+#include "generated/botqueries.sp"
 #include "generated/attack.sp"
 #include "generated/markgiant.sp"
 #include "generated/collectmoney.sp"
@@ -2509,11 +2510,6 @@ public bool NextBotTraceFilterIgnoreActors(int entity, int contentsMask, any iEx
 	return !CBaseEntity(entity).IsCombatCharacter();
 }
 
-float GetDesiredPathLookAheadRange(int client)
-{
-	return tf_bot_path_lookahead_range.FloatValue * BaseAnimating_GetModelScale(client);
-}
-
 bool IsPathToVectorPossible(int bot_entidx, const float vec[3], float &length = -1.0)
 {
 	CBaseCombatCharacter(bot_entidx).UpdateLastKnownArea();
@@ -2529,134 +2525,6 @@ bool IsPathToVectorPossible(int bot_entidx, const float vec[3], float &length = 
 	return success;
 }
 
-
-bool IsAmmoLow(int client)
-{
-	int primary = GetPlayerWeaponSlot(client, TFWeaponSlot_Primary);
-
-	if (IsValidEntity(primary) && !HasAmmo(primary))
-		return true;
-	
-	int myWeapon = BaseCombatCharacter_GetActiveWeapon(client);
-	
-	if (myWeapon != -1 && TF2Util_GetWeaponID(myWeapon) != TF_WEAPON_WRENCH)
-	{
-		if (!IsMeleeWeapon(myWeapon))
-		{
-			float flAmmoRation = float(BaseCombatCharacter_GetAmmoCount(client, TF_AMMO_PRIMARY)) / float(TF2Util_GetPlayerMaxAmmo(client, TF_AMMO_PRIMARY));
-			return flAmmoRation < 0.2;
-		}
-		
-		return false;
-	}
-	
-	return BaseCombatCharacter_GetAmmoCount(client, TF_AMMO_METAL) <= 0;
-}
-
-bool IsAmmoFull(int client)
-{
-	bool isPrimaryFull = BaseCombatCharacter_GetAmmoCount(client, TF_AMMO_PRIMARY) >= TF2Util_GetPlayerMaxAmmo(client, TF_AMMO_PRIMARY);
-	bool isSecondaryFull = BaseCombatCharacter_GetAmmoCount(client, TF_AMMO_SECONDARY) >= TF2Util_GetPlayerMaxAmmo(client, TF_AMMO_SECONDARY);
-	
-	if (TF2_GetPlayerClass(client) == TFClass_Engineer)
-	{
-		//In addition, I want some metal as well
-		return BaseCombatCharacter_GetAmmoCount(client, TF_AMMO_METAL) >= 200 && isPrimaryFull && isSecondaryFull;
-	}
-	
-	return isPrimaryFull && isSecondaryFull;
-}
-
-void ResetIntentionInterface(int bot_entidx)
-{
-	CBaseNPC_GetNextBotOfEntity(bot_entidx).GetIntentionInterface().Reset();
-}
-
-void UpdateLookAroundForEnemies(int client, bool bVal)
-{
-	SetLookingAroundForEnemies(client, bVal);
-}
-
-bool IsCombatWeapon(int client, int weapon)
-{
-	if (!IsValidEntity(weapon))
-		weapon = BaseCombatCharacter_GetActiveWeapon(client);
-	
-	if (IsValidEntity(weapon))
-	{
-		switch (TF2Util_GetWeaponID(weapon))
-		{
-			case TF_WEAPON_MEDIGUN, TF_WEAPON_PDA, TF_WEAPON_PDA_ENGINEER_BUILD, TF_WEAPON_PDA_ENGINEER_DESTROY, TF_WEAPON_PDA_SPY, TF_WEAPON_BUILDER, TF_WEAPON_DISPENSER, TF_WEAPON_INVIS, TF_WEAPON_LUNCHBOX, TF_WEAPON_BUFF_ITEM, TF_WEAPON_PUMPKIN_BOMB:
-			{
-				return false;
-			}
-		}
-    }
-	
-	return true;
-}
-
-float GetDesiredAttackRange(int client)
-{
-	int weapon = BaseCombatCharacter_GetActiveWeapon(client);
-	
-	if (weapon < 1)
-		return 0.0;
-	
-	//The loadout the server handed out is more specific than the weapon's ID
-	float tunedDesired, tunedMax;
-	
-	if (GetTunedWeaponRanges(weapon, tunedDesired, tunedMax))
-		return tunedDesired;
-	
-	int weaponID = TF2Util_GetWeaponID(weapon);
-	
-	if (weaponID == TF_WEAPON_KNIFE)
-		return 70.0;
-	
-	if (IsMeleeWeapon(weapon) || weaponID == TF_WEAPON_FLAMETHROWER)
-		return 100.0;
-	
-	/* A Pyro closes whatever is in his hands, because the flamethrower is the only reason he is here
-	
-	Reported from play: the Pyro stands a long way back and never gets to use the Phlogistinator.
-	The weapon is chosen by range and the range he closes to is chosen by the weapon, and those two
-	disagreed. Past seven hundred and fifty units he pulls the shotgun; holding the shotgun he
-	settles at shotgun range; and at shotgun range he is inside seven hundred and fifty again, so
-	he swaps back, walks in, swaps out. What that produces is a Pyro parked between the two
-	distances holding the wrong gun.
-	
-	So the distance he closes to is the flamethrower's, always. The shotgun is what he shoots with
-	on the way in, not a reason to stop there. */
-	if (TF2_GetPlayerClass(client) == TFClass_Pyro)
-	{
-		int flamethrower = GetPlayerWeaponSlot(client, TFWeaponSlot_Primary);
-		
-		if (flamethrower != -1 && TF2Util_GetWeaponID(flamethrower) == TF_WEAPON_FLAMETHROWER)
-			return 100.0;
-	}
-	
-	if (WeaponID_IsSniperRifle(weaponID))
-		return FLT_MAX;
-	
-	/* How far out a rocket is worth firing, which is not as far as it will travel
-	
-	Twelve hundred and fifty units is over a second of flight, and everything a defender shoots at
-	is walking. The blast covers a hundred and forty six of them, so a robot at that range has left
-	the splash before the rocket arrives unless it is walking straight at him.
-	
-	The Demoman fights the same shape of weapon at six hundred and out-damages the Soldier by half
-	again, on a weapon with a slower projectile and an arc on top. That is the comparison this is
-	drawn from. */
-	if (weaponID == TF_WEAPON_ROCKETLAUNCHER)
-		return Feature(FEATURE_SOLDIER_CLOSES_IN) ? SOLDIER_ROCKET_SETTLE : 1250.0;
-	
-	//The same answer as the Iron Bomber, which is the launcher this loadout actually hands out
-	if (weaponID == TF_WEAPON_GRENADELAUNCHER)
-		return DEMO_PIPE_SETTLE;
-	
-	return 500.0;
-}
 
 //Extension of the original function
 bool OpportunisticallyUseWeaponAbilities(int client, int activeWeapon, INextBot bot, const CKnownEntity threat)
@@ -3285,96 +3153,6 @@ void UtilizeCompressionBlast(int client, INextBot bot, const CKnownEntity threat
 			return;
 		}
 	}
-}
-
-bool ShouldBuybackIntoGame(int client)
-{
-	//Scouts respawn very quickly
-	if (TF2_GetPlayerClass(client) == TFClass_Scout)
-		return false;
-	
-	//Can't afford a buyback
-	if (TF2_GetCurrency(client) < MVM_BUYBACK_COST_PER_SEC)
-		return false;
-	
-	//Not opportunistic if we're about to fail
-	if (IsFailureImminent(client))
-		return true;
-	
-	//We're being revived
-	if (g_bIsBeingRevived[client])
-		return false;
-	
-	//Based on our rolled number, decide to buyback
-	return g_iBuybackNumber[client] <= redbots_manager_bot_buyback_chance.IntValue;
-}
-
-bool ShouldUpgradeMidRound(int client)
-{
-	//If we were revived, we should not bother
-	if (!TF2Util_IsPointInRespawnRoom(WorldSpaceCenter(client), client))
-		return false;
-	
-	//Based on our rolled number from spawn, decide to buy upgrades now
-	return g_iBuyUpgradesNumber[client] > 0 && g_iBuyUpgradesNumber[client] <= redbots_manager_bot_buy_upgrades_chance.IntValue;
-}
-
-bool CanBuyUpgradesNow(int client)
-{
-	if (TF2_GetCurrency(client) < 25)
-		return false;
-	
-	if (IsFailureImminent(client))
-		return false;
-	
-	return true;
-}
-
-float TransientlyConsistentRandomValue(int client, float period = 10.0, int seedValue = 0)
-{
-	CNavArea area = CBaseCombatCharacter(client).GetLastKnownArea();
-	
-	if (!area)
-		return 0.0;
-	
-	int timeMod = RoundToFloor(GetGameTime() / period) + 1;
-	
-	return FloatAbs(Cosine(float(seedValue + (client * area.GetID() * timeMod))));
-}
-
-bool IsFailureImminent(int client)
-{
-	//TODO: factor in tank closest to hatch for certain classes
-	
-	int flag = FindBombNearestToHatch();
-	
-	if (flag == -1)
-		return false;
-	
-	float bombPosition[3]; bombPosition = WorldSpaceCenter(flag);
-	
-	//Bomb is far and not a threat
-	if (GetVectorDistance(bombPosition, GetBombHatchPosition()) > BOMB_HATCH_RANGE_CRITICAL)
-		return false;
-	
-	int closestToHatch = FindBotNearestToBombNearestToHatch(client);
-	
-	//No robot near the bomb close to the hatch, we're probably okay for now
-	if (closestToHatch == -1)
-		return false;
-	
-	float threatOrigin[3]; GetClientAbsOrigin(closestToHatch, threatOrigin);
-	
-	//Robot about to pick up a bomb very close to the hatch, we're in danger!
-	return GetVectorDistance(threatOrigin, bombPosition) <= 800.0;
-}
-
-//Since March 28 2018 update, flamethrower damage is calculated based on the oldest particles
-//Aim a bit higher on the tank for the highest damage output
-void GetFlameThrowerAimForTank(int tank, float aimPos[3])
-{
-	aimPos = WorldSpaceCenter(tank);
-	aimPos[2] += 90.0;
 }
 
 /* Whether a teleporter is worth walking to
