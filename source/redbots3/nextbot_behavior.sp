@@ -580,6 +580,7 @@ public Action Command_RecoverSpawnBots(int client, int args)
 }
 
 #include "generated/botqueries.sp"
+#include "generated/readiness.sp"
 #include "generated/attack.sp"
 #include "generated/markgiant.sp"
 #include "generated/collectmoney.sp"
@@ -1202,132 +1203,8 @@ takes the ready away again while the nest is unfinished, every frame, wherever i
 
 The grace is the important part. A bot that cannot finish, because a buster took the sentry or
 the metal ran out, must not hold the wave forever: past it it is ready whatever it has. */
-#define READY_GRACE	90.0
-#define BUILDING_MAX_LEVEL		3
-
-static float m_ctReadyDeadline[MAXPLAYERS + 1];
-
-static bool IsBuildingFinished(int building)
-{
-	if (building == INVALID_ENT_REFERENCE)
-		return false;
-
-	if (TF2_IsBuilding(building))
-		return false;
-
-	return GetEntProp(building, Prop_Send, "m_iUpgradeLevel") >= BUILDING_MAX_LEVEL;
-}
-
-bool IsEngineerNestFinished(int client)
-{
-	return IsBuildingFinished(GetObjectOfType(client, TFObject_Sentry))
-		&& IsBuildingFinished(GetObjectOfType(client, TFObject_Dispenser));
-}
-
-//Whether this bot has done the thing its seat exists for, before the wave starts
-static bool IsDefenderPrepared(int client)
-{
-	//Credits in a pocket are worth nothing, and the whole break exists for spending them
-	if (redbots_manager_bot_use_upgrades.BoolValue && !g_bShoppedThisBreak[client])
-		return false;
-
-	/* Whoever walks to the front is prepared once he is stood there
-
-	Without this the last bot to finish shopping starts the wave, and the walk to the front is
-	whatever fits in the time nobody is waiting for: measured on Coaltown, where the front is five
-	thousand units from the station, that was never the whole walk. Nobody ever arrived. */
-	if (ShouldTakeUpPosition(client))
-		return IsWaitingAtTheFront(client);
-
-	if (TF2_GetPlayerClass(client) != TFClass_Engineer)
-		return true;
-
-	if (!IsEngineerNestFinished(client))
-		return false;
-
-	/* The teleporter too, but only while nobody is being made to wait for it
-
-	The nest finishing is what lets the wave start, and the engineer's teleporter window is
-	whatever is left of the between-rounds time after it. On a team of nothing but bots that is
-	nothing at all: the last nest finishes, everybody is ready, the wave starts, and the build
-	action gives up on its first update with "Wave started". No engineer had ever finished one.
-
-	Not with a player on the server. Somebody who has finished shopping should not be held at the
-	ready screen for a building the bots want, and their shopping is already the time the engineer
-	needs. */
-	if (GetRealPlayerCount() > 0)
-		return true;
-
-	return !ShouldBuildTeleporter(client);
-}
 
 /* Readying a bot, and ending whatever is stopping it saying so
-
-A taunt holds the ready. The command goes out every frame while the flag disagrees, so a short
-taunt only delays it, but a looping taunt never ends on its own and the wave waits on a bot doing
-a dance. Between rounds a taunt is worth nothing to anybody, so it loses to the ready rather than
-the other way round. */
-static void ReadyDefender(int actor, bool state)
-{
-	if (state && TF2_IsPlayerInCondition(actor, TFCond_Taunting))
-		TF2_RemoveCondition(actor, TFCond_Taunting);
-	
-	SetPlayerReady(actor, state);
-}
-
-static void UpdateDefenderReadiness(int actor)
-{
-	if (!Feature(FEATURE_READY_WHEN_PREPARED))
-		return;
-	
-	if (GameRules_GetRoundState() != RoundState_BetweenRounds)
-	{
-		m_ctReadyDeadline[actor] = 0.0;
-		return;
-	}
-
-	/* With a person on the team, the bots are a mirror of what the people have said
-
-	Everything below this exists for a team of nothing but bots, where somebody has to decide the
-	nest is finished before the wave starts. With a player on RED it is his call and only his: he
-	presses F4 when he has finished shopping, and a bot holding the wave for its own reasons is a
-	player staring at "Waiting for team to organize" with no way to find out which bot, or why, or
-	how long for. Reported from play, with two engineers still building.
-
-	One person saying ready readies the bots, and the last person taking it back takes theirs back
-	too, so somebody who changes his mind gets his upgrade time and does not have to fight six bots
-	for it. */
-	if (AnyHumanOnRed())
-	{
-		m_ctReadyDeadline[actor] = 0.0;
-		
-		ReadyDefender(actor, AnyHumanReadyOnRed());
-		
-		return;
-	}
-
-	if (m_ctReadyDeadline[actor] <= 0.0)
-		m_ctReadyDeadline[actor] = GetGameTime() + READY_GRACE;
-
-	/* Past the grace he says he is ready, rather than merely stopping being made unready
-	
-	Nothing else says it for him. A bot readies when it leaves the upgrade station or moves to the
-	front, and an engineer whose nest will not finish does neither: he is still trying to build.
-	Letting go of the ready was not the same as pressing it, so the wave waited for him for as
-	long as he kept trying, which is the whole round. */
-	if (GetGameTime() > m_ctReadyDeadline[actor])
-	{
-		if (!IsPlayerReady(actor))
-			ReadyDefender(actor, true);
-		
-		return;
-	}
-
-	if (IsDefenderPrepared(actor))
-		return;
-
-	ReadyDefender(actor, false);
-}
 
 /* Whether leaving the fight to find a pack is worth what the walk costs the team
 
@@ -1340,16 +1217,6 @@ Coaltown is why this is written down. The health pack there is in the house in t
 map, so a medic who took eighty percent of a rocket left the front line and walked to the exact
 spot he has now been reported standing in three times. Ammo goes with it: the medigun does not use
 any and the syringe gun is what he holds when there is nobody to heal.
-
-Below the critical ratio he goes anyway. A medic who dies takes the medigun with him for the rest
-of the wave, which is worse than any trip. */
-static bool ShouldLeaveToBePatchedUp(int client, float healthRatio)
-{
-	if (TF2_GetPlayerClass(client) != TFClass_Medic)
-		return true;
-
-	return healthRatio < tf_bot_health_critical_ratio.FloatValue;
-}
 
 /* A bot that is trying to walk somewhere and not getting anywhere
 
