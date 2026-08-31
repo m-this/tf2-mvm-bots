@@ -254,6 +254,7 @@ Address g_pMannVsMachineUpgrades;
 #endif
 
 #include "redbots3/archipelago.sp"
+#include "redbots3/generated/archipelago.sp"
 #include "redbots3/generated/features.sp"
 #include "redbots3/generated/loadout.sp"
 #include "redbots3/generated/entity.sp"
