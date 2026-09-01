@@ -113,6 +113,7 @@ which the search has plainly failed, and every real route on these maps is far i
 #include "generated/bottle.sp"
 #include "generated/dispatch.sp"
 #include "generated/medicnudge.sp"
+#include "generated/threataudit.sp"
 #include "generated/hooks.sp"
 #include "generated/attack.sp"
 #include "generated/markgiant.sp"
@@ -198,45 +199,6 @@ The ranges, the enum and the generated table are in generated/threat_priority.sp
 internal/threat in tf2-mvm-bots-go. The chain below is the one that shipped, kept beside it so the
 two can be played against each other: see FEATURE_GENERATED_THREAT_PRIORITY. */
 
-static int ThreatPriority(int threat, float rangeSq)
-{
-	if (rangeSq < THREAT_URGENT_RANGE * THREAT_URGENT_RANGE)
-		return THREAT_PRIORITY_URGENT;
-	
-	//Too far to be worth walking the aim across the map for
-	if (rangeSq > THREAT_PRIORITY_RANGE * THREAT_PRIORITY_RANGE)
-		return THREAT_PRIORITY_NONE;
-	
-	if (!BaseEntity_IsPlayer(threat) || !IsClientInGame(threat))
-		return THREAT_PRIORITY_NONE;
-	
-	switch (TF2_GetPlayerClass(threat))
-	{
-		//A giant with a Medic on it is not killable until the Medic is dead
-		case TFClass_Medic:
-			return THREAT_PRIORITY_MEDIC;
-		
-		//The two the rest of the team cannot get to: one sits out of reach, the other builds
-		case TFClass_Sniper, TFClass_Engineer:
-			return THREAT_PRIORITY_SUPPORT;
-	}
-	
-	bool giant = TF2_IsMiniBoss(threat);
-	bool carrier = TF2_HasTheFlag(threat);
-	
-	//Carrying the bomb halves a robot's speed, except a giant's, so that one is still running
-	if (giant && carrier)
-		return THREAT_PRIORITY_GIANT_BOMB;
-	
-	if (giant)
-		return THREAT_PRIORITY_GIANT;
-	
-	if (carrier)
-		return THREAT_PRIORITY_BOMB;
-	
-	return THREAT_PRIORITY_NONE;
-}
-
 /* The same question, asked of the generated table
 
 The record is what the move in mvm-z83.6 was for: the decision takes what is known about a threat
@@ -250,20 +212,6 @@ test has passed, and all three throw when asked about something that is not a pl
 TF2_HasTheFlag threw 3933 times over four waves on tank_boss and obj_attachment_sapper, and each
 one aborted the whole threat choice for that tick.
 
-The decision reads none of them for a non-player, so filling them false costs nothing. That is
-asserted in internal/threat rather than assumed here. See mvm-z83.46. */
-static int ThreatPriorityGenerated(int threat, float rangeSq)
-{
-	bool isPlayer = BaseEntity_IsPlayer(threat);
-	bool inGame = isPlayer && IsClientInGame(threat);
-	
-	if (!inGame)
-		return ThreatPriorityOf(rangeSq, isPlayer, false, TFClass_Unknown, false, false);
-	
-	return ThreatPriorityOf(rangeSq, isPlayer, true, TF2_GetPlayerClass(threat),
-		TF2_IsMiniBoss(threat), TF2_HasTheFlag(threat));
-}
-
 /* Where the generated answer and the shipped chain part company, while the port is measured
 
 The differential test proves the decision and the table agree on every combination it can be asked
@@ -273,44 +221,7 @@ sides from the same record. Only a running game can answer that.
 Scaffolding, to be deleted with the measurement. It runs on the armed side only, so the other arm
 pays nothing, and it stops writing after twenty lines because a disagreement that happens at all is
 the finding and a log full of them is not more of one. */
-static int g_iThreatSplits;
-static int g_iThreatCompared;
-
 /* Say how much was compared, not only what disagreed
-
-Zero disagreements and never having run look identical in a log that only writes on a
-disagreement, and reading the first as the second is the fault mvm-z83.23 is about. */
-void ThreatPortAudit_Report()
-{
-	if (g_iThreatCompared == 0)
-		return;
-	
-	LogMessage("threat audit: %d compared, %d disagreed", g_iThreatCompared, g_iThreatSplits);
-	
-	g_iThreatCompared = 0;
-}
-
-static void ThreatPortAudit(int threat, float rangeSq)
-{
-	g_iThreatCompared++;
-	
-	if (g_iThreatSplits >= 20)
-		return;
-	
-	int shipped = ThreatPriority(threat, rangeSq);
-	int fromTable = ThreatPriorityGenerated(threat, rangeSq);
-	
-	if (shipped == fromTable)
-		return;
-	
-	g_iThreatSplits++;
-	
-	char classname[64];
-	GetEntityClassname(threat, classname, sizeof(classname));
-	
-	LogMessage("threat audit: entity %d/%s rangeSq %.0f, chain says %d, table says %d",
-		threat, classname, rangeSq, shipped, fromTable);
-}
 
 /* A bot is ready when it has done the thing its seat exists for
 
