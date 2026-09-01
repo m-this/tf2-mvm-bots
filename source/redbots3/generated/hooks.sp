@@ -103,3 +103,61 @@ public Action CTFBotMedicHeal_UpdatePost(BehaviorAction action, int actor, float
 	return Plugin_Continue;
 }
 
+public Action CTFBotSniperLurk_SelectMoreDangerousThreat(BehaviorAction action, INextBot nextbot, int entity, CKnownEntity threat1, CKnownEntity threat2, CKnownEntity &knownEntity)
+{
+	knownEntity = view_as<CKnownEntity>(0);
+	int me = action.Actor;
+	if (!g_bIsDefenderBot[me])
+	{
+		return Plugin_Continue;
+	}
+	knownEntity = NULL_KNOWN_ENTITY;
+	int iThreat1 = threat1.GetEntity();
+	if (BaseEntity_IsPlayer(iThreat1) && IsLineOfFireClearEntity(me, GetEyePosition(me), iThreat1))
+	{
+		int enemyWeapon = BaseCombatCharacter_GetActiveWeapon(iThreat1);
+		if (enemyWeapon != -1)
+		{
+			TFWeaponType enemyWepID = TF2Util_GetWeaponID(enemyWeapon);
+			if (WeaponID_IsSniperRifle(enemyWepID))
+			{
+				knownEntity = threat1;
+				return Plugin_Changed;
+			}
+			else
+				if (enemyWepID == TF_WEAPON_MEDIGUN)
+				{
+					if ((GetEntPropEnt(enemyWeapon, Prop_Send, "m_hHealingTarget") != -1) || (GetEntPropFloat(enemyWeapon, Prop_Send, "m_flChargeLevel") >= 1.0))
+					{
+						knownEntity = threat1;
+						return Plugin_Changed;
+					}
+				}
+		}
+	}
+	int iThreat2 = threat2.GetEntity();
+	if (BaseEntity_IsPlayer(iThreat2) && IsLineOfFireClearEntity(me, GetEyePosition(me), iThreat2))
+	{
+		int enemyWeapon = BaseCombatCharacter_GetActiveWeapon(iThreat2);
+		if (enemyWeapon != -1)
+		{
+			TFWeaponType enemyWepID = TF2Util_GetWeaponID(enemyWeapon);
+			if (WeaponID_IsSniperRifle(enemyWepID))
+			{
+				knownEntity = threat2;
+				return Plugin_Changed;
+			}
+			else
+				if (enemyWepID == TF_WEAPON_MEDIGUN)
+				{
+					if ((GetEntPropEnt(enemyWeapon, Prop_Send, "m_hHealingTarget") != -1) || (GetEntPropFloat(enemyWeapon, Prop_Send, "m_flChargeLevel") >= 1.0))
+					{
+						knownEntity = threat2;
+						return Plugin_Changed;
+					}
+				}
+		}
+	}
+	return Plugin_Changed;
+}
+
