@@ -274,3 +274,44 @@ stock void WatchDefenderSpawnExit(int client)
 	MoveDefenderFromSpawnToBattlefield(client, "made no spawn-exit progress for six seconds");
 }
 
+public Action Command_DumpSpawnNav(int client, int args)
+{
+	ReplyToCommand(client, "Spawn NAV recovery: enabled %d, radius %.0f, max time %.1f", redbots_manager_spawn_nav_recovery.BoolValue, redbots_manager_spawn_nav_recovery_radius.FloatValue, redbots_manager_spawn_nav_recovery_time.FloatValue);
+	for (int bot = 1; bot <= MaxClients; bot++)
+	{
+		if (!IsClientInGame(bot) || !IsPlayerAlive(bot) || !g_bIsDefenderBot[bot])
+		{
+			continue;
+		}
+		bool strict = TF2Util_IsPointInRespawnRoom(WorldSpaceCenter(bot), bot, true);
+		float distance = DistanceToClosestDefenderSpawn(bot);
+		bool near = strict || ((distance >= 0.0) && (distance <= redbots_manager_spawn_nav_recovery_radius.FloatValue));
+		float now = GetGameTime();
+		float watched = (m_flSpawnExitStartedAt[bot] > 0.0 ? now - m_flSpawnExitStartedAt[bot] : 0.0);
+		float stalled = (m_flSpawnExitProgressAt[bot] > 0.0 ? now - m_flSpawnExitProgressAt[bot] : 0.0);
+		float moved = (m_flSpawnExitProgressAt[bot] > 0.0 ? GetVectorDistance(GetAbsOrigin(bot), m_vecSpawnExitProgress[bot]) : 0.0);
+		char anchorSource[512];
+		bool anchorNav = FindSpawnRecoveryArea(bot, anchorSource, 32) != NULL_AREA;
+		ReplyToCommand(client, "%N: strict %d, spawn distance %.0f, near %d, eligible %d, upgrade zone %d, watched %.1fs, stalled %.1fs, moved %.0f, anchor %s, anchor NAV %d", bot, strict, distance, near, ShouldWatchDefenderSpawnExit(bot), TF2_IsInUpgradeZone(bot), watched, stalled, moved, anchorSource, anchorNav);
+	}
+	return Plugin_Handled;
+}
+
+public Action Command_RecoverSpawnBots(int client, int args)
+{
+	int recovered;
+	for (int bot = 1; bot <= MaxClients; bot++)
+	{
+		if (!IsClientInGame(bot) || !IsPlayerAlive(bot) || !g_bIsDefenderBot[bot] || !IsInOrNearDefenderSpawn(bot))
+		{
+			continue;
+		}
+		if (MoveDefenderFromSpawnToBattlefield(bot, "was manually recovered by an admin"))
+		{
+			recovered++;
+		}
+	}
+	ReplyToCommand(client, "Recovered %d defender bot(s) from the configured spawn radius.", recovered);
+	return Plugin_Handled;
+}
+
