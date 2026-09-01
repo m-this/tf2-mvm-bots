@@ -75,7 +75,6 @@ The mesh usually refuses from one particular piece of ground rather than for the
 the answer is to get off that ground. A step in the goal's direction, guarded the same way the
 attack strafe guards one, and the next computation is made from somewhere else. Counted, because a
 bot doing this often is a bot the map's nav mesh has a hole in. */
-#define PATH_RETRY_INTERVAL	0.5
 
 /* How many paths the whole team may compute in one frame
  *
@@ -232,66 +231,6 @@ void ResetNextBot(int client)
 #endif
 }
 
-#if defined EXTRA_PLUGINBOT
-void PluginBot_SimulateFrame(int client)
-{
-	//SimulateFrame > PFContext::RecalculatePath
-	//This is used whenever we want to path somewhere constantly
-	if (g_arrPluginBot[client].bPathing)
-	{
-		if (TF2_GetPlayerClass(client) == TFClass_Engineer)
-		{
-			//Dumb hack for engineer so pathing does not conflict
-			if (ActionsManager.LookupEntityActionByName(client, "DefenderGetAmmo") != INVALID_ACTION || ActionsManager.LookupEntityActionByName(client, "DefenderGetHealth") != INVALID_ACTION)
-				return;
-		}
-		
-		bool shouldPathToVec = g_arrPluginBot[client].HasPathGoalVector();
-		bool shouldPathToEntity = g_arrPluginBot[client].HasPathGoalEntity();
-		
-		if (shouldPathToVec || shouldPathToEntity)
-		{
-			INextBot myBot = CBaseNPC_GetNextBotOfEntity(client);
-			
-			float goal[3];
-			
-			if (shouldPathToVec)
-				goal = g_arrPluginBot[client].vecPathGoal;
-			else
-				goal = GetAbsOrigin(g_arrPluginBot[client].iPathGoalEntity);
-			
-			if (m_flRepathTime[client] <= GetGameTime() && TakePathBudget())
-			{
-				CBaseCombatCharacter(client).UpdateLastKnownArea();
-				
-				bool built;
-				
-				if (shouldPathToVec)
-					built = m_pPath[client].ComputeToPos(myBot, g_arrPluginBot[client].vecPathGoal, PathLengthCap());
-				else
-					built = m_pPath[client].ComputeToTarget(myBot, g_arrPluginBot[client].iPathGoalEntity, PathLengthCap());
-				
-				//An empty path is a failure the same as a refusal, and it is the shape seen in play
-				bool failed = !built || m_pPath[client].GetLength() <= 0.0;
-				
-				if (failed && !m_bPathFailed[client])
-					m_iPathFailures[client]++;
-				
-				m_bPathFailed[client] = failed;
-				
-				//Retrying a refusal on the walking interval is most of a frame's path work for nothing
-				m_flRepathTime[client] = GetGameTime() + (failed ? PATH_RETRY_INTERVAL : 0.2);
-			}
-			
-			//I don't see a reason to use UpdateLastKnownArea again
-			
-			if (m_bPathFailed[client])
-				NudgeTowardsGoal(client, myBot, goal);
-			else
-				m_pPath[client].Update(myBot);
-		}
-	}
-}
 #endif
 
 //Ends the behaviour of the bot the empty-stack injector holds, and does nothing otherwise

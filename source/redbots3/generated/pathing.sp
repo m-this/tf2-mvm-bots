@@ -10,6 +10,8 @@
 
 #define PATHS_PER_FRAME (2)
 
+#define PATH_RETRY_INTERVAL (0.5)
+
 int m_iPathBudgetTick;
 int m_iPathsThisTick;
 bool m_bPathFailed[65];
@@ -122,5 +124,64 @@ stock void NotePathResult(int actor, bool built)
 		m_iPathFailures[actor]++;
 	}
 	m_bPathFailed[actor] = failed;
+}
+
+stock void PluginBot_SimulateFrame(int client)
+{
+	if (g_arrPluginBot[client].bPathing)
+	{
+		if (TF2_GetPlayerClass(client) == TFClass_Engineer)
+		{
+			if ((ActionsManager.LookupEntityActionByName(client, "DefenderGetAmmo") != INVALID_ACTION) || (ActionsManager.LookupEntityActionByName(client, "DefenderGetHealth") != INVALID_ACTION))
+			{
+				return;
+			}
+		}
+		bool shouldPathToVec = g_arrPluginBot[client].HasPathGoalVector();
+		bool shouldPathToEntity = g_arrPluginBot[client].HasPathGoalEntity();
+		if (shouldPathToVec || shouldPathToEntity)
+		{
+			INextBot myBot = CBaseNPC_GetNextBotOfEntity(client);
+			float goal[3];
+			if (shouldPathToVec)
+			{
+				goal = g_arrPluginBot[client].vecPathGoal;
+			}
+			else
+			{
+				goal = GetAbsOrigin(g_arrPluginBot[client].iPathGoalEntity);
+			}
+			if ((m_flRepathTime[client] <= GetGameTime()) && TakePathBudget())
+			{
+				CBaseCombatCharacter(client).UpdateLastKnownArea();
+				bool built;
+				if (shouldPathToVec)
+				{
+					float vecGoal[3];
+					vecGoal = g_arrPluginBot[client].vecPathGoal;
+					built = m_pPath[client].ComputeToPos(myBot, vecGoal, PathLengthCap());
+				}
+				else
+				{
+					built = m_pPath[client].ComputeToTarget(myBot, g_arrPluginBot[client].iPathGoalEntity, PathLengthCap());
+				}
+				bool failed = !built || (m_pPath[client].GetLength() <= 0.0);
+				if (failed && !m_bPathFailed[client])
+				{
+					m_iPathFailures[client]++;
+				}
+				m_bPathFailed[client] = failed;
+				m_flRepathTime[client] = GetGameTime() + (failed ? PATH_RETRY_INTERVAL : 0.2);
+			}
+			if (m_bPathFailed[client])
+			{
+				NudgeTowardsGoal(client, myBot, goal);
+			}
+			else
+			{
+				m_pPath[client].Update(myBot);
+			}
+		}
+	}
 }
 
