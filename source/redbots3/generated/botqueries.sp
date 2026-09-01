@@ -573,3 +573,80 @@ stock void EquipBestWeaponForThreat(int client, const CKnownEntity threat)
 	}
 }
 
+stock void UtilizeCompressionBlast(int client, INextBot bot, const CKnownEntity threat, int enhancedStage = 0)
+{
+	if (threat == NULL_KNOWN_ENTITY)
+	{
+		return;
+	}
+	if (redbots_manager_bot_reflect_skill.IntValue < 1)
+	{
+		return;
+	}
+	int iThreat = threat.GetEntity();
+	if (BaseEntity_IsPlayer(iThreat))
+	{
+		float threatOrigin[3];
+		GetClientAbsOrigin(iThreat, threatOrigin);
+		if (bot.IsRangeLessThanEx(threatOrigin, 250.0))
+		{
+			if (TF2_IsInvulnerable(iThreat))
+			{
+				g_arrExtraButtons[client].ReleaseButtons(IN_ATTACK);
+				VS_PressAltFireButton(client);
+				return;
+			}
+			if (TF2_IsPlayerInCondition(iThreat, TFCond_Charging))
+			{
+				g_arrExtraButtons[client].ReleaseButtons(IN_ATTACK);
+				VS_PressAltFireButton(client);
+				return;
+			}
+			if (TF2_HasTheFlag(iThreat) && (GetVectorDistance(threatOrigin, GetBombHatchPosition()) <= 100.0))
+			{
+				g_arrExtraButtons[client].ReleaseButtons(IN_ATTACK);
+				VS_PressAltFireButton(client);
+				return;
+			}
+		}
+	}
+	if (redbots_manager_bot_reflect_skill.IntValue < 2)
+	{
+		return;
+	}
+	if ((redbots_manager_bot_reflect_chance.FloatValue < 100.0) && (TransientlyConsistentRandomValue(client, 1.0) > (redbots_manager_bot_reflect_chance.FloatValue / 100.0)))
+	{
+		return;
+	}
+	int myTeam = GetClientTeam(client);
+	float myEyePos[3];
+	GetClientEyePosition(client, myEyePos);
+	int ent = -1;
+	for (;;)
+	{
+		ent = FindEntityByClassname(ent, "tf_projectile_*");
+		if (ent == -1)
+		{
+			break;
+		}
+		if (BaseEntity_GetTeamNumber(ent) == myTeam)
+		{
+			continue;
+		}
+		if (!CanBeReflected(ent))
+		{
+			continue;
+		}
+		float origin[3];
+		BaseEntity_GetLocalOrigin(ent, origin);
+		float vec[3];
+		MakeVectorFromPoints(origin, myEyePos, vec);
+		if (GetVectorLength(vec) < 150.0)
+		{
+			g_arrExtraButtons[client].ReleaseButtons(IN_ATTACK);
+			VS_PressAltFireButton(client);
+			return;
+		}
+	}
+}
+
