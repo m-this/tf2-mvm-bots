@@ -267,6 +267,7 @@ Address g_pMannVsMachineUpgrades;
 #include "redbots3/generated/scan.sp"
 #include "redbots3/generated/blu_assist.sp"
 #include "redbots3/util.sp"
+#include "redbots3/generated/roster_counts.sp"
 #include "redbots3/generated/lineoffire.sp"
 #include "redbots3/generated/nestscore.sp"
 #include "redbots3/generated/nestpick.sp"
@@ -2125,56 +2126,6 @@ void ShowPlayerUpgrades(int client, int target, int slot)
 	ShowUpgradesOn(client, weapon, label);
 }
 
-int GetHumanAndDefenderBotCount(TFTeam team)
-{
-	int count = 0;
-	
-	for (int i = 1; i <= MaxClients; i++)
-		if (IsClientInGame(i) && (IsDefenderBot(i) || !IsFakeClient(i)) && TF2_GetClientTeam(i) == team)
-			count++;
-	
-	return count;
-}
-
-/* One of ours, including one that has not spawned yet
-g_bIsDefenderBot is set on the first spawn, and between tf_bot_add and that spawn the bot is on the
-team and counts for nothing. The top-up timer runs every second in that window and adds one more,
-which is how a six man team ends up with seven or eight members. The name is set at tf_bot_add */
-bool IsDefenderBot(int client)
-{
-	if (g_bIsDefenderBot[client])
-		return true;
-	
-	if (!IsFakeClient(client))
-		return false;
-	
-	char clientName[MAX_NAME_LENGTH]; GetClientName(client, clientName, sizeof(clientName));
-	
-	return StrContains(clientName, TFBOT_IDENTITY_NAME) != -1;
-}
-
-int GetDefenderBotCount(TFTeam team)
-{
-	int count = 0;
-	
-	for (int i = 1; i <= MaxClients; i++)
-		if (IsClientInGame(i) && g_bIsDefenderBot[i] && TF2_GetClientTeam(i) == team)
-			count++;
-	
-	return count;
-}
-
-int GetCountOfPlayersChoosingBotClasses()
-{
-	int count = 0;
-	
-	for (int i = 1; i <= MaxClients; i++)
-		if (IsClientInGame(i) && g_bChoosingBotClasses[i])
-			count++;
-	
-	return count;
-}
-
 /* Used to check players last command input
 Usually for preventing palyers from sending a command multiple times in a single frame */
 bool ShouldProcessCommand(int client)
@@ -2184,17 +2135,6 @@ bool ShouldProcessCommand(int client)
 	
 	m_flLastCommandTime[client] = GetGameTime() + COMMAND_MAX_RATE;
 	return true;
-}
-
-int GetRealPlayerCount()
-{
-	int count = 0;
-	
-	for (int i = 1; i <= MaxClients; i++)
-		if (IsClientInGame(i) && !IsFakeClient(i))
-			count++;
-	
-	return count;
 }
 
 /* Put a bot back in the slot a player just left
