@@ -250,3 +250,83 @@ public Action CTFBotTacticalMonitor_Update(BehaviorAction action, int actor, flo
 	return Plugin_Continue;
 }
 
+public Action CTFBotMainAction_SelectMoreDangerousThreat(BehaviorAction action, INextBot nextbot, int entity, CKnownEntity threat1, CKnownEntity threat2, CKnownEntity &knownEntity)
+{
+	knownEntity = view_as<CKnownEntity>(0);
+	int me = action.Actor;
+	if (!g_bIsDefenderBot[me])
+	{
+		return Plugin_Continue;
+	}
+	int myWeapon = BaseCombatCharacter_GetActiveWeapon(me);
+	if ((myWeapon != -1) && ((TF2Util_GetWeaponID(myWeapon) == TF_WEAPON_FLAMETHROWER) || IsMeleeWeapon(myWeapon)))
+	{
+		knownEntity = HealerOrThreat(nextbot, SelectCloserThreat(nextbot, threat1, threat2));
+		return Plugin_Changed;
+	}
+	int iThreat1 = threat1.GetEntity();
+	int iThreat2 = threat2.GetEntity();
+	int oneVisible = FindOnlyOneVisibleEntity(me, iThreat1, iThreat2);
+	if (oneVisible == iThreat1)
+	{
+		knownEntity = HealerOrThreat(nextbot, threat1);
+		return Plugin_Changed;
+	}
+	if (oneVisible == iThreat2)
+	{
+		knownEntity = HealerOrThreat(nextbot, threat2);
+		return Plugin_Changed;
+	}
+	if ((myWeapon != -1) && (TF2Util_GetWeaponID(myWeapon) == TF_WEAPON_MINIGUN))
+	{
+		if (TF2_IsRageDraining(me))
+		{
+			if (BaseEntity_IsPlayer(iThreat1) && (TF2_HasTheFlag(iThreat1) || TF2_IsMiniBoss(iThreat1)))
+			{
+				knownEntity = threat1;
+				return Plugin_Changed;
+			}
+			if (BaseEntity_IsPlayer(iThreat2) && (TF2_HasTheFlag(iThreat2) || TF2_IsMiniBoss(iThreat2)))
+			{
+				knownEntity = threat2;
+				return Plugin_Changed;
+			}
+		}
+		if (IsBaseBoss(iThreat1) && !IsBaseBoss(iThreat2))
+		{
+			knownEntity = threat2;
+			return Plugin_Changed;
+		}
+		if (!IsBaseBoss(iThreat1) && IsBaseBoss(iThreat2))
+		{
+			knownEntity = threat1;
+			return Plugin_Changed;
+		}
+	}
+	float rangeSq1 = nextbot.GetRangeSquaredTo(iThreat1);
+	float rangeSq2 = nextbot.GetRangeSquaredTo(iThreat2);
+	bool generated = Feature(FEATURE_GENERATED_THREAT_PRIORITY);
+	int priority1 = (generated ? ThreatPriorityGenerated(iThreat1, rangeSq1) : ThreatPriority(iThreat1, rangeSq1));
+	int priority2 = (generated ? ThreatPriorityGenerated(iThreat2, rangeSq2) : ThreatPriority(iThreat2, rangeSq2));
+	if (generated)
+	{
+		ThreatPortAudit(iThreat1, rangeSq1);
+		ThreatPortAudit(iThreat2, rangeSq2);
+	}
+	if (Feature(FEATURE_THREAT_PRIORITY) && (priority1 != priority2))
+	{
+		knownEntity = (priority1 > priority2 ? threat1 : threat2);
+	}
+	else
+		if (rangeSq1 < rangeSq2)
+		{
+			knownEntity = threat1;
+		}
+		else
+		{
+			knownEntity = threat2;
+		}
+	knownEntity = HealerOrThreat(nextbot, knownEntity);
+	return Plugin_Changed;
+}
+
