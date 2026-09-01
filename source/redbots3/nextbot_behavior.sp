@@ -157,6 +157,7 @@ public Action Command_RecoverSpawnBots(int client, int args)
 #include "generated/bottle.sp"
 #include "generated/dispatch.sp"
 #include "generated/medicnudge.sp"
+#include "generated/hooks.sp"
 #include "generated/attack.sp"
 #include "generated/markgiant.sp"
 #include "generated/collectmoney.sp"
@@ -234,15 +235,6 @@ void ResetNextBot(int client)
 }
 
 #endif
-
-//Ends the behaviour of the bot the empty-stack injector holds, and does nothing otherwise
-public Action CTFBotMainAction_Update(BehaviorAction action, int actor, float interval, ActionResult result)
-{
-	if (g_bIsDefenderBot[actor] && DebugFaults_ShouldEmpty(actor))
-		return action.Done("DebugFaults: emptying the stack");
-
-	return Plugin_Continue;
-}
 
 public void OnActionCreated(BehaviorAction action, int actor, const char[] name)
 {
@@ -999,36 +991,6 @@ public Action CTFBotMedicHeal_UpdatePost(BehaviorAction action, int actor, float
 	return Plugin_Continue;
 }
 
-public Action CTFBotFetchFlag_OnStart(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
-{
-	if (g_bIsDefenderBot[actor] == false)
-		return Plugin_Continue;
-	
-	return action.Done();
-}
-
-public Action CTFBotMvMEngineerIdle_OnStart(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
-{
-	if (g_bIsDefenderBot[actor] == false)
-		return Plugin_Continue;
-	
-	return action.Done();
-}
-
-public Action CTFBotSniperLurk_Update(BehaviorAction action, int actor, float interval, ActionResult result)
-{
-	if (g_bIsDefenderBot[actor] == false)
-		return Plugin_Continue;
-	
-	if (!CanUsePrimayWeapon(actor))
-	{
-		//Where did my gun go?
-		return action.SuspendFor(CTFBotDefenderAttack(), "Lost my rifle");
-	}
-	
-	return Plugin_Continue;
-}
-
 public Action CTFBotSniperLurk_SelectMoreDangerousThreat(BehaviorAction action, INextBot nextbot, int entity, CKnownEntity threat1, CKnownEntity threat2, CKnownEntity& knownEntity)
 {
 	int me = action.Actor;
@@ -1094,14 +1056,6 @@ public Action CTFBotSniperLurk_SelectMoreDangerousThreat(BehaviorAction action, 
 	}
 	
 	return Plugin_Changed;
-}
-
-public Action CTFBotSpyLeaveSpawnRoom_OnStart(BehaviorAction action, int actor, BehaviorAction priorAction, ActionResult result)
-{
-	if (g_bIsDefenderBot[actor] == false)
-		return Plugin_Continue;
-	
-	return action.Done();
 }
 
 /* Whether this bot has nowhere of its own to wait out the break

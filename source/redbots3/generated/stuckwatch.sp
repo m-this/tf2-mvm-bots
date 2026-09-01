@@ -29,13 +29,13 @@ stock int StuckCountOf(int client)
 	return m_iStuckCount[client];
 }
 
-public void Frame_UnstickDefender(int client)
+public void Frame_UnstickDefender(any client)
 {
-	if (!IsClientInGame(client) || !g_bIsDefenderBot[client] || !IsPlayerAlive(client))
+	if (!IsClientInGame(view_as<int>(client)) || !g_bIsDefenderBot[view_as<int>(client)] || !IsPlayerAlive(view_as<int>(client)))
 	{
 		return;
 	}
-	ResetIntentionInterface(client);
+	ResetIntentionInterface(view_as<int>(client));
 }
 
 stock bool IsSniperStalled(int client)
