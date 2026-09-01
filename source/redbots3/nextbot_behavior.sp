@@ -156,6 +156,7 @@ public Action Command_RecoverSpawnBots(int client, int args)
 #include "generated/scoutjump.sp"
 #include "generated/bottle.sp"
 #include "generated/dispatch.sp"
+#include "generated/medicnudge.sp"
 #include "generated/attack.sp"
 #include "generated/markgiant.sp"
 #include "generated/collectmoney.sp"
@@ -941,61 +942,6 @@ Pressed again, it starts again, which is what a player who is still hurt does an
  * Every frame would be arguing with the action rather than nudging it, and the beam does not need
  * an answer more often than the team changes shape.
  */
-#define MEDIC_PATIENT_INTERVAL	2.0
-
-static float m_ctNextPatientNudge[MAXPLAYERS + 1];
-
-/* Point the game's own heal action at the biggest body, from inside the action's own callback
- *
- * The mod used to answer this by replacing the whole action, which cost the medic his walking and
- * most of his output. The action is left alone now and only its patient is written.
- *
- * An earlier attempt at writing this field segfaulted the server, and this is deliberately narrower
- * than that one. It runs only from CTFBotMedicHeal_UpdatePost, so the action being written is the
- * action the game is running and not one looked up from somewhere else; the same offset is read in
- * the same callback every frame and has never faulted. The value is a checked, living, same team,
- * non medic client, and it is only written when it differs from what is already there.
- */
-static void PointMedicAtBiggestBody(BehaviorAction action, int actor)
-{
-	if (m_ctNextPatientNudge[actor] > GetGameTime())
-		return;
-
-	m_ctNextPatientNudge[actor] = GetGameTime() + MEDIC_PATIENT_INTERVAL;
-
-	int have = action.GetHandleEntity(ACTION_HEAL_PATIENT_OFFSET);
-	int want = BiggestBody(actor, have);
-
-	if (want <= 0)
-		return;
-
-	if (have == want)
-		return;
-
-	action.SetHandleEntity(ACTION_HEAL_PATIENT_OFFSET, want);
-}
-
-void MedicUberAndResist(int actor, int medigun, int patient)
-{
-	MedicProjectileShield(actor, patient);
-
-	if (ShouldDeployUber(actor, medigun, patient))
-		VS_PressAltFireButton(actor);
-	
-	if (patient <= 0 || GetMedigunType(medigun) != MEDIGUN_RESIST)
-		return;
-	
-	int iResistType = GetResistType(medigun);
-	int iLastDmgType = GetLastDamageType(patient);
-	
-	if (iLastDmgType & DMG_BULLET && iResistType != MEDIGUN_BULLET_RESIST)
-		g_arrExtraButtons[actor].PressButtons(IN_RELOAD);
-	else if (iLastDmgType & DMG_BLAST && iResistType != MEDIGUN_BLAST_RESIST)
-		g_arrExtraButtons[actor].PressButtons(IN_RELOAD);
-	else if (iLastDmgType & DMG_BURN && iResistType != MEDIGUN_FIRE_RESIST)
-		g_arrExtraButtons[actor].PressButtons(IN_RELOAD);
-}
-
 public Action CTFBotMedicHeal_UpdatePost(BehaviorAction action, int actor, float interval, ActionResult result)
 {
 	if (g_bIsDefenderBot[actor] == false)
