@@ -2306,20 +2306,6 @@ void AddBotsBasedOnLineupMode(int count, bool bAdjustTime = true)
 		ExtendUpgradeTimeForNewBots();
 }
 
-void ExtendUpgradeTimeForNewBots()
-{
-	float restartRoundTime = GameRules_GetPropFloat("m_flRestartRoundTime");
-
-	if (restartRoundTime <= 0)
-		return;
-
-	if (restartRoundTime - GetGameTime() <= BUY_UPGRADES_MAX_TIME)
-	{
-		//Add a little more time for the new bot to ready
-		GameRules_SetPropFloat("m_flRestartRoundTime", restartRoundTime + BUY_UPGRADES_MAX_TIME);
-	}
-}
-
 /* The seats sm_redbots_manager_team_composition still wants filled, in its order, at most count of
 them. Zero when the convar is empty, and the caller falls back to the lineup mode
 
@@ -2413,49 +2399,11 @@ A sentry outlives the engineer that placed it, and the mod holds hooks on both. 
 and leaving the building standing is the shape of crash a reseat can cause and an ordinary wave
 cannot, so every path that removes a bot mid-mission goes through here first.
 
-Everything it owns, not only the sentry: a dispenser and both ends of a teleporter are the same
-question */
-void ClearBuildingsBeforeKick(int client)
-{
-	for (int i = PlayerObjectCount(client) - 1; i >= 0; i--)
-	{
-		int building = TF2Util_GetPlayerObject(client, i);
-
-		if (IsValidEntity(building))
-			RemoveEntity(building);
-	}
-
-	//The one the game already took out of that list, because he was carrying it
-	int carried = TF2_GetCarriedObject(client);
-
-	if (carried != -1 && IsValidEntity(carried))
-		RemoveEntity(carried);
-}
-
 /* Send the whole team back through the join path, and say how many went
 
 A lineup change kicks only the bots the new list has no seat for, which is right and is nobody at
 all when the classes did not move. A loadout change moves no class and still has to reach every bot,
 because a weapon is handed out on the way in and never again.
-
-So this is the blunt one: everybody out, and the fill timer builds the team again from the
-composition and the loadout file as they now stand */
-int RecycleDefenderBots()
-{
-	int kicked = 0;
-
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (IsClientInGame(i) && IsDefenderBot(i) && TF2_GetClientTeam(i) == TFTeam_Red)
-		{
-			kicked++;
-			ClearBuildingsBeforeKick(i);
-			KickClient(i, "BotManager3: the team changed");
-		}
-	}
-
-	return kicked;
-}
 
 /* Reload the loadout file and put the team back together with it
 

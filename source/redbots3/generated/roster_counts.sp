@@ -69,3 +69,48 @@ stock int GetCountOfPlayersChoosingBotClasses()
 	return count;
 }
 
+stock void ExtendUpgradeTimeForNewBots()
+{
+	float restartRoundTime = GameRules_GetPropFloat("m_flRestartRoundTime");
+	if (restartRoundTime <= 0.0)
+	{
+		return;
+	}
+	if ((restartRoundTime - GetGameTime()) <= BUY_UPGRADES_MAX_TIME)
+	{
+		GameRules_SetPropFloat("m_flRestartRoundTime", restartRoundTime + BUY_UPGRADES_MAX_TIME);
+	}
+}
+
+stock void ClearBuildingsBeforeKick(int client)
+{
+	for (int i = PlayerObjectCount(client) - 1; i >= 0; i--)
+	{
+		int building = TF2Util_GetPlayerObject(client, i);
+		if (IsValidEntity(building))
+		{
+			RemoveEntity(building);
+		}
+	}
+	int carried = TF2_GetCarriedObject(client);
+	if ((carried != -1) && IsValidEntity(carried))
+	{
+		RemoveEntity(carried);
+	}
+}
+
+stock int RecycleDefenderBots()
+{
+	int kicked = 0;
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (IsClientInGame(i) && IsDefenderBot(i) && (TF2_GetClientTeam(i) == TFTeam_Red))
+		{
+			kicked++;
+			ClearBuildingsBeforeKick(i);
+			KickClient(i, "BotManager3: the team changed");
+		}
+	}
+	return kicked;
+}
+
