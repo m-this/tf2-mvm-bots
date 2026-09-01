@@ -173,3 +173,80 @@ stock Action CTFBotMainAction_ShouldAttack(BehaviorAction action, INextBot nextb
 	return Plugin_Changed;
 }
 
+public Action CTFBotTacticalMonitor_Update(BehaviorAction action, int actor, float interval, ActionResult result)
+{
+	if (!g_bIsDefenderBot[actor])
+	{
+		return Plugin_Continue;
+	}
+	UpdateDefenderReadiness(actor);
+	if (TF2_IsInUpgradeZone(actor) && (ActionsManager.LookupEntityActionByName(actor, "DefenderUpgrade") != INVALID_ACTION))
+	{
+		TFClassType iClass = TF2_GetPlayerClass(actor);
+		if ((iClass == TFClass_DemoMan) || (iClass == TFClass_Scout))
+		{
+			CountdownTimer pOpportunisticTimer = CountdownTimer(GetOpportunisticTimer(actor));
+			if (pOpportunisticTimer.Address != Address_Null)
+			{
+				pOpportunisticTimer.Start(interval);
+			}
+		}
+		return Plugin_Continue;
+	}
+	if (!ShouldUseTeleporter(actor))
+	{
+		CountdownTimer pFindTeleporterTimer = CountdownTimer(view_as<Address>(view_as<int>(action) + 0x70));
+		if (pFindTeleporterTimer.Address != Address_Null)
+		{
+			pFindTeleporterTimer.Start(interval);
+		}
+	}
+	UpdateStuckWatchdog(actor);
+	if (GameRules_GetRoundState() == RoundState_RoundRunning)
+	{
+		if (CTFBotEvadeBuster_IsPossible(actor))
+		{
+			return action.SuspendFor(CTFBotEvadeBuster(), "Sentry buster");
+		}
+		UpdateScoutCombatJump(actor);
+		if (ShouldDetonateStickies(actor))
+		{
+			VS_PressAltFireButton(actor);
+		}
+		UpdateSpyIntel(actor);
+		if (CTFBotSpyCheck_IsPossible(actor))
+		{
+			return action.SuspendFor(CTFBotSpyCheck(), "Spy check");
+		}
+		bool lowHealth = false;
+		float healthRatio = HealthRatio(actor);
+		if (((GetTimeSinceWeaponFired(actor) > 2.0) || (TF2_GetPlayerClass(actor) == TFClass_Sniper)) && (healthRatio < tf_bot_health_critical_ratio.FloatValue))
+		{
+			lowHealth = true;
+		}
+		else
+			if (healthRatio < tf_bot_health_ok_ratio.FloatValue)
+			{
+				lowHealth = true;
+			}
+		if (lowHealth && ShouldLeaveToBePatchedUp(actor, healthRatio) && CTFBotGetHealth_IsPossible(actor))
+		{
+			return action.SuspendFor(CTFBotGetHealth(), "Getting health");
+		}
+		int primary = GetPlayerWeaponSlot(actor, TFWeaponSlot_Primary);
+		if ((primary != -1) && (TF2Util_GetWeaponID(primary) == TF_WEAPON_FLAMETHROWER) && (TF2_IsCritBoosted(actor) || TF2_IsPlayerInCondition(actor, TFCond_CritMmmph)))
+		{
+			if (!HasAmmo(primary) && CTFBotGetAmmo_IsPossible(actor))
+			{
+				return action.SuspendFor(CTFBotGetAmmo(), "Get ammo for crit");
+			}
+		}
+		else
+			if (IsAmmoLow(actor) && ShouldLeaveToBePatchedUp(actor, healthRatio) && CTFBotGetAmmo_IsPossible(actor))
+			{
+				return action.SuspendFor(CTFBotGetAmmo(), "Getting ammo");
+			}
+	}
+	return Plugin_Continue;
+}
+
