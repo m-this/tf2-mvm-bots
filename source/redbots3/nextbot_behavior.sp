@@ -17,31 +17,6 @@ The second was worse. This used to be a cached canteen type, written by the purc
 purchase code is gone: nothing wrote it any more, so the switch below always read "no bottle" and
 a bot handed a canteen would never have drunk it. The type comes off the bottle now, which is
 where it was always true. */
-static int m_hPowerupBottle[MAXPLAYERS + 1] = {INVALID_ENT_REFERENCE, ...};
-static float m_ctPowerupBottleLook[MAXPLAYERS + 1];
-
-static int PowerupBottleOf(int client)
-{
-	int bottle = EntRefToEntIndex(m_hPowerupBottle[client]);
-	
-	if (bottle != INVALID_ENT_REFERENCE)
-		return bottle;
-	
-	//A bot with no bottle is the normal case now, and it should not cost an entity walk a frame
-	if (m_ctPowerupBottleLook[client] > GetGameTime())
-		return -1;
-	
-	m_ctPowerupBottleLook[client] = GetGameTime() + 1.0;
-	
-	bottle = GetPowerupBottle(client);
-	
-	if (bottle != -1)
-		m_hPowerupBottle[client] = EntIndexToEntRef(bottle);
-	
-	return bottle;
-}
-static float m_flNextBottleUseTime[MAXPLAYERS + 1];
-
 #if defined EXTRA_PLUGINBOT
 //Replicate behavior of PathFollower's PluginBot
 enum struct esPluginBot
@@ -180,6 +155,7 @@ public Action Command_RecoverSpawnBots(int client, int args)
 #include "generated/mediccall.sp"
 #include "generated/spawnexit.sp"
 #include "generated/scoutjump.sp"
+#include "generated/bottle.sp"
 #include "generated/attack.sp"
 #include "generated/markgiant.sp"
 #include "generated/collectmoney.sp"
@@ -1620,179 +1596,6 @@ bool OpportunisticallyUseWeaponAbilities(int client, int activeWeapon, INextBot 
 				VS_PressSpecialFireButton(client);
 				return true;
 			}
-		}
-	}
-	
-	return false;
-}
-
-bool OpportunisticallyUsePowerupBottle(int client, int activeWeapon, INextBot bot, const CKnownEntity threat)
-{
-	if (m_flNextBottleUseTime[client] > GetGameTime())
-		return false;
-	
-	int bottle = PowerupBottleOf(client);
-	
-	if (bottle == -1)
-		return false;
-	
-	if (PowerupBottle_GetNumCharges(bottle) < 1)
-		return false;
-	
-	switch (PowerupBottle_GetType(bottle))
-	{
-		case POWERUP_BOTTLE_CRITBOOST:
-		{
-			//Can't do anything useful without a weapon
-			if (activeWeapon == -1)
-				return false;
-			
-			//No threat to tactually use it against
-			if (threat == NULL_KNOWN_ENTITY)
-				return false;
-			
-			//Medic would rather share this than use it for himself
-			if (TF2_GetPlayerClass(client) == TFClass_Medic)
-				return false;
-			
-			//Already have crits
-			if (TF2_IsCritBoosted(client) || TF2_IsPlayerInCondition(client, TFCond_CritMmmph))
-				return false;
-			
-			int iThreat = threat.GetEntity();
-			
-			if (!IsLineOfFireClearEntity(client, GetEyePosition(client), iThreat))
-				return false;
-			
-			int weaponID = TF2Util_GetWeaponID(activeWeapon);
-			
-			if (weaponID == TF_WEAPON_FLAMETHROWER && bot.IsRangeGreaterThan(iThreat, FLAMETHROWER_REACH_RANGE))
-				return false;
-			
-			if (weaponID == TF_WEAPON_FLAME_BALL && bot.IsRangeGreaterThan(iThreat, FLAMEBALL_REACH_RANGE))
-				return false;
-			
-			if (IsMeleeWeapon(activeWeapon) && bot.IsRangeGreaterThan(iThreat, 100.0))
-				return false;
-			
-			if (BaseEntity_IsPlayer(iThreat))
-			{
-				/* So basically here we determine based on a few factors
-				if our threat is giant and has a lot of health, they're probably a boss
-				if we're close to failing and they have a lot of health left, we want to kill them fast
-				i really want this to be done better, but we probably need people that actually know what the optimal use of this canteen is */
-				if ((TF2_IsMiniBoss(iThreat) && GetClientHealth(iThreat) > 5000) || (IsFailureImminent(client) && GetClientHealth(iThreat) > 2000))
-				{
-					UseActionSlotItem(client);
-					return true;
-				}
-			}
-			else if (IsBaseBoss(iThreat) && BaseEntity_GetHealth(iThreat) > 1000)
-			{
-				//Crit against the tank
-				UseActionSlotItem(client);
-				return true;
-			}
-		}
-		case POWERUP_BOTTLE_UBERCHARGE:
-		{
-			//I'm invincible already
-			if (TF2_IsInvulnerable(client))
-				return false;
-			
-			//Only when there's a threat nearby, otherwise we could just go heal ourselves
-			if (!threat || !threat.IsVisibleRecently())
-				return false;
-			
-			float healthRatio = float(GetClientHealth(client)) / float(TEMP_GetPlayerMaxHealth(client));
-			
-			if (healthRatio < tf_bot_health_critical_ratio.FloatValue)
-			{
-				//I'm about to die
-				UseActionSlotItem(client);
-				m_flNextBottleUseTime[client] = GetGameTime() + GetRandomFloat(10.0, 30.0);
-				return true;
-			}
-			
-			if (TF2_IsPlayerInCondition(client, TFCond_Gas))
-			{
-				//This gas might be explosive
-				UseActionSlotItem(client);
-				m_flNextBottleUseTime[client] = GetGameTime() + GetRandomFloat(20.0, 30.0);
-				return true;
-			}
-		}
-		case POWERUP_BOTTLE_RECALL:
-		{
-			//TODO: medic can't share this, but he could use it for himself in an attempt to defend the hatch
-			if (TF2_GetPlayerClass(client) == TFClass_Medic)
-				return false;
-			
-			//TODO: engineer should probably only uses this if his sentry was destroyed
-			if (TF2_GetPlayerClass(client) == TFClass_Engineer)
-				return false;
-			
-			//We're busy going for the tank
-			if (ActionsManager.LookupEntityActionByName(client, "DefenderAttackTank") != INVALID_ACTION)
-				return false;
-			
-			float myPosition[3]; myPosition = WorldSpaceCenter(client);
-			
-			//I'm already in my spawn room
-			if (TF2Util_IsPointInRespawnRoom(myPosition, client, true))
-				return false;
-			
-			float hatchPosition[3]; hatchPosition = GetBombHatchPosition();
-			
-			//We're already close enough to the hatch
-			if (GetVectorDistance(myPosition, hatchPosition) <= 1000.0)
-				return false;
-			
-			int flag = FindBombNearestToHatch();
-			
-			//No bomb active
-			if (flag == -1)
-				return false;
-			
-			float bombPosition[3]; bombPosition = WorldSpaceCenter(flag);
-			
-			//Bomb is far and not a threat
-			if (GetVectorDistance(bombPosition, hatchPosition) > BOMB_HATCH_RANGE_CRITICAL)
-				return false;
-			
-			int closestToHatch = FindBotNearestToBombNearestToHatch(client);
-			
-			//No robot near the bomb close to the hatch
-			if (closestToHatch == -1)
-				return false;
-			
-			float threatPosition[3]; GetClientAbsOrigin(closestToHatch, threatPosition);
-			
-			//Nearest robot isn't that close to the bomb
-			if (GetVectorDistance(threatPosition, bombPosition) > 800.0)
-				return false;
-			
-			//We are already close enough to deal with it
-			if (GetVectorDistance(myPosition, threatPosition) <= 500.0)
-				return false;
-			
-			UseActionSlotItem(client);
-			return true;
-		}
-		case POWERUP_BOTTLE_REFILL_AMMO:
-		{
-			int primary = GetPlayerWeaponSlot(client, TFWeaponSlot_Primary);
-			
-			if (primary != -1 && !HasAmmo(primary))
-			{
-				//I got no ammo
-				UseActionSlotItem(client);
-				return true;
-			}
-		}
-		case POWERUP_BOTTLE_BUILDINGS_INSTANT_UPGRADE:
-		{
-			//TODO
 		}
 	}
 	

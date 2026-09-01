@@ -40,7 +40,7 @@ static char ITEMS_GAME_CLASS[][] =
 ArrayList g_adtHats[10];
 ArrayList g_adtHatEffects;
 Go_Wardrobe g_wardrobe[65];
-int g_iBotHat[65];
+int g_iBotHat[65] = {INVALID_ENT_REFERENCE, ...};
 bool g_bCosmeticsPending[65];
 int g_iEquipping[65];
 
