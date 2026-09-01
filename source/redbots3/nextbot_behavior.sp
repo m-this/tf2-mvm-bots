@@ -7,10 +7,6 @@
 PathFollower m_pPath[MAXPLAYERS + 1];
 ChasePath m_pChasePath[MAXPLAYERS + 1];
 float m_flRepathTime[MAXPLAYERS + 1];
-static float m_flNextJumpTime[MAXPLAYERS + 1];
-static float m_flScoutDoubleJumpTime[MAXPLAYERS + 1];
-static int m_iScoutDoubleJumpSide[MAXPLAYERS + 1];
-
 /* The bottle this bot is wearing, kept rather than found again every frame
 
 Finding it walks the entity list looking for a tf_powerup_bottle, and this runs on the player
@@ -183,6 +179,7 @@ public Action Command_RecoverSpawnBots(int client, int args)
 #include "generated/stuckwatch.sp"
 #include "generated/mediccall.sp"
 #include "generated/spawnexit.sp"
+#include "generated/scoutjump.sp"
 #include "generated/attack.sp"
 #include "generated/markgiant.sp"
 #include "generated/collectmoney.sp"
@@ -1069,10 +1066,8 @@ Only a Scout. Every other class is slower in the air than on it, and a Heavy who
 ground has traded his aim for a hop */
 
 //Close enough that the robot shooting back cannot miss unless it is made to
-#define SCOUT_JUMP_THREAT_RANGE	900.0
 
 //Slow enough to be standing still, whatever the bot thinks it is doing
-#define SCOUT_JUMP_MIN_SPEED	100.0
 
 /* The second jump, and why it is not every time
 
@@ -1083,74 +1078,6 @@ irregular enough that expecting it is wrong.
 The second jump goes the other way. Jumping twice in one direction is one long arc and a shooter
 tracks it; jumping left and then right is two arcs with a corner in the middle, and the corner is
 what a robot's aim cannot follow. Reported after the 1.3 play-test: he only ever single jumps */
-#define SCOUT_DOUBLE_JUMP_CHANCE	70
-#define SCOUT_DOUBLE_JUMP_DELAY		0.22
-#define SCOUT_JUMP_STRAFE_TIME		0.35
-
-static void UpdateScoutCombatJump(int client)
-{
-	if (TF2_GetPlayerClass(client) != TFClass_Scout)
-		return;
-
-	/* The second half of a double jump, which by definition happens off the ground, so this is
-	before every check that wants the bot standing on something */
-	if (m_flScoutDoubleJumpTime[client] > 0.0)
-	{
-		if (GetGameTime() < m_flScoutDoubleJumpTime[client])
-			return;
-
-		m_flScoutDoubleJumpTime[client] = 0.0;
-
-		//Landed early. The air jump is gone and pressing it again only queues the next ground one
-		if (GetEntityFlags(client) & FL_ONGROUND)
-			return;
-
-		g_arrExtraButtons[client].PressButtons(IN_JUMP | m_iScoutDoubleJumpSide[client], SCOUT_JUMP_STRAFE_TIME);
-
-		return;
-	}
-
-	if (m_flNextJumpTime[client] > GetGameTime())
-		return;
-
-	//Already in the air, or held down by something that a jump will not get it out of
-	if (!(GetEntityFlags(client) & FL_ONGROUND))
-		return;
-
-	if (TF2_IsPlayerInCondition(client, TFCond_Dazed) || TF2_IsPlayerInCondition(client, TFCond_Slowed))
-		return;
-
-	/* Standing still. A jump in place lands where it started and is a worse target for the second
-	it is in the air, so the dodge is only a dodge while the bot is going somewhere */
-	float velocity[3]; GetEntPropVector(client, Prop_Data, "m_vecVelocity", velocity);
-
-	if (velocity[0] * velocity[0] + velocity[1] * velocity[1] < SCOUT_JUMP_MIN_SPEED * SCOUT_JUMP_MIN_SPEED)
-		return;
-
-	INextBot myBot = CBaseNPC_GetNextBotOfEntity(client);
-	CKnownEntity threat = myBot.GetVisionInterface().GetPrimaryKnownThreat(false);
-
-	if (threat == NULL_KNOWN_ENTITY || !threat.IsVisibleRecently())
-		return;
-
-	float threatOrigin[3]; threat.GetLastKnownPosition(threatOrigin);
-
-	if (myBot.IsRangeGreaterThanEx(threatOrigin, SCOUT_JUMP_THREAT_RANGE))
-		return;
-
-	//Irregular on purpose: a jump on a fixed beat is as easy to lead as no jump at all
-	m_flNextJumpTime[client] = GetGameTime() + GetRandomFloat(0.5, 1.2);
-
-	int side = GetRandomInt(0, 1) ? IN_MOVELEFT : IN_MOVERIGHT;
-
-	g_arrExtraButtons[client].PressButtons(IN_JUMP | side, SCOUT_JUMP_STRAFE_TIME);
-
-	if (GetRandomInt(1, 100) > SCOUT_DOUBLE_JUMP_CHANCE)
-		return;
-
-	m_flScoutDoubleJumpTime[client] = GetGameTime() + SCOUT_DOUBLE_JUMP_DELAY;
-	m_iScoutDoubleJumpSide[client] = (side == IN_MOVELEFT) ? IN_MOVERIGHT : IN_MOVELEFT;
-}
 
 public Action CTFBotScenarioMonitor_Update(BehaviorAction action, int actor, float interval, ActionResult result)
 {
