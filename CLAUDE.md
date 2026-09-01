@@ -48,16 +48,16 @@ chat here. Turn it into beads.
 - Add the label `discord`. Drop the messages that report nothing, then say so.
 - Read the close reason before you reopen a bead. It names the trigger measured.
 
-## Beads in this repository
+## Beads moved
 
-The block below has the commands. These facts are local to this repository.
+The tracker is in `../tf2-mvm-bots-go` now, with everything else. It went over
+whole, 161 issues and every note, and the counts were checked both ways. Run bd
+with `-C ../tf2-mvm-bots-go`. The copy left here is the export as it stood the
+day it moved and is not written to again.
 
-- The prefix is `mvm`. P0 crash, P1 costs a player a run, P2 bug, P3 polish.
-- Git tracks `.beads/issues.jsonl`. Git ignores the Dolt database.
-- There is no Dolt remote. A new clone needs `bd init --from-jsonl`.
-- Two sessions share one database and can overwrite each other. Check with
-  `bd show` before you set a status.
-
+This repository is being archived read-only. The plugin tree, the gamedata, the
+configs and the test-bed all live under `plugin/` in the Go repository, and
+tf2-archipelago builds from there.
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:970c3bf2 -->
 ## Beads Issue Tracker
