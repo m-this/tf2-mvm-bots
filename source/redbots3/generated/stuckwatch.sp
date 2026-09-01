@@ -14,6 +14,8 @@
 
 #define SNIPER_STALL_TIME (20.0)
 
+#define MOVE_WEDGED_TRIES (8)
+
 float m_vStuckOrigin[65][3];
 float m_ctStuckDeadline[65];
 int m_iStuckCount[65];
@@ -130,5 +132,96 @@ stock void UpdateStuckWatchdog(int actor)
 		return;
 	}
 	RequestFrame(Frame_UnstickDefender, actor);
+}
+
+stock bool AreaEscapePoint(CNavArea area, const float here[3], float destination[3])
+{
+	for (int i = 0; i < 3; i++)
+	{
+		destination[i] = 0.0;
+	}
+	for (int attempt = 0; attempt < MOVE_WEDGED_TRIES; attempt++)
+	{
+		float point[3];
+		CNavArea_GetRandomPoint(area, point);
+		point[2] += 10.0;
+		if (GetVectorDistance(here, point) > STUCK_RADIUS)
+		{
+			destination = point;
+			return true;
+		}
+	}
+	return false;
+}
+
+stock bool WedgeEscapePoint(CNavArea area, const float here[3], float destination[3])
+{
+	bool found;
+	for (int i = 0; i < 3; i++)
+	{
+		destination[i] = 0.0;
+	}
+	found = AreaEscapePoint(area, here, destination);
+	if (found)
+	{
+		return true;
+	}
+	for (NavDirType dir = NORTH; dir < NUM_DIRECTIONS; dir++)
+	{
+		int count = area.GetAdjacentCount(dir);
+		for (int i = 0; i < count; i++)
+		{
+			CNavArea next = area.GetAdjacentArea(dir, i);
+			if (next != NULL_AREA)
+			{
+				found = AreaEscapePoint(next, here, destination);
+				if (found)
+				{
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+stock bool MoveWedgedDefender(int client)
+{
+	float here[3];
+	here = GetAbsOrigin(client);
+	CNavArea area = TheNavMesh.GetNearestNavArea(here, true, STUCK_WEDGE_SEARCH, false, true, TEAM_ANY);
+	if (area == NULL_AREA)
+	{
+		LogMessage("Stuck: %N is wedged at %.0f %.0f %.0f with no nav area within %.0f, so nothing can be done", client, here[0], here[1], here[2], STUCK_WEDGE_SEARCH);
+		return false;
+	}
+	float destination[3];
+	if (DebugFaults_OldWedgeRecovery())
+	{
+		CNavArea_GetRandomPoint(area, destination);
+		destination[2] += 10.0;
+		if (GetVectorDistance(here, destination) <= STUCK_RADIUS)
+		{
+			return false;
+		}
+	}
+	else
+	{
+		float escape[3];
+		bool found = WedgeEscapePoint(area, here, escape);
+		if (!found)
+		{
+			LogMessage("Stuck: %N is wedged at %.0f %.0f %.0f and every point in its area and the ones touching it is too close", client, here[0], here[1], here[2]);
+			return false;
+		}
+		destination = escape;
+	}
+	float stopped[3];
+	TeleportEntity(client, destination, NULL_VECTOR, stopped);
+	CBaseCombatCharacter(client).UpdateLastKnownArea();
+	m_flRepathTime[client] = 0.0;
+	m_iStuckWedgeCount[client] = 0;
+	LogMessage("Stuck: %N was wedged at %.0f %.0f %.0f, moved to %.0f %.0f %.0f", client, here[0], here[1], here[2], destination[0], destination[1], destination[2]);
+	return true;
 }
 

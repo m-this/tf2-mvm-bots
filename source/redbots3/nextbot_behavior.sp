@@ -835,46 +835,6 @@ move, which is mvm-ipf.
 
 So his own area is tried first and only accepted when the point clears STUCK_RADIUS, then the areas
 touching it. Bounded twice over: the four directions, and MOVE_WEDGED_TRIES points per area. */
-#define MOVE_WEDGED_TRIES	8
-
-static bool WedgeEscapePoint(CNavArea area, const float here[3], float destination[3])
-{
-	if (AreaEscapePoint(area, here, destination))
-		return true;
-
-	for (NavDirType dir = NORTH; dir < NUM_DIRECTIONS; dir++)
-	{
-		int count = area.GetAdjacentCount(dir);
-
-		for (int i = 0; i < count; i++)
-		{
-			CNavArea next = area.GetAdjacentArea(dir, i);
-
-			if (next != NULL_AREA && AreaEscapePoint(next, here, destination))
-				return true;
-		}
-	}
-
-	return false;
-}
-
-//A point in one area that is far enough from where he is wedged, tried a fixed number of times
-static bool AreaEscapePoint(CNavArea area, const float here[3], float destination[3])
-{
-	for (int attempt = 0; attempt < MOVE_WEDGED_TRIES; attempt++)
-	{
-		float point[3]; CNavArea_GetRandomPoint(area, point);
-		point[2] += 10.0;
-
-		if (GetVectorDistance(here, point) > STUCK_RADIUS)
-		{
-			destination = point;
-			return true;
-		}
-	}
-
-	return false;
-}
 
 /* Put a wedged bot somewhere it can walk, when resetting it has stopped working
 
@@ -882,52 +842,6 @@ The same shape as the spawn recovery below and for the same reason, one step fur
 one moves a bot that never left spawn, and this one moves a bot that left and then stopped. Both
 beat leaving it where it is, because a bot that cannot move asks for a path every frame and the
 watchdog kills the server on the answer.
-
-Nearby rather than at the objective. He was going somewhere and the wedge is what stopped him, so
-the least surprising thing is the same place minus the geometry he is inside. */
-static bool MoveWedgedDefender(int client)
-{
-	float here[3]; here = GetAbsOrigin(client);
-
-	CNavArea area = TheNavMesh.GetNearestNavArea(here, true, STUCK_WEDGE_SEARCH, false, true, TEAM_ANY);
-
-	if (area == NULL_AREA)
-	{
-		LogMessage("Stuck: %N is wedged at %.0f %.0f %.0f with no nav area within %.0f, so nothing can be done",
-			client, here[0], here[1], here[2], STUCK_WEDGE_SEARCH);
-		return false;
-	}
-
-	float destination[3];
-
-	if (DebugFaults_OldWedgeRecovery())
-	{
-		//The pre-2.21.3 behaviour, kept only so a run can measure what replacing it was worth
-		CNavArea_GetRandomPoint(area, destination);
-		destination[2] += 10.0;
-
-		if (GetVectorDistance(here, destination) <= STUCK_RADIUS)
-			return false;
-	}
-	else if (!WedgeEscapePoint(area, here, destination))
-	{
-		LogMessage("Stuck: %N is wedged at %.0f %.0f %.0f and every point in its area and the ones touching it is too close",
-			client, here[0], here[1], here[2]);
-		return false;
-	}
-
-	float stopped[3];
-	TeleportEntity(client, destination, NULL_VECTOR, stopped);
-	CBaseCombatCharacter(client).UpdateLastKnownArea();
-
-	m_flRepathTime[client] = 0.0;
-	m_iStuckWedgeCount[client] = 0;
-
-	LogMessage("Stuck: %N was wedged at %.0f %.0f %.0f, moved to %.0f %.0f %.0f",
-		client, here[0], here[1], here[2], destination[0], destination[1], destination[2]);
-
-	return true;
-}
 
 public Action CTFBotTacticalMonitor_Update(BehaviorAction action, int actor, float interval, ActionResult result)
 {
