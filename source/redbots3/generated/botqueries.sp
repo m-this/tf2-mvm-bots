@@ -375,3 +375,201 @@ stock void MonitorKnownEntities(int client, IVision vision)
 	}
 }
 
+stock bool IsThrowableReady(int client, int weapon)
+{
+	switch (TF2Util_GetWeaponID(weapon))
+	{
+		case TF_WEAPON_JAR_GAS:
+		{
+			return GetEntPropFloat(client, Prop_Send, "m_flItemChargeMeter") >= 100.0;
+		}
+		case TF_WEAPON_JAR, TF_WEAPON_JAR_MILK, TF_WEAPON_CLEAVER:
+		{
+			return GetEntPropFloat(weapon, Prop_Send, "m_flEffectBarRegenTime") <= GetGameTime();
+		}
+	}
+	return HasAmmo(weapon);
+}
+
+stock void EquipBestWeaponForThreat(int client, const CKnownEntity threat)
+{
+	int primary = GetPlayerWeaponSlot(client, TFWeaponSlot_Primary);
+	if (!IsCombatWeapon(client, primary))
+	{
+		primary = -1;
+	}
+	int secondary = GetPlayerWeaponSlot(client, TFWeaponSlot_Secondary);
+	if (!IsCombatWeapon(client, secondary))
+	{
+		secondary = -1;
+	}
+	int melee = GetPlayerWeaponSlot(client, TFWeaponSlot_Melee);
+	if (!IsCombatWeapon(client, melee))
+	{
+		melee = -1;
+	}
+	int gun = -1;
+	if (primary != -1)
+	{
+		gun = primary;
+	}
+	else
+		if (secondary != -1)
+		{
+			gun = secondary;
+		}
+		else
+		{
+			gun = melee;
+		}
+	if ((threat == NULL_KNOWN_ENTITY) || !threat.WasEverVisible() || (threat.GetTimeSinceLastSeen() > 5.0))
+	{
+		if (gun != -1)
+		{
+			TF2Util_SetPlayerActiveWeapon(client, gun);
+		}
+		return;
+	}
+	if (BaseCombatCharacter_GetAmmoCount(client, TF_AMMO_PRIMARY) <= 0)
+	{
+		primary = -1;
+	}
+	if (BaseCombatCharacter_GetAmmoCount(client, TF_AMMO_SECONDARY) <= 0)
+	{
+		secondary = -1;
+	}
+	INextBot myBot = CBaseNPC_GetNextBotOfEntity(client);
+	int threatEnt = threat.GetEntity();
+	switch (TF2_GetPlayerClass(client))
+	{
+		case TFClass_DemoMan:
+		{
+			float threatOrigin[3];
+			threat.GetLastKnownPosition(threatOrigin);
+			float myOrigin[3];
+			GetClientAbsOrigin(client, myOrigin);
+			float threatRange = GetVectorDistance(myOrigin, threatOrigin);
+			bool wantSticky = (secondary != -1) && ShouldUseStickyLauncher(client, secondary, threatEnt, threatRange);
+			if (wantSticky && (Clip1(secondary) > 0))
+			{
+				gun = secondary;
+			}
+			else
+				if ((gun != -1) && (Clip1(gun) == 0) && (secondary != -1) && (Clip1(secondary) != 0))
+				{
+					gun = secondary;
+				}
+		}
+		case TFClass_Heavy, TFClass_Spy, TFClass_Engineer:
+		{
+		}
+		case TFClass_Medic:
+		{
+			if ((secondary != -1) && MedicHasPatient(client, secondary))
+			{
+				gun = secondary;
+			}
+		}
+		case TFClass_Scout:
+		{
+			if (secondary != -1)
+			{
+				TFWeaponType weaponID = TF2Util_GetWeaponID(secondary);
+				if (((weaponID == TF_WEAPON_JAR_MILK) || (weaponID == TF_WEAPON_CLEAVER)) && IsThrowableReady(client, secondary) && BaseEntity_IsPlayer(threatEnt) && !TF2_IsInvulnerable(threatEnt))
+				{
+					gun = secondary;
+				}
+				else
+					if ((gun != -1) && (Clip1(gun) == 0))
+					{
+						gun = secondary;
+					}
+			}
+		}
+		case TFClass_Soldier:
+		{
+			if ((gun != -1) && (Clip1(gun) == 0))
+			{
+				if ((secondary != -1) && (Clip1(secondary) != 0) && (!BaseEntity_IsPlayer(threatEnt) || !TF2_IsInvulnerable(threatEnt)))
+				{
+					float closeSoldierRange = 500.0;
+					float lastKnownPos[3];
+					threat.GetLastKnownPosition(lastKnownPos);
+					if (myBot.IsRangeLessThanEx(lastKnownPos, closeSoldierRange))
+					{
+						gun = secondary;
+					}
+				}
+			}
+		}
+		case TFClass_Sniper:
+		{
+			if ((secondary != -1) && (TF2Util_GetWeaponID(secondary) == TF_WEAPON_JAR) && IsThrowableReady(client, secondary) && BaseEntity_IsPlayer(threatEnt) && !TF2_IsInvulnerable(threatEnt))
+			{
+				gun = secondary;
+			}
+			else
+				if ((primary != -1) && (TF2Util_GetWeaponID(primary) == TF_WEAPON_COMPOUND_BOW))
+				{
+					gun = primary;
+				}
+				else
+				{
+					float closeSniperRange = 750.0;
+					float lastKnownPos[3];
+					threat.GetLastKnownPosition(lastKnownPos);
+					if ((secondary != -1) && myBot.IsRangeLessThanEx(lastKnownPos, closeSniperRange))
+					{
+						gun = secondary;
+					}
+				}
+		}
+		case TFClass_Pyro:
+		{
+			if ((secondary != -1) && (TF2Util_GetWeaponID(secondary) == TF_WEAPON_JAR_GAS) && IsThrowableReady(client, secondary) && BaseEntity_IsPlayer(threatEnt) && !TF2_IsInvulnerable(threatEnt))
+			{
+				gun = secondary;
+			}
+			else
+			{
+				float flameRange = 750.0;
+				float lastKnownPos[3];
+				threat.GetLastKnownPosition(lastKnownPos);
+				if ((secondary != -1) && myBot.IsRangeGreaterThanEx(lastKnownPos, flameRange))
+				{
+					gun = secondary;
+				}
+				if (BaseEntity_IsPlayer(threatEnt))
+				{
+					TFClassType threatClass = TF2_GetPlayerClass(threatEnt);
+					if ((threatClass == TFClass_Soldier) || (threatClass == TFClass_DemoMan))
+					{
+						gun = primary;
+					}
+				}
+			}
+		}
+	}
+	if ((gun != -1) && !IsMeleeWeapon(gun) && !HasAmmo(gun))
+	{
+		if ((primary != -1) && HasAmmo(primary))
+		{
+			gun = primary;
+		}
+		else
+			if ((secondary != -1) && HasAmmo(secondary))
+			{
+				gun = secondary;
+			}
+			else
+				if (melee != -1)
+				{
+					gun = melee;
+				}
+	}
+	if (gun != -1)
+	{
+		TF2Util_SetPlayerActiveWeapon(client, gun);
+	}
+}
+
