@@ -470,3 +470,53 @@ public Action CTFBotMainAction_SelectTargetPoint(BehaviorAction action, INextBot
 	return Plugin_Continue;
 }
 
+public void OnActionCreated(BehaviorAction action, int actor, const char[] name)
+{
+	if (actor <= MaxClients)
+	{
+		if (StrEqual(name, "MainAction", true))
+		{
+			action.SelectTargetPoint = CTFBotMainAction_SelectTargetPoint;
+			action.ShouldAttack = CTFBotMainAction_ShouldAttack;
+			action.Update = CTFBotMainAction_Update;
+		}
+		else
+			if (StrEqual(name, "TacticalMonitor", true))
+			{
+				action.Update = CTFBotTacticalMonitor_Update;
+				action.SelectMoreDangerousThreat = CTFBotMainAction_SelectMoreDangerousThreat;
+			}
+			else
+				if (StrEqual(name, "ScenarioMonitor", true))
+				{
+					action.Update = CTFBotScenarioMonitor_Update;
+				}
+				else
+					if (StrEqual(name, "Heal", true))
+					{
+						action.UpdatePost = CTFBotMedicHeal_UpdatePost;
+					}
+					else
+						if (StrEqual(name, "FetchFlag", true))
+						{
+							action.OnStart = CTFBotFetchFlag_OnStart;
+						}
+						else
+							if (StrEqual(name, "MvMEngineerIdle", true))
+							{
+								action.OnStart = CTFBotMvMEngineerIdle_OnStart;
+							}
+							else
+								if (StrEqual(name, "SniperLurk", true))
+								{
+									action.Update = CTFBotSniperLurk_Update;
+									action.SelectMoreDangerousThreat = CTFBotSniperLurk_SelectMoreDangerousThreat;
+								}
+								else
+									if (StrEqual(name, "SpyLeaveSpawnRoom", true))
+									{
+										action.OnStart = CTFBotSpyLeaveSpawnRoom_OnStart;
+									}
+	}
+}
+

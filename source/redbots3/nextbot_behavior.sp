@@ -236,54 +236,6 @@ void ResetNextBot(int client)
 
 #endif
 
-public void OnActionCreated(BehaviorAction action, int actor, const char[] name)
-{
-	//TFBots are players, ignore all other nextbots
-	if (actor <= MaxClients)
-	{
-		if (StrEqual(name, "MainAction"))
-		{
-			action.SelectTargetPoint = CTFBotMainAction_SelectTargetPoint;
-			action.ShouldAttack = CTFBotMainAction_ShouldAttack;
-			action.Update = CTFBotMainAction_Update;
-		}
-		else if (StrEqual(name, "TacticalMonitor"))
-		{
-			action.Update = CTFBotTacticalMonitor_Update;
-			
-			/* NOTE: I've noticed this seems to be very inconsistent at the MainAction level and it also seems to behave differently on windows vs linux
-			Let's just override it at the TacticalMonitor level, though this one doesn't actually have a function for it in its class
-			But since all nextbot callbacks are virtual i think this should work fine */
-			action.SelectMoreDangerousThreat = CTFBotMainAction_SelectMoreDangerousThreat;
-		}
-		else if (StrEqual(name, "ScenarioMonitor"))
-		{
-			action.Update = CTFBotScenarioMonitor_Update;
-		}
-		else if (StrEqual(name, "Heal"))
-		{
-			action.UpdatePost = CTFBotMedicHeal_UpdatePost;
-		}
-		else if (StrEqual(name, "FetchFlag"))
-		{
-			action.OnStart = CTFBotFetchFlag_OnStart;
-		}
-		else if (StrEqual(name, "MvMEngineerIdle"))
-		{
-			action.OnStart = CTFBotMvMEngineerIdle_OnStart;
-		}
-		else if (StrEqual(name, "SniperLurk"))
-		{
-			action.Update = CTFBotSniperLurk_Update;
-			action.SelectMoreDangerousThreat = CTFBotSniperLurk_SelectMoreDangerousThreat;
-		}
-		else if (StrEqual(name, "SpyLeaveSpawnRoom"))
-		{
-			action.OnStart = CTFBotSpyLeaveSpawnRoom_OnStart;
-		}
-	}
-}
-
 /* What a robot is worth killing first
 
 The ranges, the enum and the generated table are in generated/threat_priority.sp, written from
