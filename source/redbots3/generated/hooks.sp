@@ -330,3 +330,143 @@ public Action CTFBotMainAction_SelectMoreDangerousThreat(BehaviorAction action, 
 	return Plugin_Changed;
 }
 
+public Action CTFBotMainAction_SelectTargetPoint(BehaviorAction action, INextBot nextbot, int entity, float vec[3])
+{
+	for (int i = 0; i < 3; i++)
+	{
+		vec[i] = 0.0;
+	}
+	int me = action.Actor;
+	if (!g_bIsDefenderBot[me])
+	{
+		return Plugin_Continue;
+	}
+	int myWeapon = BaseCombatCharacter_GetActiveWeapon(me);
+	if (myWeapon != -1)
+	{
+		switch (TF2Util_GetWeaponID(myWeapon))
+		{
+			case TF_WEAPON_GRENADELAUNCHER, TF_WEAPON_PIPEBOMBLAUNCHER:
+			{
+				float targetPoint[3];
+				targetPoint = WorldSpaceCenter(entity);
+				float vecTarget[3];
+				vecTarget = GetAbsOrigin(entity);
+				float vecActor[3];
+				GetClientAbsOrigin(me, vecActor);
+				float distance = GetVectorDistance(vecTarget, vecActor);
+				if (distance > 150.0)
+				{
+					distance = distance / GetProjectileSpeed(myWeapon);
+					float absVelocity[3];
+					CBaseEntity(entity).GetAbsVelocity(absVelocity);
+					targetPoint[0] = vecTarget[0] + (absVelocity[0] * distance);
+					targetPoint[1] = vecTarget[1] + (absVelocity[1] * distance);
+					targetPoint[2] = vecTarget[2] + (absVelocity[2] * distance);
+				}
+				else
+				{
+					targetPoint = WorldSpaceCenter(entity);
+				}
+				float vecToTarget[3];
+				SubtractVectors(targetPoint, vecActor, vecToTarget);
+				float unit[3];
+				float a5 = NormalizeVector(vecToTarget, unit);
+				float ballisticElevation = 0.0125 * a5;
+				if (ballisticElevation > 45.0)
+				{
+					ballisticElevation = 45.0;
+				}
+				float elevation = ballisticElevation * (FLOAT_PI / 180.0);
+				float sineValue = Sine(elevation);
+				float cosineValue = Cosine(elevation);
+				if (cosineValue != 0.0)
+				{
+					targetPoint[2] += (sineValue * a5) / cosineValue;
+				}
+				vec = targetPoint;
+				return Plugin_Changed;
+			}
+			case TF_WEAPON_PARTICLE_CANNON:
+			{
+				float targetPoint[3];
+				float vecTarget[3];
+				vecTarget = GetAbsOrigin(entity);
+				float vecActor[3];
+				vecActor = GetAbsOrigin(me);
+				float distance = GetVectorDistance(vecTarget, vecActor);
+				if (distance > 150.0)
+				{
+					distance = distance * 0.0009090909;
+					float absVelocity[3];
+					CBaseEntity(entity).GetAbsVelocity(absVelocity);
+					targetPoint[0] = vecTarget[0] + (absVelocity[0] * distance);
+					targetPoint[1] = vecTarget[1] + (absVelocity[1] * distance);
+					targetPoint[2] = vecTarget[2] + (absVelocity[2] * distance);
+					if (!IsLineOfFireClearPosition(me, GetEyePosition(me), targetPoint))
+					{
+						vecTarget = WorldSpaceCenter(entity);
+						targetPoint[0] = vecTarget[0] + (absVelocity[0] * distance);
+						targetPoint[1] = vecTarget[1] + (absVelocity[1] * distance);
+						targetPoint[2] = vecTarget[2] + (absVelocity[2] * distance);
+					}
+				}
+				else
+				{
+					targetPoint = WorldSpaceCenter(entity);
+				}
+				vec = targetPoint;
+				return Plugin_Changed;
+			}
+			case TF_WEAPON_ROCKETLAUNCHER:
+			{
+				if (BaseEntity_IsPlayer(entity) && ShouldAimRocketsAtFeet(me, entity, TF_WEAPON_ROCKETLAUNCHER))
+				{
+					vec = GetAbsOrigin(entity);
+					return Plugin_Changed;
+				}
+			}
+			case TF_WEAPON_SNIPERRIFLE, TF_WEAPON_SNIPERRIFLE_DECAP, TF_WEAPON_SNIPERRIFLE_CLASSIC:
+			{
+				int bone = LookupBone(entity, "bip_head");
+				if (bone != -1)
+				{
+					float vEmpty[3];
+					float head[3];
+					GetBonePosition(entity, bone, head, vEmpty);
+					head[2] += 3.0;
+					vec = head;
+					return Plugin_Changed;
+				}
+			}
+			case TF_WEAPON_REVOLVER:
+			{
+				if (CanRevolverHeadshot(myWeapon))
+				{
+					int bone = LookupBone(entity, "bip_head");
+					if (bone != -1)
+					{
+						float vEmpty[3];
+						float head[3];
+						GetBonePosition(entity, bone, head, vEmpty);
+						head[2] += 3.0;
+						vec = head;
+						return Plugin_Changed;
+					}
+					vec = GetEyePosition(entity);
+					return Plugin_Changed;
+				}
+			}
+			case TF_WEAPON_FLAMETHROWER:
+			{
+				if (IsBaseBoss(entity))
+				{
+					vec = GetFlameThrowerAimForTank(entity);
+					return Plugin_Changed;
+				}
+			}
+		}
+	}
+	return Plugin_Continue;
+}
+
