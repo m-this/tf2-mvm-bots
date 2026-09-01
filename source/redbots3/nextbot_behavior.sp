@@ -1203,56 +1203,6 @@ bool IsPathToVectorPossible(int bot_entidx, const float vec[3], float &length = 
 }
 
 
-//Extension of the original function
-bool OpportunisticallyUseWeaponAbilities(int client, int activeWeapon, INextBot bot, const CKnownEntity threat)
-{
-	if (threat == NULL_KNOWN_ENTITY)
-		return false;
-	
-	if (activeWeapon == -1)
-		return false;
-	
-	int weaponID = TF2Util_GetWeaponID(activeWeapon);
-	
-	//Hitmans Heatmaker
-	if (weaponID == TF_WEAPON_SNIPERRIFLE && TF2_IsPlayerInCondition(client, TFCond_Slowed) && threat.IsVisibleRecently())
-	{
-		if (TF2_GetRageMeter(client) >= 0.0 && !TF2_IsRageDraining(client))
-		{
-			g_arrExtraButtons[client].PressButtons(IN_RELOAD);
-			return true;
-		}
-	}
-	
-	int iThreat = threat.GetEntity();
-	
-	//Phlogistinator
-	if (weaponID == TF_WEAPON_FLAMETHROWER && bot.IsRangeLessThan(iThreat, FLAMETHROWER_REACH_RANGE) && !TF2_IsCritBoosted(client))
-	{
-		if (TF2_GetRageMeter(client) >= 100.0 && !TF2_IsRageDraining(client))
-		{
-			VS_PressAltFireButton(client);
-			return true;
-		}
-	}
-	
-	if (weaponID == TF_WEAPON_MINIGUN && BaseEntity_IsPlayer(iThreat) && TF2_GetRageMeter(client) >= 100.0)
-	{
-		if (TF2_HasTheFlag(iThreat))
-		{
-			float vThreatOrigin[3]; GetClientAbsOrigin(iThreat, vThreatOrigin);
-			
-			if (GetVectorDistance(vThreatOrigin, GetBombHatchPosition()) <= 100.0)
-			{
-				VS_PressSpecialFireButton(client);
-				return true;
-			}
-		}
-	}
-	
-	return false;
-}
-
 /* Whether a weapon that fires off a meter has enough of it to fire, which HasAmmo cannot say
 
 HasAmmo is CBaseCombatWeapon::HasAmmo, and a weapon carrying a meter instead of a clip has no ammo
@@ -1474,58 +1424,6 @@ void EquipBestWeaponForThreat(int client, const CKnownEntity threat)
 }
 
 /* The Medic behind whatever we just picked, when there is one
-
-void MonitorKnownEntities(int client, IVision vision)
-{
-	if (nb_blind.BoolValue)
-		return;
-	
-	static int maxEntCount = -1;
-	
-	if (maxEntCount == -1)
-		maxEntCount = GetMaxEntities();
-	
-	int myTeam = GetClientTeam(client);
-	
-	for (int i = 1; i <= maxEntCount; i++)
-	{
-		if (!IsValidEntity(i))
-			continue;
-		
-		if (i == client)
-			continue;
-		
-		if (BaseEntity_IsPlayer(i) && !IsPlayerAlive(i))
-			continue;
-		
-		if (CBaseEntity(i).IsCombatCharacter() == false)
-			continue;
-		
-		if (BaseEntity_GetTeamNumber(i) == myTeam)
-			continue;
-		
-		/* IVision::UpdateKnownEntities runs its own check for collecting potentially visible entities
-		However it only seems to check for them only regarding the bot's FOV
-		When the known entity leaves the bot's FOV, it would eventually become obsolete after 10 seconds
-		And when it becomes obsolete, it gets removed from the list of known entities
-		So here we are basically expanding the functionality using our own line-of-sight of check */
-		if (IsLineOfFireClearEntity(client, GetEyePosition(client), i))
-		{
-			CKnownEntity known = vision.GetKnown(i);
-			
-			if (known)
-			{
-				//We already know about this entity and we can currently see it
-				known.UpdatePosition();
-			}
-			else
-			{
-				//We didn't know about it but we can see it now, recognize it
-				vision.AddKnownEntity(i);
-			}
-		}
-	}
-}
 
 void UtilizeCompressionBlast(int client, INextBot bot, const CKnownEntity threat, int enhancedStage = 0)
 {

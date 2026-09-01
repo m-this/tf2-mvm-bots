@@ -2,6 +2,8 @@
 
 #define TELEPORTER_WORTH_RIDING (1500.0)
 
+int s_iMaxEntCount = -1;
+
 stock float GetDesiredPathLookAheadRange(int client)
 {
 	return tf_bot_path_lookahead_range.FloatValue * BaseAnimating_GetModelScale(client);
@@ -279,5 +281,97 @@ stock CKnownEntity SelectCloserThreat(INextBot bot, const CKnownEntity threat1, 
 		return threat1;
 	}
 	return threat2;
+}
+
+stock bool OpportunisticallyUseWeaponAbilities(int client, int activeWeapon, INextBot bot, const CKnownEntity threat)
+{
+	if (threat == NULL_KNOWN_ENTITY)
+	{
+		return false;
+	}
+	if (activeWeapon == -1)
+	{
+		return false;
+	}
+	TFWeaponType weaponID = TF2Util_GetWeaponID(activeWeapon);
+	if ((weaponID == TF_WEAPON_SNIPERRIFLE) && TF2_IsPlayerInCondition(client, TFCond_Slowed) && threat.IsVisibleRecently())
+	{
+		if ((TF2_GetRageMeter(client) >= 0.0) && !TF2_IsRageDraining(client))
+		{
+			g_arrExtraButtons[client].PressButtons(IN_RELOAD);
+			return true;
+		}
+	}
+	int iThreat = threat.GetEntity();
+	if ((weaponID == TF_WEAPON_FLAMETHROWER) && bot.IsRangeLessThan(iThreat, FLAMETHROWER_REACH_RANGE) && !TF2_IsCritBoosted(client))
+	{
+		if ((TF2_GetRageMeter(client) >= 100.0) && !TF2_IsRageDraining(client))
+		{
+			VS_PressAltFireButton(client);
+			return true;
+		}
+	}
+	if ((weaponID == TF_WEAPON_MINIGUN) && BaseEntity_IsPlayer(iThreat) && (TF2_GetRageMeter(client) >= 100.0))
+	{
+		if (TF2_HasTheFlag(iThreat))
+		{
+			float vThreatOrigin[3];
+			GetClientAbsOrigin(iThreat, vThreatOrigin);
+			if (GetVectorDistance(vThreatOrigin, GetBombHatchPosition()) <= 100.0)
+			{
+				VS_PressSpecialFireButton(client);
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+stock void MonitorKnownEntities(int client, IVision vision)
+{
+	if (nb_blind.BoolValue)
+	{
+		return;
+	}
+	if (s_iMaxEntCount == -1)
+	{
+		s_iMaxEntCount = GetMaxEntities();
+	}
+	int myTeam = GetClientTeam(client);
+	for (int i = 1; i <= s_iMaxEntCount; i++)
+	{
+		if (!IsValidEntity(i))
+		{
+			continue;
+		}
+		if (i == client)
+		{
+			continue;
+		}
+		if (BaseEntity_IsPlayer(i) && !IsPlayerAlive(i))
+		{
+			continue;
+		}
+		if (!CBaseEntity(i).IsCombatCharacter())
+		{
+			continue;
+		}
+		if (BaseEntity_GetTeamNumber(i) == myTeam)
+		{
+			continue;
+		}
+		if (IsLineOfFireClearEntity(client, GetEyePosition(client), i))
+		{
+			CKnownEntity known = vision.GetKnown(i);
+			if (known != NULL_KNOWN_ENTITY)
+			{
+				known.UpdatePosition();
+			}
+			else
+			{
+				vision.AddKnownEntity(i);
+			}
+		}
+	}
 }
 
