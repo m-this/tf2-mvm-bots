@@ -114,6 +114,7 @@ which the search has plainly failed, and every real route on these maps is far i
 #include "generated/dispatch.sp"
 #include "generated/medicnudge.sp"
 #include "generated/threataudit.sp"
+#include "generated/botreset.sp"
 #include "generated/hooks.sp"
 #include "generated/attack.sp"
 #include "generated/markgiant.sp"
@@ -145,51 +146,6 @@ which the search has plainly failed, and every real route on these maps is far i
 #include "generated/destroyteleporter.sp"
 #include "generated/guardpoint.sp"
 #include "generated/collectnearmoney.sp"
-
-void InitNextBotPathing()
-{
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		m_pPath[i] = PathFollower(_, Path_FilterIgnoreActors, Path_FilterOnlyActors);
-		m_pChasePath[i] = ChasePath(LEAD_SUBJECT, _, Path_FilterIgnoreActors, Path_FilterOnlyActors);
-	}
-}
-
-void ResetNextBot(int client)
-{
-	m_flRepathTime[client] = 0.0;
-	m_flNextJumpTime[client] = 0.0;
-	ResetSpyCheck(client);
-	ResetStickyTrap(client);
-	
-	m_hPowerupBottle[client] = INVALID_ENT_REFERENCE;
-	m_ctPowerupBottleLook[client] = 0.0;
-	m_flNextBottleUseTime[client] = 0.0;
-	
-	m_iAttackTarget[client] = -1;
-	m_iTarget[client] = -1;
-	m_flNextMarkTime[client] = 0.0;
-	m_iCurrencyPack[client] = -1;
-	m_iStation[client] = -1;
-	m_flNextUpgrade[client] = 0.0;
-	m_nPurchasedUpgrades[client] = 0;
-	m_flUpgradingTime[client] = 0.0;
-	m_iAmmoPack[client] = -1;
-	m_vecGoalArea[client] = NULL_VECTOR;
-	m_ctMoveTimeout[client] = 0.0;
-	m_iHealthPack[client] = -1;
-	//NOTE: engineer-specific behavior stuff is reset in the action itself
-	m_iSapTarget[client] = -1;
-	m_iPlayerSapTarget[client] = -1;
-	m_vecStartArea[client] = NULL_VECTOR;
-	m_iTankTarget[client] = -1;
-	m_iTeleporterTarget[client] = -1;
-	m_vecPointDefendArea[client] = NULL_VECTOR;
-	
-#if defined EXTRA_PLUGINBOT
-	g_arrPluginBot[client].Reset();
-#endif
-}
 
 #endif
 

@@ -211,3 +211,8 @@ stock bool IsTargetEntityReachable(int client, int target)
 	return true;
 }
 
+stock void Go_ResetAttack(int client)
+{
+	m_iAttackTarget[client] = -1;
+}
+

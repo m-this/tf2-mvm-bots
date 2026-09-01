@@ -209,3 +209,8 @@ stock bool CTFBotGetHealth_IsPossible(int actor)
 	return bPossible;
 }
 
+stock void Go_ResetGetHealth(int client)
+{
+	m_iHealthPack[client] = -1;
+}
+

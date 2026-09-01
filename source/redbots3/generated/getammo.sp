@@ -326,3 +326,8 @@ stock int SortByStraightLineRange(int index1, int index2, Handle array, Handle h
 	return (first > second ? 1 : 0);
 }
 
+stock void Go_ResetGetAmmo(int client)
+{
+	m_iAmmoPack[client] = -1;
+}
+

@@ -143,3 +143,8 @@ stock bool CTFBotCollectMoney_IsPossible(int actor)
 	return true;
 }
 
+stock void Go_ResetCollectMoney(int client)
+{
+	m_iCurrencyPack[client] = -1;
+}
+

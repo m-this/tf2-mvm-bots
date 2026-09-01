@@ -291,3 +291,9 @@ public Action Command_DumpFront(int client, int args)
 	return Plugin_Handled;
 }
 
+stock void Go_ResetMoveToFront(int client)
+{
+	m_vecGoalArea[client] = NULL_VECTOR;
+	m_ctMoveTimeout[client] = 0.0;
+}
+

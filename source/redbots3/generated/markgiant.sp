@@ -174,3 +174,9 @@ stock bool CTFBotMarkGiant_IsPossible(int actor)
 	return victimExists;
 }
 
+stock void Go_ResetMarkGiant(int client)
+{
+	m_iTarget[client] = -1;
+	m_flNextMarkTime[client] = 0.0;
+}
+

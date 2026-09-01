@@ -103,3 +103,8 @@ public Action CTFBotSpySap_IsHindrance(BehaviorAction action, INextBot nextbot, 
 	return Plugin_Changed;
 }
 
+stock void Go_ResetSpySap(int client)
+{
+	m_iSapTarget[client] = -1;
+}
+

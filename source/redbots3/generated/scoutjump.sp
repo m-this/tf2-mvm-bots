@@ -88,3 +88,8 @@ stock void UpdateScoutCombatJump(int client)
 	}
 }
 
+stock void Go_ResetScoutJump(int client)
+{
+	m_flNextJumpTime[client] = 0.0;
+}
+

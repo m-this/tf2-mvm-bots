@@ -127,3 +127,8 @@ stock bool CTFBotAttackUber_IsPossible(int client, int medigun)
 	return true;
 }
 
+stock void Go_ResetAttackForUber(int client)
+{
+	m_vecStartArea[client] = NULL_VECTOR;
+}
+

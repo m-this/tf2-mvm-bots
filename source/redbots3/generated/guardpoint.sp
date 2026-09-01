@@ -143,3 +143,8 @@ stock bool CTFBotGuardPoint_IsPossible(int client)
 	return true;
 }
 
+stock void Go_ResetGuardPoint(int client)
+{
+	m_vecPointDefendArea[client] = NULL_VECTOR;
+}
+

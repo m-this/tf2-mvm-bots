@@ -82,3 +82,8 @@ stock bool CTFBotDestroyTeleporter_SelectTarget(int actor)
 	return m_iTeleporterTarget[actor] != -1;
 }
 
+stock void Go_ResetDestroyTeleporter(int client)
+{
+	m_iTeleporterTarget[client] = -1;
+}
+

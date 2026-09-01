@@ -691,3 +691,8 @@ stock int EvalTankWeapon_Spy(int slot, int weapon)
 	}
 }
 
+stock void Go_ResetAttackTank(int client)
+{
+	m_iTankTarget[client] = -1;
+}
+

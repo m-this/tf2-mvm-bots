@@ -117,3 +117,8 @@ stock void StartBuilderEffectBarRegen(int weapon)
 	SetEntPropFloat(weapon, Prop_Send, "m_flEffectBarRegenTime", GetGameTime() + SAPPER_RECHARGE_TIME);
 }
 
+stock void Go_ResetSpySapPlayer(int client)
+{
+	m_iPlayerSapTarget[client] = -1;
+}
+

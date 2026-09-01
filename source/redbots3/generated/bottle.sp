@@ -189,3 +189,10 @@ stock bool OpportunisticallyUsePowerupBottle(int client, int activeWeapon, INext
 	return false;
 }
 
+stock void Go_ResetBottle(int client)
+{
+	m_hPowerupBottle[client] = INVALID_ENT_REFERENCE;
+	m_ctPowerupBottleLook[client] = 0.0;
+	m_flNextBottleUseTime[client] = 0.0;
+}
+

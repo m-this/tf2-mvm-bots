@@ -185,3 +185,8 @@ stock bool GetMapUpgradeStationGoal(float buffer[3])
 	return false;
 }
 
+stock void Go_ResetGotoUpgrade(int client)
+{
+	m_iStation[client] = -1;
+}
+
