@@ -484,44 +484,6 @@ all three get there under their own behaviour.
 
 /* Whether this bot is one of the ones that should fall back to holding the hatch
 
-public bool NextBotTraceFilterIgnoreActors(int entity, int contentsMask, any iExclude)
-{
-	char class[64]; GetEntityClassname(entity, class, sizeof(class));
-	
-	if (StrEqual(class, "entity_medigun_shield"))
-		return false;
-	else if (StrEqual(class, "func_respawnroomvisualizer"))
-		return false;
-	else if (StrContains(class, "tf_projectile_", false) != -1)
-		return false;
-	else if (StrContains(class, "obj_", false) != -1)
-		return false;
-	else if (StrEqual(class, "entity_revive_marker"))
-		return false;
-	else if (StrEqual(class, "tank_boss"))
-		return false;
-	else if (StrEqual(class, "func_forcefield"))
-		return false;
-	
-	return !CBaseEntity(entity).IsCombatCharacter();
-}
-
-bool IsPathToVectorPossible(int bot_entidx, const float vec[3], float &length = -1.0)
-{
-	CBaseCombatCharacter(bot_entidx).UpdateLastKnownArea();
-	
-	PathFollower temp_path = PathFollower(_, Path_FilterIgnoreActors, Path_FilterOnlyActors);
-	
-	bool success = temp_path.ComputeToPos(CBaseNPC_GetNextBotOfEntity(bot_entidx), vec);
-	
-	length = temp_path.GetLength();
-	
-	temp_path.Destroy();
-	
-	return success;
-}
-
-
 /* Whether a weapon that fires off a meter has enough of it to fire, which HasAmmo cannot say
 
 HasAmmo is CBaseCombatWeapon::HasAmmo, and a weapon carrying a meter instead of a clip has no ammo

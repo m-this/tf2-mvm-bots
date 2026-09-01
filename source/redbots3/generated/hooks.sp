@@ -520,3 +520,54 @@ public void OnActionCreated(BehaviorAction action, int actor, const char[] name)
 	}
 }
 
+public bool NextBotTraceFilterIgnoreActors(int entity, int contentsMask, any iExclude)
+{
+	char class[512];
+	GetEntityClassname(entity, class, 512);
+	if (StrEqual(class, "entity_medigun_shield"))
+	{
+		return false;
+	}
+	else
+		if (StrEqual(class, "func_respawnroomvisualizer"))
+		{
+			return false;
+		}
+		else
+			if (StrContains(class, "tf_projectile_", false) != -1)
+			{
+				return false;
+			}
+			else
+				if (StrContains(class, "obj_", false) != -1)
+				{
+					return false;
+				}
+				else
+					if (StrEqual(class, "entity_revive_marker"))
+					{
+						return false;
+					}
+					else
+						if (StrEqual(class, "tank_boss"))
+						{
+							return false;
+						}
+						else
+							if (StrEqual(class, "func_forcefield"))
+							{
+								return false;
+							}
+	return !CBaseEntity(entity).IsCombatCharacter();
+}
+
+stock bool IsPathToVectorPossible(int botEntidx, const float vec[3], float &length = -1.0)
+{
+	CBaseCombatCharacter(botEntidx).UpdateLastKnownArea();
+	PathFollower tempPath = PathFollower(_, Path_FilterIgnoreActors, Path_FilterOnlyActors);
+	bool success = tempPath.ComputeToPos(CBaseNPC_GetNextBotOfEntity(botEntidx), vec);
+	length = tempPath.GetLength();
+	tempPath.Destroy();
+	return success;
+}
+
