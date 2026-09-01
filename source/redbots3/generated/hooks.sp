@@ -161,3 +161,15 @@ public Action CTFBotSniperLurk_SelectMoreDangerousThreat(BehaviorAction action, 
 	return Plugin_Changed;
 }
 
+stock Action CTFBotMainAction_ShouldAttack(BehaviorAction action, INextBot nextbot, CKnownEntity knownEntity, QueryResultType &result)
+{
+	result = view_as<QueryResultType>(0);
+	int me = action.Actor;
+	if (!g_bIsDefenderBot[me])
+	{
+		return Plugin_Continue;
+	}
+	result = ANSWER_YES;
+	return Plugin_Changed;
+}
+

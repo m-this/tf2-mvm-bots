@@ -683,18 +683,6 @@ public Action CTFBotMainAction_SelectTargetPoint(BehaviorAction action, INextBot
 	return Plugin_Continue;
 }
 
-static Action CTFBotMainAction_ShouldAttack(BehaviorAction action, INextBot nextbot, CKnownEntity knownEntity, QueryResultType& result)
-{
-	int me = action.Actor;
-	
-	if (g_bIsDefenderBot[me] == false)
-		return Plugin_Continue;
-	
-	//Always attack even in spawn room because we are not the invaders
-	result = ANSWER_YES;
-	return Plugin_Changed;
-}
-
 /* A bot is ready when it has done the thing its seat exists for
 
 An engineer pressed ready the moment a sentry entity existed, which is a level one still being
