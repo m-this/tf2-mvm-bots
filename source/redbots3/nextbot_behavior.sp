@@ -902,16 +902,6 @@ The second jump goes the other way. Jumping twice in one direction is one long a
 tracks it; jumping left and then right is two arcs with a corner in the middle, and the corner is
 what a robot's aim cannot follow. Reported after the 1.3 play-test: he only ever single jumps */
 
-public Action CTFBotScenarioMonitor_Update(BehaviorAction action, int actor, float interval, ActionResult result)
-{
-	if (g_bIsDefenderBot[actor] == false)
-		return Plugin_Continue;
-	
-	//Suspend for the action we desire
-	//Once it has ended, we will return here and suspend for another one
-	return GetDesiredBotAction(actor, action);
-}
-
 /* The charge and the resistance, whoever is doing the healing
 
 Written for the game's heal action and called from the mod's own as well, because suspending an
@@ -927,69 +917,6 @@ The game gives one event and no state: nothing says the call is still wanted, an
 was met. So the call is a countdown rather than a flag, and it is short. Long enough to cross the
 room he is being called across, short enough that a player who called once during a wave is not
 still holding the beam a minute later.
-
-Pressed again, it starts again, which is what a player who is still hurt does anyway. */
-/* How often the game is told who its patient should be
- *
- * Every frame would be arguing with the action rather than nudging it, and the beam does not need
- * an answer more often than the team changes shape.
- */
-public Action CTFBotMedicHeal_UpdatePost(BehaviorAction action, int actor, float interval, ActionResult result)
-{
-	if (g_bIsDefenderBot[actor] == false)
-		return Plugin_Continue;
-	
-	if (result.type == CHANGE_TO)
-	{
-		//In mvm mode, medic bots will go for the flag when there's no patient available
-		//Let's be smarter about it instead
-		
-		BehaviorAction resultingAction = result.action;
-		char name[ACTION_NAME_LENGTH]; resultingAction.GetName(name);
-		
-		/* Nobody to heal, so he holds the hatch like the rest of them
-		
-		The game's answer here is to go and fetch the bomb, and the answer this had for that was to
-		go and fight whatever is on it, which is the same walk into the middle of the map by a
-		different name. Everything the team is defending comes to the hatch eventually. */
-		if (StrEqual(name, "FetchFlag"))
-			return action.SuspendFor(CTFBotGuardPoint(), "Nothing to heal, so hold the hatch");
-	}
-	
-	int secondary = GetPlayerWeaponSlot(actor, TFWeaponSlot_Secondary);
-	
-	if (secondary == -1)
-		return action.SuspendFor(CTFBotDefenderAttack(), "No medigun");
-	
-	if (CTFBotAttackUber_IsPossible(actor, secondary))
-		return action.SuspendFor(CTFBotAttackUber(), "Seek uber");
-	
-	if (CTFBotMedicRevive_IsPossible(actor))
-		return action.SuspendFor(CTFBotMedicRevive(), "Revive teammate");
-	
-	/* Only his own shopping comes before healing
-
-	This used to be the whole break, so a medic spent the upgrade period walking after whoever he
-	had picked: to the station, out of it, across the map, wherever that man went. Then it was the
-	other extreme, and he walked to the front and stood there with a medigun and nobody in front of
-	it until the wave started.
-
-	Buying his upgrades is the one thing nobody else can do for him. After that the man he beams is
-	walking to the front regardless, so following him is both the healing and the walk, and the
-	team starts the wave with the overheal it spent the break earning. */
-	if (GameRules_GetRoundState() == RoundState_BetweenRounds && !g_bShoppedThisBreak[actor])
-		return Plugin_Continue;
-
-	if (Feature(FEATURE_MEDIC_POCKETS_BIGGEST))
-		PointMedicAtBiggestBody(action, actor);
-
-	int myWeapon = BaseCombatCharacter_GetActiveWeapon(actor);
-
-	if (myWeapon != -1 && TF2Util_GetWeaponID(myWeapon) == TF_WEAPON_MEDIGUN)
-		MedicUberAndResist(actor, myWeapon, action.GetHandleEntity(ACTION_HEAL_PATIENT_OFFSET));
-	
-	return Plugin_Continue;
-}
 
 public Action CTFBotSniperLurk_SelectMoreDangerousThreat(BehaviorAction action, INextBot nextbot, int entity, CKnownEntity threat1, CKnownEntity threat2, CKnownEntity& knownEntity)
 {

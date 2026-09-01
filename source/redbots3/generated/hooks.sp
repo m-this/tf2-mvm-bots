@@ -49,3 +49,57 @@ public Action CTFBotSniperLurk_Update(BehaviorAction action, int actor, float in
 	return Plugin_Continue;
 }
 
+public Action CTFBotScenarioMonitor_Update(BehaviorAction action, int actor, float interval, ActionResult result)
+{
+	if (!g_bIsDefenderBot[actor])
+	{
+		return Plugin_Continue;
+	}
+	return GetDesiredBotAction(actor, action);
+}
+
+public Action CTFBotMedicHeal_UpdatePost(BehaviorAction action, int actor, float interval, ActionResult result)
+{
+	if (!g_bIsDefenderBot[actor])
+	{
+		return Plugin_Continue;
+	}
+	if (result.type == CHANGE_TO)
+	{
+		BehaviorAction resultingAction = result.action;
+		char name[512];
+		resultingAction.GetName(name, 512);
+		if (StrEqual(name, "FetchFlag"))
+		{
+			return action.SuspendFor(CTFBotGuardPoint(), "Nothing to heal, so hold the hatch");
+		}
+	}
+	int secondary = GetPlayerWeaponSlot(actor, TFWeaponSlot_Secondary);
+	if (secondary == -1)
+	{
+		return action.SuspendFor(CTFBotDefenderAttack(), "No medigun");
+	}
+	if (CTFBotAttackUber_IsPossible(actor, secondary))
+	{
+		return action.SuspendFor(CTFBotAttackUber(), "Seek uber");
+	}
+	if (CTFBotMedicRevive_IsPossible(actor))
+	{
+		return action.SuspendFor(CTFBotMedicRevive(), "Revive teammate");
+	}
+	if ((GameRules_GetRoundState() == RoundState_BetweenRounds) && !g_bShoppedThisBreak[actor])
+	{
+		return Plugin_Continue;
+	}
+	if (Feature(FEATURE_MEDIC_POCKETS_BIGGEST))
+	{
+		PointMedicAtBiggestBody(action, actor);
+	}
+	int myWeapon = BaseCombatCharacter_GetActiveWeapon(actor);
+	if ((myWeapon != -1) && (TF2Util_GetWeaponID(myWeapon) == TF_WEAPON_MEDIGUN))
+	{
+		MedicUberAndResist(actor, myWeapon, action.GetHandleEntity(ACTION_HEAL_PATIENT_OFFSET));
+	}
+	return Plugin_Continue;
+}
+
